@@ -9,7 +9,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential ffmpeg python3 python3-pip \
     && rm -rf /var/lib/apt/lists/*
 COPY package*.json ./
-RUN --mount=type=cache,target=/root/.npm npm ci && npm prune --omit=dev
+# mediasoup uses the process CPU affinity as its Ninja -j value. Limit compilation
+# to two jobs so a fresh build also fits the production host's 4 GiB RAM budget.
+RUN --mount=type=cache,target=/root/.npm taskset -c 0-1 npm ci && npm prune --omit=dev
 COPY --chown=node:node app ./app
 COPY --chown=node:node public ./public
 RUN node --check app/src/Room.js \
