@@ -1368,7 +1368,7 @@ class RoomClient {
         console.info('[Recovery] signaling connected', { socketId: this.socket.id, recovered: this.socket.recovered });
         // Manager reconnect fires before the namespace socket receives its id and
         // recovery state. Only the Socket connect event can decide how to resume.
-        if (this.recoveryDisconnectedAt != null) {
+        if (this.recoveryDisconnectedAt != null && !this.isLeaving) {
             console.info('[Recovery] namespace reconnected', {
                 socketId: this.socket.id,
                 recovered: this.socket.recovered,
@@ -1379,6 +1379,7 @@ class RoomClient {
     };
 
     handleSocketDisconnect = (reason) => {
+        if (this.isLeaving) return;
         this.recoveryDisconnectedAt = Date.now();
         console.warn('[Recovery] signaling disconnected', { socketId: this.socket.id, reason });
         this.handleDisconnect(reason);
@@ -1412,6 +1413,7 @@ class RoomClient {
     };
 
     handleTransportClosed = ({ transport_id }) => {
+        if (this.isLeaving) return;
         const transport = [this.producerTransport, this.consumerTransport].find(
             (candidate) => candidate?.id === transport_id
         );
@@ -1424,7 +1426,7 @@ class RoomClient {
 
     /** Recover media when signaling survived but the current WebRTC transport did not. */
     readmitAfterTransportFailure(transport) {
-        if (!this.socket.connected || !this._isConnected) return;
+        if (this.isLeaving || !this.socket.connected || !this._isConnected) return;
         if (transport !== this.producerTransport && transport !== this.consumerTransport) return;
         this.needsReadmission = true;
         if (this.rejoinInProgress) return;
@@ -1983,12 +1985,12 @@ class RoomClient {
     }
 
     handleReconnectAttempt(attempt) {
-        if (this._isConnected || attempt > this.maxReconnectAttempts) return;
+        if (this.isLeaving || this._isConnected || attempt > this.maxReconnectAttempts) return;
         this.attemptReconnect(attempt);
     }
 
     async handleReconnect() {
-        if (this.rejoinInProgress) return;
+        if (this.isLeaving || this.rejoinInProgress) return;
         this.rejoinInProgress = true;
         const reconnectId = this.socket.id;
         console.info('[Recovery] meeting recovery started', {
@@ -2012,21 +2014,21 @@ class RoomClient {
                     this.startConsumerReconcile();
                 }
             }
-            if (!this.socket.connected || this.socket.id !== reconnectId) return;
+            if (this.isLeaving || !this.socket.connected || this.socket.id !== reconnectId) return;
             this.needsReadmission = false;
             this._isConnected = true;
             startRoomSession();
             this.closeReconnectAlert(true);
             console.info('Recovered meeting without reloading the page');
         } catch (error) {
-            if (!this.socket.connected || this.socket.id !== reconnectId) return;
+            if (this.isLeaving || !this.socket.connected || this.socket.id !== reconnectId) return;
             console.error('In-place meeting recovery failed', error);
             this.needsReadmission = true;
             this._isConnected = false;
             this.showMaxAttemptsAlert();
         } finally {
             this.rejoinInProgress = false;
-            if (this.socket.connected && this.socket.id !== reconnectId) this.handleReconnect();
+            if (!this.isLeaving && this.socket.connected && this.socket.id !== reconnectId) this.handleReconnect();
         }
     }
 
@@ -2037,7 +2039,7 @@ class RoomClient {
     }
 
     handleReconnectFailed() {
-        if (!this._isConnected) {
+        if (!this._isConnected && !this.isLeaving) {
             this.closeReconnectAlert();
             this.showMaxAttemptsAlert();
         }
@@ -4699,14 +4701,17 @@ class RoomClient {
     // EXIT ROOM
     // ####################################################
 
+    /** Suppress recovery during a deliberate leave, then release media after exit acknowledgment or timeout. */
     exit(offline = false) {
+        this.isLeaving = true;
+        this._isConnected = false;
+        this.closeReconnectAlert();
         if (VideoAI.active) this.stopSession();
         if (this.rtmpFilestreamer) this.stopRTMP();
         if (this.rtmpUrlstreamer) this.stopRTMPfromURL();
         if (this.RNNoiseProcessor) this.disableRNNoiseSuppression();
 
         const clean = () => {
-            this._isConnected = false;
             this.stopConsumerReconcile();
             if (this.consumerTransport) this.consumerTransport.close();
             if (this.producerTransport) this.producerTransport.close();
@@ -4755,18 +4760,13 @@ class RoomClient {
             }
         };
 
-        if (!offline) {
-            this.socket
-                .request('exitRoom')
-                .then((e) => console.log('Exit Room', e))
-                .catch((e) => console.warn('Exit Room ', e))
-                .finally(() => {
-                    clean();
-                    this.event(_EVENTS.exitRoom);
-                });
-        } else {
+        const done = () => {
             clean();
-        }
+            if (!offline) this.event(_EVENTS.exitRoom);
+        };
+        if (!offline && this.socket?.connected) {
+            this.socket.request('exitRoom', {}, 1500).catch((error) => console.warn('Exit Room', error)).finally(done);
+        } else done();
     }
 
     exitRoom(disconnectAll = false) {
