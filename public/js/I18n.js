@@ -1,12 +1,10 @@
 'use strict';
 
 /**
- * MiroTalk SFU - Optional native (human) translation for the in-room UI.
+ * Bodrik FM - Human-maintained Russian/English translations for the in-room UI.
  *
- * When a native language file exists at `public/lang/<lang>.json` for the configured
- * UI language, it is used to translate the in-room UI and the Google Translate widget
- * is skipped (see Translate.js). When no native file exists, the existing runtime
- * machine translation (Google) remains untouched.
+ * English is the source language; the Russian dictionary is loaded from
+ * public/lang/ru.json. Missing translations remain English, never machine-translated.
  *
  * Namespaces (see public/lang/README.md):
  *   - tooltips : tippy tooltips (setTippy)
@@ -16,7 +14,7 @@
  *   - toasts   : snackbar/toast notifications (RoomClient.userLog)
  *
  * Keys within each namespace are the original English source strings. Missing keys
- * fall back to the original English text (the Google widget is not re-enabled).
+ * fall back to the original English text.
  *
  * @link    GitHub: https://github.com/miroslavpejic85/mirotalksfu
  * @license AGPLv3
@@ -25,25 +23,9 @@
 (function () {
     const LANG_PATH = '../lang/';
 
-    // Flag + native name shown in the in-room Language settings when native mode is active.
     const LANG_DISPLAY = {
-        en: { flag: '🇬🇧', name: 'English' },
-        hu: { flag: '🇭🇺', name: 'Magyar' },
-        es: { flag: '🇪🇸', name: 'Español' },
-        fr: { flag: '🇫🇷', name: 'Français' },
-        de: { flag: '🇩🇪', name: 'Deutsch' },
-        pt: { flag: '🇵🇹', name: 'Português' },
-        it: { flag: '🇮🇹', name: 'Italiano' },
         ru: { flag: '🇷🇺', name: 'Русский' },
-        zh: { flag: '🇨🇳', name: '中文' },
-        ja: { flag: '🇯🇵', name: '日本語' },
-        ar: { flag: '🇸🇦', name: 'العربية' },
-        hi: { flag: '🇮🇳', name: 'हिन्दी' },
-        sr: { flag: '🇷🇸', name: 'Srpski' },
-        id: { flag: '🇮🇩', name: 'Bahasa Indonesia' },
-        ko: { flag: '🇰🇷', name: '한국어' },
-        tr: { flag: '🇹🇷', name: 'Türkçe' },
-        nl: { flag: '🇳🇱', name: 'Nederlands' },
+        en: { flag: '🇬🇧', name: 'English' },
     };
 
     const ATTR_KEYS = ['title', 'placeholder', 'aria-label', 'data-tippy-content'];
@@ -54,17 +36,13 @@
     const state = {
         native: false,
         dict: null,
-        lang: 'en',
-        mode: 'auto',
-        googleActive: false,
+        lang: 'ru',
     };
 
     /**
      * Resolve a translation for a given source string within a namespace.
      * Preserves surrounding whitespace of the original string.
      */
-    const NS_ORDER = ['tooltips', 'buttons', 'labels', 'dialogs', 'toasts'];
-
     function lookup(key, namespace) {
         const table = state.dict && state.dict[namespace];
         if (table) {
@@ -78,30 +56,21 @@
         if (!state.native || typeof text !== 'string' || text.length === 0) return text;
         const key = text.trim();
         if (key.length === 0) return text;
-        // Preferred namespace first (keeps context-specific translations like "Cancel"),
-        // then fall back across the others so a string is still translated if it exists elsewhere.
-        let value = lookup(key, namespace);
-        if (value === null) {
-            for (const ns of NS_ORDER) {
-                if (ns === namespace) continue;
-                value = lookup(key, ns);
-                if (value !== null) break;
-            }
-        }
+        // Do not borrow translations from another context (e.g. a button vs. a dialog).
+        const value = lookup(key, namespace);
         return value !== null ? text.replace(key, value) : text;
     }
 
-    // Public API used by Translate.js and (optionally) other scripts.
+    // Public API for room scripts and the in-room language picker.
     window.i18n = {
         /**
          * Resolves once the native decision is made.
-         * @returns {Promise<boolean>} true if native mode is active.
+         * @returns {Promise<boolean>} true when the Russian dictionary is active.
          */
         ready: null,
         t: translate,
         isNative: () => state.native,
         getLang: () => state.lang,
-        googleAllowed: true,
     };
 
     // ####################################################
@@ -338,6 +307,7 @@
     // Live language switch (no reload): load the dict, then re-translate the page from stored originals.
     async function applyLanguage(lang) {
         state.lang = lang;
+        document.documentElement.lang = lang;
         try {
             if (lang === configLang()) localStorage.removeItem(OVERRIDE_KEY);
             else localStorage.setItem(OVERRIDE_KEY, lang);
@@ -368,6 +338,7 @@
 
         translateTree(document.body);
         refreshTooltips();
+        window.dispatchEvent(new Event('bodrik:languagechange'));
     }
 
     const OVERRIDE_KEY = 'uiLanguageOverride';
@@ -381,27 +352,17 @@
     }
 
     function configLang() {
-        // BRAND is declared with `let` in Brand.js (global lexical binding, not window.BRAND).
-        const brand = typeof BRAND !== 'undefined' && BRAND ? BRAND : window.BRAND || {};
-        return (brand.app && brand.app.language) || 'en';
-    }
-
-    // UI_TRANSLATION_MODE (via config.ui.brand.app.translationMode): auto | native | google.
-    // Backward compatible: if unset/absent, use Google machine translation (pre-native behavior).
-    function configMode() {
-        const brand = typeof BRAND !== 'undefined' && BRAND ? BRAND : window.BRAND || {};
-        const m = brand.app && brand.app.translationMode;
-        return m === 'native' || m === 'auto' || m === 'google' ? m : 'google';
+        return 'ru';
     }
 
     // Per-browser override (set via the in-room picker) wins over the server UI_LANGUAGE.
     function resolveLang() {
         const override = getOverride();
-        if (override && (override === 'en' || LANG_DISPLAY[override])) return override;
+        if (override && Object.hasOwn(LANG_DISPLAY, override)) return override;
         return configLang();
     }
 
-    // In-room language picker (human-translated languages + English). Switches live without reload.
+    // In-room Russian/English picker switches live without a reload.
     function renderLanguageSelect(current) {
         const container = document.getElementById('tabLanguages');
         if (!container || document.getElementById('i18nLanguageSelect')) return;
@@ -410,51 +371,15 @@
         select.className = 'form-select text-light bg-dark notranslate';
         select.style.cssText = 'max-width:280px;margin-top:4px;';
 
-        let matched = false;
-        for (const code of Object.keys(LANG_DISPLAY)) {
-            const info = LANG_DISPLAY[code];
+        for (const [code, info] of Object.entries(LANG_DISPLAY)) {
             const opt = document.createElement('option');
             opt.value = code;
             opt.textContent = `${info.flag} ${info.name}`;
-            if (code === current) {
-                opt.selected = true;
-                matched = true;
-            }
-            select.appendChild(opt);
-        }
-        // Reflect a machine-translated (non-native) language if that is the current one.
-        if (!matched) {
-            const opt = document.createElement('option');
-            opt.value = current;
-            opt.textContent = `🌐 ${current}`;
-            opt.selected = true;
-            select.appendChild(opt);
-        }
-        // Always offer the server default language so a saved override can be reset back to it.
-        const cfg = configLang();
-        if (cfg !== 'en' && !LANG_DISPLAY[cfg] && cfg !== current) {
-            const opt = document.createElement('option');
-            opt.value = cfg;
-            opt.textContent = `🌐 ${cfg}`;
+            opt.selected = code === current;
             select.appendChild(opt);
         }
 
-        select.addEventListener('change', () => {
-            const chosen = select.value;
-            // Machine-translated (non-native) languages need a page load for Google; native/English switch live.
-            const needsGoogle = chosen !== 'en' && !LANG_DISPLAY[chosen];
-            if (state.googleActive || needsGoogle) {
-                try {
-                    if (chosen === configLang()) localStorage.removeItem(OVERRIDE_KEY);
-                    else localStorage.setItem(OVERRIDE_KEY, chosen);
-                } catch (e) {
-                    console.warn('i18n: cannot persist language choice', e.message);
-                }
-                location.reload();
-                return;
-            }
-            applyLanguage(chosen);
-        });
+        select.addEventListener('change', () => applyLanguage(select.value));
 
         // Place the select right under the "Language:" title (avoids the empty <br> gap below it).
         const title = container.querySelector('.title');
@@ -462,30 +387,9 @@
         else container.appendChild(select);
     }
 
-    // In 'google' mode the Google combo is the switcher, so reveal it in the Language tab
-    // (Translate.css hides #google_translate_element by default).
-    function revealGoogleWidget() {
-        const el = document.getElementById('google_translate_element');
-        if (el) el.style.setProperty('display', 'block', 'important');
-    }
-
     // ####################################################
     // INIT
     // ####################################################
-
-    function whenBrandReady() {
-        return new Promise((resolve) => {
-            let settled = false;
-            const finish = () => {
-                if (settled) return;
-                settled = true;
-                resolve();
-            };
-            document.addEventListener('brand:ready', finish, { once: true });
-            // Fallback in case brand is already resolved or Brand.js is absent.
-            setTimeout(finish, 2000);
-        });
-    }
 
     function whenDomReady() {
         return new Promise((resolve) => {
@@ -498,56 +402,25 @@
     }
 
     window.i18n.ready = (async function init() {
-        await whenBrandReady();
-
-        const mode = configMode();
-        state.mode = mode;
         const lang = resolveLang();
         state.lang = lang;
-
-        // 'google' forces machine translation; 'auto'/'native' try the human file first.
-        if (mode !== 'google' && lang !== 'en') {
+        document.documentElement.lang = lang;
+        if (lang === 'ru') {
             try {
-                const response = await fetch(`${LANG_PATH}${encodeURIComponent(lang)}.json`, { cache: 'no-cache' });
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data && typeof data === 'object' && Object.keys(data).length > 0) {
-                        state.dict = data;
-                        state.native = true;
-                    }
-                }
+                const response = await fetch(`${LANG_PATH}ru.json`, { cache: 'no-cache' });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                state.dict = await response.json();
+                state.native = true;
             } catch (error) {
-                console.warn(`i18n: no native language file for "${lang}"`, error.message);
+                console.error('i18n: Russian dictionary unavailable', error);
             }
         }
 
-        // Whether Translate.js may load the Google widget.
-        // English needs no translation, so 'auto' only uses Google for a non-English language
-        // that has no native file.
-        const googleAllowed = mode === 'google' ? true : mode === 'native' ? false : lang !== 'en' && !state.native;
-        window.i18n.googleAllowed = googleAllowed;
-        state.googleActive = googleAllowed && lang !== 'en' && !state.native;
-
-        if (state.native) console.log(`i18n: native translation active for "${lang}" (mode: ${mode})`);
-
         await whenDomReady();
-
-        if (state.native) {
-            // Native human translation: hooks, static pass, picker, observer.
-            installHooks();
-            applyStatic();
-            renderLanguageSelect(lang);
-            installObserver();
-        } else if (mode === 'google' || state.googleActive) {
-            // Google machine translation is the switcher (default/backward-compatible) → reveal its combo.
-            revealGoogleWidget();
-        } else {
-            // 'native'/'auto' mode with English (or no native file): native picker only.
-            installHooks();
-            renderLanguageSelect(lang);
-            installObserver();
-        }
-
+        installHooks();
+        if (state.native) applyStatic();
+        renderLanguageSelect(lang);
+        installObserver();
         return state.native;
     })();
 })();

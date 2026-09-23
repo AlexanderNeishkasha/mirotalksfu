@@ -1,3 +1,10 @@
+> **Bodrik FM fork.** This branch contains the MiroTalk SFU changes used by
+> [meet.bodrik.fm](https://meet.bodrik.fm). It is based on upstream commit
+> [`7a74f019`](https://github.com/miroslavpejic85/mirotalksfu/commit/7a74f019d02cbbd9b7dbe5757f2d74ed607537e5),
+> not the current upstream `main`. See [fork notes](BODRIK_FORK.md) for the
+> changes, build, source availability and license. This repository contains
+> MiroTalk source only; deployment configuration and credentials are separate.
+>
 <div align="center">
     <a href="https://sfu.mirotalk.com" target="_blank">
         <img src="public/images/mirotalk-icon.png">

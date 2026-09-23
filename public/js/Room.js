@@ -42,7 +42,7 @@ const showDocumentPipBtn = !isEmbedded && 'documentPictureInPicture' in window;
  * @property {string[]} transports - The transport mechanisms to use. Default: ['polling', 'websocket']. Here, only ['websocket'] is used.
  * @property {boolean} reconnection - Whether to automatically reconnect if connection is lost. Default: true.
  * @property {number} reconnectionAttempts - Maximum number of reconnection attempts before giving up. Default: Infinity. Here, set to 10.
- * @property {number} reconnectionDelay - How long to initially wait before attempting a new reconnection (in ms). Default: 1000. Here, set to 3000.
+ * @property {number} reconnectionDelay - Initial delay (ms): 1000; custom backoff below uses 1/2/3/6/12/15 seconds.
  * @property {number} reconnectionDelayMax - Maximum amount of time to wait between reconnections (in ms). Default: 5000. Here, set to 15000.
  * @property {number} timeout - Connection timeout before an error is emitted (in ms). Default: 20000.
  */
@@ -50,10 +50,18 @@ const socket = io({
     transports: ['websocket'],
     reconnection: true,
     reconnectionAttempts: 10,
-    reconnectionDelay: 3000,
+    reconnectionDelay: 1000,
     reconnectionDelayMax: 15000,
+    randomizationFactor: 0,
     timeout: 20000,
 });
+// Socket.IO 4.8.3's public options only support geometric 1/2/4/8 backoff.
+// Keep its attempt counter intact so reconnectionAttempts and reset still work.
+socket.io.backoff.duration = function () {
+    const attempt = this.attempts++;
+    return Math.min(attempt === 0 ? 1000 : attempt === 1 ? 2000 : 3000 * 2 ** (attempt - 2), 15000);
+};
+
 
 let survey = {
     enabled: true,
@@ -295,6 +303,7 @@ let peer_info = null;
 let isPushToTalkActive = false;
 let isPushToTalkPressed = false;
 let pushToTalkAudioContext = null;
+let pushToTalkTransition = Promise.resolve();
 let isPitchBarEnabled = true;
 let isSoundEnabled = true;
 let isKeepButtonsVisible = false;
@@ -368,7 +377,20 @@ let workletNode = null;
 // window.location.origin + '/join/' + roomId
 // window.location.origin + '/join/?room=' + roomId + '&token=' + myToken
 
-let RoomURL = window.location.origin + '/join/' + room_id;
+const requestedInvitation = new URLSearchParams(window.location.search).get('invite');
+let RoomURL = window.location.origin + '/join/' + encodeURIComponent(room_id);
+let publicRoomSlug = '';
+try {
+    const invitation = new URL(requestedInvitation);
+    if (invitation.origin === window.location.origin && invitation.pathname.startsWith('/join/')) {
+        RoomURL = invitation.toString();
+        publicRoomSlug = decodeURIComponent(invitation.pathname.slice('/join/'.length).replace(/\/$/, ''));
+        if (/^[a-z0-9]+(?:-[a-z0-9]+)*$/i.test(publicRoomSlug)) {
+            document.title = `Бодрик FM - встреча ${publicRoomSlug}`;
+            window.history.replaceState(null, '', `/room/${encodeURIComponent(publicRoomSlug)}`);
+        }
+    }
+} catch {}
 
 let isExiting = false;
 
@@ -416,6 +438,7 @@ function initDocumentListener() {
 async function initClient() {
     await getThemes();
     setTheme();
+    window.BodrikTheme.connect(publicRoomSlug, applyTheme);
 
     // Transcription
     transcription = new Transcription();
@@ -500,6 +523,7 @@ async function initClient() {
         setTippy('chatShowParticipantsListBtn', 'Toggle participants list', 'bottom');
         setTippy('chatMarkdownButton', 'Markdown', 'top');
         setTippy('fileShareChatButton', 'Share the file', 'top');
+        setTippy('bodrikChatImageButton', 'Attach image', 'top');
         setTippy('chatCloseButton', 'Close', 'bottom');
         setTippy('chatTogglePin', 'Toggle pin', 'bottom');
         setTippy('chatHideParticipantsList', 'Hide', 'bottom');
@@ -581,15 +605,12 @@ function refreshMainButtonsToolTipPlacement() {
     }
 }
 
+/** Keep the disconnect tooltip aligned with the rest of the controls. */
 function refreshExitButtonTooltip(placement) {
     if (!exitButton || isMobileDevice) return;
-    if (isPresenter && participantsCount > 1) {
-        exitButton._tippy?.destroy();
-        return;
-    }
     const buttonPlacement =
         placement || (BtnsBarPosition.options[BtnsBarPosition.selectedIndex].value == 'vertical' ? 'top' : 'right');
-    setTippy('exitButton', 'Leave room', buttonPlacement);
+    setTippy('exitButton', 'Disconnect', buttonPlacement);
 }
 
 // ####################################################
@@ -1032,10 +1053,6 @@ function getPeerName() {
     }
     console.log('Direct join', { name: name });
 
-    if (isValidEmail(name)) {
-        getId('notifyEmailInput').value = name;
-    }
-
     if (name === 'random') {
         const randomName = generateRandomName();
         console.log('Direct join', { name: randomName });
@@ -1080,12 +1097,15 @@ function getPeerUUID() {
 }
 
 function getPeerToken() {
-    if (window.sessionStorage.peer_token) return window.sessionStorage.peer_token;
     let token = getQueryParam('token');
     let queryToken = false;
     if (token) {
         queryToken = token;
+        window.sessionStorage.peer_token = token;
+        console.log('Direct join', { token: true });
+        return queryToken;
     }
+    if (window.sessionStorage.peer_token) return window.sessionStorage.peer_token;
     console.log('Direct join', { token: queryToken });
     return queryToken;
 }
@@ -1386,15 +1406,26 @@ async function whoAreYou() {
     } catch (error) {
         console.error('AXIOS OIDC Error fetching profile', error.message || error);
     }
+    window.BodrikProfile?.init({
+        token: peer_token,
+        avatar: peer_avatar,
+        onAvatar: (avatarUrl) => {
+            peer_avatar = avatarUrl;
+            localStorageSettings.peer_avatar = avatarUrl;
+            lS.setSettings(localStorageSettings);
+        },
+    });
 
+
+    await window.i18n?.ready;
     Swal.fire({
         allowOutsideClick: false,
         allowEscapeKey: false,
         background: swalBackground,
-        title: BRAND.app?.name,
+        title: meetingJoinTitle(),
         input: 'text',
-        inputPlaceholder: 'Enter your email or name',
-        inputAttributes: { maxlength: 254, id: 'usernameInput' },
+        inputPlaceholder: 'Enter your name',
+        inputAttributes: { maxlength: 32, id: 'usernameInput' },
         inputValue: default_name,
         html: initUser, // Inject HTML
         confirmButtonText: `Join meeting`,
@@ -1406,16 +1437,18 @@ async function whoAreYou() {
         },
         didOpen: () => {
             showMobileAudioGuidance();
+            const nicknameInput = getId('usernameInput');
+            const profile = getId('bodrikProfile');
+            if (nicknameInput && profile) {
+                nicknameInput.insertAdjacentElement('afterend', profile);
+            }
         },
         inputValidator: (name) => {
             if (isVideoAllowed && !isInitVideoLoaded) {
                 return 'Please wait for video to initialize...';
             }
-            if (!name) return 'Please enter your email or name';
-            const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(name);
-            if ((isEmail && name.length > 254) || (!isEmail && name.length > 32)) {
-                return isEmail ? 'Email must be max 254 char' : 'Name must be max 32 char';
-            }
+            if (!name) return 'Please enter your name';
+            if (name.length > 32) return 'Name must be max 32 char';
             name = filterXSS(name);
             if (isHtml(name)) return 'Invalid name!';
             if (!getCookie(room_id + '_name')) {
@@ -1424,9 +1457,6 @@ async function whoAreYou() {
             setCookie(room_id + '_name', name, 30);
             peer_name = name;
 
-            if (isValidEmail(peer_name)) {
-                getId('notifyEmailInput').value = peer_name;
-            }
         },
     }).then(async () => {
         if (!usernameEmoji.classList.contains('hidden')) {
@@ -1661,53 +1691,29 @@ async function shareRoom(useNavigator = false) {
                     roomUrl: RoomURL,
                 },
             }),
-            showDenyButton: true,
+            showDenyButton: false,
             showCancelButton: true,
             cancelButtonColor: 'red',
             denyButtonColor: 'green',
             confirmButtonText: `Copy URL`,
-            denyButtonText: `Email invite`,
             cancelButtonText: `Close`,
             showClass: { popup: 'animate__animated animate__fadeInDown' },
             hideClass: { popup: 'animate__animated animate__fadeOutUp' },
         }).then((result) => {
             if (result.isConfirmed) {
                 copyRoomURL();
-            } else if (result.isDenied) {
-                shareRoomByEmail();
             }
             // share screen on join
             if (isScreenAllowed) {
                 rc.shareScreen();
             }
         });
-        makeRoomQR();
     }
 }
 
 // ####################################################
 // ROOM UTILITY
 // ####################################################
-
-function makeRoomQR() {
-    const qr = new QRious({
-        element: document.getElementById('qrRoom'),
-        value: RoomURL,
-    });
-    qr.set({
-        size: 256,
-    });
-}
-
-function makeRoomPopupQR() {
-    const qr = new QRious({
-        element: document.getElementById('qrRoomPopup'),
-        value: RoomURL,
-    });
-    qr.set({
-        size: 256,
-    });
-}
 
 function copyRoomURL() {
     let tmpInput = document.createElement('input');
@@ -1787,11 +1793,12 @@ function shareRoomByEmail() {
 function joinRoom(peer_name, room_id) {
     if (rc && rc.isConnected()) {
         console.log('Already connected to a room');
+        getId('myProfileNameInput').value = peer_name;
     } else {
         console.log('05 ----> join Room ' + room_id);
-        roomId.innerText = room_id;
+        roomId.innerText = publicRoomSlug || room_id;
         userName.innerText = peer_name;
-        isUserPresenter.innerText = isPresenter;
+        isUserPresenter.innerText = presenterLabel(isPresenter);
         rc = new RoomClient(
             localAudio,
             remoteAudios,
@@ -1818,7 +1825,6 @@ function joinRoom(peer_name, room_id) {
 function roomIsReady() {
     startRoomSession();
 
-    makeRoomPopupQR();
 
     if (peer_avatar && isValidAvatarURL(peer_avatar)) {
         myProfileAvatar.setAttribute('src', peer_avatar);
@@ -1951,15 +1957,12 @@ function roomIsReady() {
         elemDisplay('tabVirtualBackgroundBtn', false);
         elemDisplay('tabVirtualBackground', false);
     }
-    BUTTONS.settings.activeRooms && show(activeRoomsButton);
     BUTTONS.settings.fileSharing && show(fileShareButton);
     BUTTONS.settings.lockRoomButton && show(lockRoomButton);
     BUTTONS.settings.broadcastingButton && show(broadcastingButton);
     BUTTONS.settings.lobbyButton && show(lobbyButton);
     updateJoinLockButtons();
-    BUTTONS.settings.sendEmailInvitation && show(sendEmailInvitation);
     !BUTTONS.settings.customNoiseSuppression && hide(noiseSuppressionButton);
-    BUTTONS.settings.tabNotificationsBtn && show(tabNotificationsBtn);
     if (rc.recording.recSyncServerRecording) show(roomRecordingServer);
     BUTTONS.main.aboutButton && show(aboutButton);
     if (!isMobileDevice) show(pinUnpinGridDiv);
@@ -2166,6 +2169,44 @@ function applyPeerAvatar(avatarSrc) {
     }
 }
 
+/** Validate, persist, and broadcast a changed meeting nickname. */
+function updateMyPeerName() {
+    const input = getId('myProfileNameInput');
+    const name = filterXSS(input?.value.trim() || '');
+    if (!name || name.length > 32 || isHtml(name)) {
+        const message = 'Nickname must contain 1–32 plain-text characters';
+        return userLog('warning', window.i18n?.t(message, 'toasts') || message);
+    }
+    peer_name = name;
+    window.localStorage.peer_name = name;
+    setCookie(room_id + '_name', name, 30);
+    userName.innerText = name;
+    rc.peer_name = name;
+    rc.peer_info.peer_name = name;
+    rc.updatePeerInfo(name, rc.peer_id, 'name', name);
+    const message = 'Nickname updated';
+    userLog('info', window.i18n?.t(message, 'toasts') || message);
+}
+
+/** Upload and apply an avatar selected from the in-meeting Profile tab. */
+async function uploadMyPeerAvatar() {
+    const input = getId('myProfileAvatarFileInput');
+    const file = input?.files?.[0];
+    if (input) input.value = '';
+    if (!file || !file.type.startsWith('image/')) return;
+    const button = getId('myProfileAvatarUploadBtn');
+    if (button) button.disabled = true;
+    try {
+        const avatarUrl = await window.BodrikProfile.uploadFile(file, peer_token);
+        applyPeerAvatar(avatarUrl);
+    } catch (error) {
+        console.error('Avatar upload failed', error);
+        userLog('error', 'Unable to upload avatar');
+    } finally {
+        if (button) button.disabled = false;
+    }
+}
+
 function resetMyPeerAvatarInMemory() {
     peer_avatar = false;
     hasTemporaryAvatar = false;
@@ -2193,7 +2234,7 @@ function resetMyPeerAvatarInMemory() {
 function updateMyAvatarResetButtonVisibility() {
     if (!myProfileAvatarResetBtn) return;
     myProfileAvatarResetBtn.classList.toggle('hidden', !hasTemporaryAvatar);
-    if (myProfileAvatarUploadBtn) myProfileAvatarUploadBtn.classList.toggle('hidden', hasTemporaryAvatar);
+    if (myProfileAvatarUploadBtn) show(myProfileAvatarUploadBtn);
 }
 
 // ####################################################
@@ -2202,6 +2243,19 @@ function updateMyAvatarResetButtonVisibility() {
 
 // renderRoomTemplate is defined in RoomTemplate.js
 
+/** Build the pre-join title from the public invitation slug, never the private provider room ID. */
+function meetingJoinTitle() {
+    const label = window.i18n?.t('Bodrik FM meeting', 'labels') || 'Bodrik FM meeting';
+    return publicRoomSlug ? `${label} - ${publicRoomSlug}` : label;
+}
+
+/** Format the current presenter role for the profile, including live language changes. */
+function presenterLabel(value) {
+    const source = value ? 'Yes' : 'No';
+    return window.i18n?.t(source, 'labels') || source;
+}
+
+/** Update the visible chat count in the current meeting language. */
 function updateChatConversationsCount() {
     const el = getId('chatConversationsCount');
     if (!el) return;
@@ -2209,8 +2263,34 @@ function updateChatConversationsCount() {
     const count = list
         ? Array.from(list.querySelectorAll(':scope > li')).filter((li) => li.style.display !== 'none').length
         : 0;
-    el.textContent = count > 0 ? `${count} conversation${count !== 1 ? 's' : ''}` : '';
+    const label = window.i18n?.t('Chats: {count}', 'labels') || 'Chats: {count}';
+    el.textContent = count > 0 ? label.replace('{count}', count) : '';
 }
+
+/** Rebuild chat labels after the user switches the native meeting language. */
+async function refreshChatLanguage() {
+    if (!rc || !participantsList) return;
+    const selected = participantsList.querySelector('li.active');
+    const peerId = selected?.id;
+    const peerName = rc.chatPeerName;
+    const peerAvatar = rc.chatPeerAvatar;
+    await getRoomParticipants();
+    if (peerId && getId(peerId)) {
+        rc.showPeerAboutAndMessages(peerId, peerName, peerAvatar, { target: { tagName: 'BUTTON' } });
+    }
+}
+
+window.addEventListener('bodrik:languagechange', () => {
+    if (Swal.getHtmlContainer()?.contains(initUser)) Swal.getTitle().textContent = meetingJoinTitle();
+    if (getId('isUserPresenter')) getId('isUserPresenter').textContent = presenterLabel(isPresenter);
+    const name = rc?.getId(rc.peer_id + '__name');
+    for (const node of name?.childNodes || []) {
+        if (node.nodeType === Node.TEXT_NODE) {
+            node.nodeValue = node.nodeValue.replace(/\((me|вы)\)/, rc.meSuffix().trim());
+        }
+    }
+    refreshChatLanguage().catch((error) => console.warn('Cannot refresh chat language', error));
+});
 
 function updateChatCharCount() {
     const el = getId('chatCharCount');
@@ -2400,14 +2480,6 @@ function handleButtons() {
     shareButton.onclick = () => {
         shareRoom(true);
     };
-    shareButton.onmouseenter = () => {
-        if (isMobileDevice || !BUTTONS.popup.shareRoomQrOnHover) return;
-        show(qrRoomPopupContainer);
-    };
-    shareButton.onmouseleave = () => {
-        if (isMobileDevice || !BUTTONS.popup.shareRoomQrOnHover) return;
-        hide(qrRoomPopupContainer);
-    };
     hideMeButton.onclick = (e) => {
         if (isHideALLVideosActive) {
             return userLog('warning', 'To use this feature, please toggle video focus mode', 'top-end', 6000);
@@ -2428,8 +2500,11 @@ function handleButtons() {
     mySettingsCloseBtn.onclick = () => {
         rc.toggleMySettings();
     };
-    myProfileAvatarUploadBtn.onclick = async () => {
-        await updateMyPeerAvatarByUrl();
+    myProfileAvatarUploadBtn.onclick = () => getId('myProfileAvatarFileInput').click();
+    getId('myProfileAvatarFileInput').onchange = uploadMyPeerAvatar;
+    getId('myProfileNameSaveBtn').onclick = updateMyPeerName;
+    getId('myProfileNameInput').onkeydown = (event) => {
+        if (event.key === 'Enter') updateMyPeerName();
     };
     myProfileAvatarResetBtn.onclick = () => {
         resetMyPeerAvatarInMemory();
@@ -2464,9 +2539,6 @@ function handleButtons() {
     tabAspectBtn.onclick = (e) => {
         rc.openTab(e, 'tabAspect');
     };
-    tabNotificationsBtn.onclick = (e) => {
-        rc.openTab(e, 'tabNotifications');
-    };
     tabModeratorBtn.onclick = (e) => {
         rc.openTab(e, 'tabModerator');
     };
@@ -2481,13 +2553,6 @@ function handleButtons() {
     };
     tabLanguagesBtn.onclick = (e) => {
         rc.openTab(e, 'tabLanguages');
-    };
-    notifyEmailCleanBtn.onclick = () => {
-        rc.cleanNotifications();
-        rc.saveNotifications(false);
-    };
-    saveNotificationsBtn.onclick = () => {
-        rc.saveNotifications();
     };
     tabVideoAIBtn.onclick = (e) => {
         rc.openTab(e, 'tabVideoAI');
@@ -2508,9 +2573,6 @@ function handleButtons() {
     };
     copyRoomUrlBtn.onclick = () => {
         navigator.share ? shareRoom(true) : copyRoomURL();
-    };
-    roomSendEmail.onclick = () => {
-        shareRoomByEmail();
     };
     chatButton.onclick = () => {
         rc.toggleChat();
@@ -2706,8 +2768,35 @@ function handleButtons() {
     chatPasteButton.onclick = () => {
         rc.pasteMessage();
     };
-    chatSendButton.onclick = () => {
-        rc.sendMessage();
+    chatSendButton.onclick = async () => {
+        const image = window.BodrikChatImage?.pending;
+        if (!image) return rc.sendMessage();
+        const caption = chatMessage.value.trim();
+        if (caption.length > 1000) {
+            return userLog('warning', 'Подпись к картинке не должна превышать 1000 символов.', 'top-end');
+        }
+        if (!rc.thereAreParticipants()) return userLog('warning', 'Нет участников для отправки картинки.', 'top-end');
+        if (Date.now() - rc.chatMessageTimeLast <= rc.chatMessageTimeBetween) {
+            return userLog('warning', 'Подождите перед отправкой следующего сообщения.', 'top-end');
+        }
+        chatSendButton.disabled = true;
+        try {
+            const imageUrl = await window.BodrikChatImage.upload(image, peer_token);
+            const draft = caption;
+            try {
+                chatMessage.value = caption ? `${imageUrl}\n${caption}` : imageUrl;
+                rc.sendMessage();
+                window.BodrikChatImage.clear();
+            } catch (error) {
+                chatMessage.value = draft;
+                throw error;
+            }
+        } catch (error) {
+            console.error('Chat image upload failed', error);
+            userLog('error', 'Не удалось загрузить картинку. Попробуйте ещё раз.', 'top-end');
+        } finally {
+            chatSendButton.disabled = false;
+        }
     };
     chatEmojiButton.onclick = (event) => {
         if (!isMobileDevice && event.detail > 0) return;
@@ -2851,9 +2940,6 @@ function handleButtons() {
     };
     stopRtmpURLButton.onclick = () => {
         rc.stopRTMPfromURL();
-    };
-    activeRoomsButton.onclick = () => {
-        rc.showActiveRooms();
     };
     fileShareButton.onclick = () => {
         rc.selectFileToShare(socket.id, true);
@@ -3459,22 +3545,28 @@ function updatePushToTalkUi(enabled, transmitting = false) {
     stopIcon.className = enabled ? 'fas fa-microphone-lines' : 'fas fa-microphone';
 }
 
-async function setPushToTalkPressed(pressed) {
+function setPushToTalkPressed(pressed) {
     if (!isPushToTalkActive || pressed === isPushToTalkPressed) return;
 
     isPushToTalkPressed = pressed;
     updatePushToTalkUi(true, pressed);
     playPushToTalkBlip(pressed);
 
-    if (pressed) {
-        await rc.resumeProducer(RoomClient.mediaType.audio);
-        rc.updatePeerInfo(peer_name, socket.id, 'audio', true);
-        console.log('Push-to-talk: audio resumed');
-    } else {
-        await rc.pauseProducer(RoomClient.mediaType.audio);
-        rc.updatePeerInfo(peer_name, socket.id, 'audio', false);
-        console.log('Push-to-talk: audio paused');
-    }
+    pushToTalkTransition = pushToTalkTransition
+        .catch(() => {})
+        .then(async () => {
+            if (pressed) {
+                await rc.resumeProducer(RoomClient.mediaType.audio);
+                rc.updatePeerInfo(peer_name, socket.id, 'audio', true);
+                console.log('Push-to-talk: audio resumed');
+            } else {
+                await rc.pauseProducer(RoomClient.mediaType.audio);
+                rc.updatePeerInfo(peer_name, socket.id, 'audio', false);
+                console.log('Push-to-talk: audio paused');
+            }
+        })
+        .catch((error) => console.error('Push-to-talk transition failed', error));
+    return pushToTalkTransition;
 }
 
 function handleSelects() {
@@ -3532,35 +3624,46 @@ function handleSelects() {
     };
 
     switchPushToTalk.onchange = async (e) => {
-        const producerExist = rc.producerExist(RoomClient.mediaType.audio);
         const enablePushToTalk = e.currentTarget.checked;
-        if (!producerExist && enablePushToTalk) {
-            console.log('Push-to-talk: start audio producer');
-            setAudioButtonsDisabled(true);
-            if (!isEnumerateAudioDevices) initEnumerateAudioDevices();
-            await rc.produce(RoomClient.mediaType.audio, microphoneSelect.value);
-            setTimeout(async function () {
-                await rc.pauseProducer(RoomClient.mediaType.audio);
-                rc.updatePeerInfo(peer_name, socket.id, 'audio', false);
-            }, 1000);
-        }
         isPushToTalkActive = enablePushToTalk;
         isPushToTalkPressed = false;
         updatePushToTalkUi(isPushToTalkActive);
-        if (producerExist && !isPushToTalkActive) {
+
+        if (isPushToTalkActive) {
+            if (!rc.producerExist(RoomClient.mediaType.audio)) {
+                console.log('Push-to-talk: start audio producer');
+                setAudioButtonsDisabled(true);
+                if (!isEnumerateAudioDevices) await initEnumerateAudioDevices();
+                await rc.produce(RoomClient.mediaType.audio, microphoneSelect.value);
+            }
+            await rc.pauseProducer(RoomClient.mediaType.audio);
+            rc.updatePeerInfo(peer_name, socket.id, 'audio', false);
+        } else if (rc.producerExist(RoomClient.mediaType.audio)) {
             console.log('Push-to-talk: resume audio producer');
             await rc.resumeProducer(RoomClient.mediaType.audio);
             rc.updatePeerInfo(peer_name, socket.id, 'audio', true);
         }
+
         e.target.blur(); // Removes focus from the element
         rc.roomMessage('ptt', isPushToTalkActive);
         console.log(`Push-to-talk enabled: ${isPushToTalkActive}`);
     };
     document.addEventListener('keydown', (e) => {
-        if (isPushToTalkActive && e.code === 'Space') setPushToTalkPressed(true);
+        const typing = e.target.closest?.('input, textarea, select, [contenteditable="true"]');
+        if (isPushToTalkActive && e.code === 'Space' && !typing) {
+            e.preventDefault();
+            setPushToTalkPressed(true);
+        }
     });
     document.addEventListener('keyup', (e) => {
-        if (isPushToTalkActive && e.code === 'Space') setPushToTalkPressed(false);
+        if (isPushToTalkActive && e.code === 'Space') {
+            e.preventDefault();
+            setPushToTalkPressed(false);
+        }
+    });
+    window.addEventListener('blur', () => setPushToTalkPressed(false));
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) setPushToTalkPressed(false);
     });
     // room
     switchBroadcasting.onchange = (e) => {
@@ -3817,22 +3920,6 @@ function handleSelects() {
         rc.updateRoomModerator({ type: 'chat_cant_publicly', status: chatCantPublicly });
         rc.roomMessage('chat_cant_publicly', chatCantPublicly);
         localStorageSettings.moderator_chat_cant_publicly = chatCantPublicly;
-        lS.setSettings(localStorageSettings);
-        e.target.blur();
-    };
-    switchEveryoneCantChatChatGPT.onchange = (e) => {
-        const chatCantChatGPT = e.currentTarget.checked;
-        rc.updateRoomModerator({ type: 'chat_cant_chatgpt', status: chatCantChatGPT });
-        rc.roomMessage('chat_cant_chatgpt', chatCantChatGPT);
-        localStorageSettings.moderator_chat_cant_chatgpt = chatCantChatGPT;
-        lS.setSettings(localStorageSettings);
-        e.target.blur();
-    };
-    switchEveryoneCantChatDeepSeek.onchange = (e) => {
-        const chatCantDeepSeek = e.currentTarget.checked;
-        rc.updateRoomModerator({ type: 'chat_cant_deep_seek', status: chatCantDeepSeek });
-        rc.roomMessage('chat_cant_deep_seek', chatCantDeepSeek);
-        localStorageSettings.moderator_chat_cant_deep_seek = chatCantDeepSeek;
         lS.setSettings(localStorageSettings);
         e.target.blur();
     };
@@ -4111,10 +4198,13 @@ function handleInputs() {
         updateChatCharCount();
     };
 
-    chatMessage.onpaste = () => {
-        isChatPasteTxt = true;
-        rc.checkLineBreaks();
-    };
+    getId('chatRoom').addEventListener('paste', (event) => {
+        if (window.BodrikChatImage?.paste(event)) return;
+        if (event.target === chatMessage) {
+            isChatPasteTxt = true;
+            rc.checkLineBreaks();
+        }
+    });
 }
 
 // ####################################################
@@ -7577,7 +7667,12 @@ function getParticipantsList(peers) {
         avatarSrc: image.all,
         name: 'Public chat',
         nameSuffix: ' <span id="all-unread-count" class="unread-count hidden"></span>',
-        statusHtml: renderParticipantStatus(`Everyone in room ${participantsCount}`),
+        statusHtml: renderParticipantStatus(
+            (window.i18n?.t('Everyone in room {count}', 'labels') || 'Everyone in room {count}').replace(
+                '{count}',
+                participantsCount
+            )
+        ),
         dropdownHtml: publicDropdownHtml,
         buttonsHtml: publicButtonsHtml,
     });
@@ -8322,6 +8417,7 @@ function setCustomTheme() {
 }
 
 function setTheme() {
+    if (window.BodrikTheme.applyCurrent()) return;
     if (themeCustom.keep) return setCustomTheme();
 
     selectTheme.selectedIndex = localStorageSettings.theme;
@@ -8833,6 +8929,13 @@ window.addEventListener('popstate', (event) => {
 });
 
 // Intercept tab close, refresh, or direct URL navigation
+// A page reload is an intentional leave, not a recoverable network outage.
+// Notify the server while the websocket is still open so the next page can
+// join without waiting for the disconnected peer's recovery grace period.
+window.addEventListener('pagehide', () => {
+    if (socket.connected) socket.disconnect();
+});
+
 window.addEventListener('beforeunload', (e) => {
     // Save recording if in progress
     if (rc.isRecording() || rc.hasActiveRecorder()) {

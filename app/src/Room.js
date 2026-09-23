@@ -3,7 +3,9 @@
 const { v4: uuidv4 } = require('uuid');
 const config = require('./config');
 const RtmpStreaming = require('./RtmpStreaming');
+const { BodrikMusic } = require('./BodrikMusic');
 const Logger = require('./Logger');
+const { createTurnTransportOptions } = require('./TurnCredentials');
 const log = new Logger('Room');
 
 const { audioLevelObserverEnabled, activeSpeakerObserverEnabled } = config.mediasoup.router;
@@ -77,6 +79,7 @@ module.exports = class Room {
         this.peers = new Map();
         this.bannedPeers = new Map(); // uuid -> timestamp, with TTL-based expiration
         this.webRtcTransport = config.mediasoup.webRtcTransport;
+        this.bodrikMusic = null;
         this.router = null;
         this.routerSettings = config.mediasoup.router;
         this.routerReady = this.createTheRouter();
@@ -136,7 +139,7 @@ module.exports = class Room {
             peers: JSON.stringify([...this.peers]),
             peersCount: this.getPeersCount(),
             maxParticipants: this.maxParticipants,
-            maxParticipantsReached: this.peers.size > this.maxParticipants,
+            maxParticipantsReached: this.getPeersCount() > this.maxParticipants,
             globalLobby: this.globalLobby,
         };
     }
@@ -253,6 +256,10 @@ module.exports = class Room {
 
     async ready() {
         await this.routerReady;
+        if (BodrikMusic.enabled()) {
+            this.bodrikMusic = await new BodrikMusic(this).start();
+        }
+
         return this;
     }
 
@@ -269,6 +276,7 @@ module.exports = class Room {
 
     async close() {
         this.closeAudioLevelObserver();
+        this.bodrikMusic?.stop();
         this.closeActiveSpeakerObserver();
         this.rtmpStreaming.closeAll();
         this.closeRouter();
@@ -514,7 +522,7 @@ module.exports = class Room {
     }
 
     getPeersCount() {
-        return this.peers.size;
+        return Array.from(this.peers.values()).filter((peer) => !peer.peer_info?.peer_bot).length;
     }
 
     getProducerListForPeer(socket_id) {
@@ -750,6 +758,7 @@ module.exports = class Room {
             iceCandidates: iceCandidates,
             dtlsParameters: dtlsParameters,
             sctpParameters: sctpParameters,
+            ...createTurnTransportOptions(socket_id),
         };
     }
 

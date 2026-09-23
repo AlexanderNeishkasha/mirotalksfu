@@ -143,7 +143,7 @@ module.exports = class ServerApi {
     getToken(token) {
         if (!token) return '';
 
-        const { username = 'username', password = 'password', presenter = false, expire } = token;
+        const { username = 'username', password = 'password', presenter = false, expire, room = '' } = token;
 
         const expireValue = expire || JWT_EXP;
 
@@ -152,6 +152,7 @@ module.exports = class ServerApi {
             username: String(username),
             password: String(password),
             presenter: String(presenter),
+            room: String(room),
         };
 
         // Encrypt payload using AES encryption

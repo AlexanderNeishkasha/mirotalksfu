@@ -54,7 +54,6 @@ let BUTTONS = {
         sendEmailInvitation: true, // presenter
         micOptionsButton: true,
         tabRTMPStreamingBtn: true, // presenter
-        tabNotificationsBtn: true, // presenter
         tabModerator: true, // presenter
         tabVideoAIBtn: true, // presenter
         tabRecording: true,
@@ -174,7 +173,6 @@ function handleRules(isPresenter, roomSetup = true) {
         BUTTONS.settings.sendEmailInvitation = false;
         BUTTONS.settings.tabRTMPStreamingBtn = false;
         BUTTONS.settings.tabModerator = false;
-        BUTTONS.settings.tabNotificationsBtn = false;
         BUTTONS.videoOff.muteAudioButton = false;
         BUTTONS.videoOff.geolocationButton = false;
         BUTTONS.videoOff.banButton = false;
@@ -200,7 +198,7 @@ function handleRules(isPresenter, roomSetup = true) {
 
         // If a presenter-only settings tab was open, reset to the default Room tab so its
         // content isn't left visible after the tab button is hidden.
-        const openPresenterTab = ['tabModerator', 'tabRTMPStreaming', 'tabNotifications', 'tabVideoAI'].some((id) => {
+        const openPresenterTab = ['tabModerator', 'tabRTMPStreaming', 'tabVideoAI'].some((id) => {
             const el = rc.getId(id);
             return el && el.style.display === 'block';
         });
@@ -280,9 +278,7 @@ function handleRules(isPresenter, roomSetup = true) {
     BUTTONS.settings.broadcastingButton ? show(broadcastingButton) : hide(broadcastingButton);
     BUTTONS.settings.lobbyButton ? show(lobbyButton) : hide(lobbyButton);
     updateJoinLockButtons();
-    BUTTONS.settings.sendEmailInvitation ? show(sendEmailInvitation) : hide(sendEmailInvitation);
     BUTTONS.settings.micOptionsButton ? show(micOptionsButton) : hide(micOptionsButton);
-    BUTTONS.settings.tabNotificationsBtn ? show(tabNotificationsBtn) : hide(tabNotificationsBtn);
     BUTTONS.settings.tabModerator ? show(tabModeratorBtn) : hide(tabModeratorBtn);
     if (BUTTONS.settings.host_only_recording) {
         show(recordingActionButton);
@@ -316,8 +312,6 @@ function loadModeratorData() {
     switchEveryoneCantShareScreen.checked = localStorageSettings.moderator_screen_cant_share;
     switchEveryoneCantChatPrivately.checked = localStorageSettings.moderator_chat_cant_privately;
     switchEveryoneCantChatPublicly.checked = localStorageSettings.moderator_chat_cant_publicly;
-    switchEveryoneCantChatChatGPT.checked = localStorageSettings.moderator_chat_cant_chatgpt;
-    switchEveryoneCantChatDeepSeek.checked = localStorageSettings.moderator_chat_cant_deep_seek;
     switchEveryoneCantMediaSharing.checked = localStorageSettings.moderator_media_cant_sharing;
     switchEveryoneCantPolls.checked = localStorageSettings.moderator_polls_cant_create;
     switchDisconnectAllOnLeave.checked = localStorageSettings.moderator_disconnect_all_on_leave;
@@ -339,8 +333,6 @@ function loadModeratorDataFromRoom() {
     switchEveryoneCantShareScreen.checked = !!moderator.screen_cant_share;
     switchEveryoneCantChatPrivately.checked = !!moderator.chat_cant_privately;
     switchEveryoneCantChatPublicly.checked = !!moderator.chat_cant_publicly;
-    switchEveryoneCantChatChatGPT.checked = !!moderator.chat_cant_chatgpt;
-    switchEveryoneCantChatDeepSeek.checked = !!moderator.chat_cant_deep_seek;
     switchEveryoneCantMediaSharing.checked = !!moderator.media_cant_sharing;
     switchEveryoneCantPolls.checked = !!moderator.polls_cant_create;
 }
@@ -358,8 +350,6 @@ function updateModeratorSwitchUI(type, status) {
         screen_cant_share: switchEveryoneCantShareScreen,
         chat_cant_privately: switchEveryoneCantChatPrivately,
         chat_cant_publicly: switchEveryoneCantChatPublicly,
-        chat_cant_chatgpt: switchEveryoneCantChatChatGPT,
-        chat_cant_deep_seek: switchEveryoneCantChatDeepSeek,
         media_cant_sharing: switchEveryoneCantMediaSharing,
         polls_cant_create: switchEveryoneCantPolls,
     };
@@ -377,8 +367,8 @@ function getModeratorData() {
         screen_cant_share: switchEveryoneCantShareScreen.checked,
         chat_cant_privately: switchEveryoneCantChatPrivately.checked,
         chat_cant_publicly: switchEveryoneCantChatPublicly.checked,
-        chat_cant_chatgpt: switchEveryoneCantChatChatGPT.checked,
-        chat_cant_deep_seek: switchEveryoneCantChatDeepSeek.checked,
+        chat_cant_chatgpt: localStorageSettings.moderator_chat_cant_chatgpt,
+        chat_cant_deep_seek: localStorageSettings.moderator_chat_cant_deep_seek,
         media_cant_sharing: switchEveryoneCantMediaSharing.checked,
         polls_cant_create: switchEveryoneCantPolls.checked,
     };
@@ -447,7 +437,6 @@ function handleRulesBroadcasting() {
     elemDisplay('joinUnlockButton', false);
     elemDisplay('settingsButton', false);
     elemDisplay('tabRTMPStreamingBtn', false);
-    elemDisplay('tabNotificationsBtn', false);
 
     elemDisplay('startVideoDeviceDropdown', false);
     elemDisplay('startAudioDeviceDropdown', false);

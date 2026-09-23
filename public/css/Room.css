@@ -421,8 +421,10 @@ body {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 48px;
-    height: 48px;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    object-fit: cover;
     animation: pulse-logo 2s ease-in-out infinite;
 }
 
@@ -1625,9 +1627,58 @@ body {
     border-radius: 50px;
 }
 
-#myProfileAvatarUploadBtn,
-#myProfileAvatarResetBtn {
-    margin-top: 6px;
+#tabProfile .profile-avatar-actions,
+#tabProfile .profile-name-edit {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+#tabProfile .profile-avatar-actions {
+    margin: 8px 0 18px;
+}
+
+#tabProfile .profile-name-edit {
+    margin: 10px 0 12px;
+}
+
+#tabProfile .profile-name-edit input {
+    flex: 1 1 220px;
+    min-width: 0;
+    height: 42px;
+}
+
+#tabProfile .profile-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    flex: 0 0 auto;
+    min-height: 42px;
+    width: auto;
+    margin: 0;
+    padding: 8px 16px;
+    border: 1px solid var(--room-border-strong);
+    background: var(--room-control-bg);
+    color: var(--fg-1);
+    font: inherit;
+    cursor: pointer;
+}
+
+#tabProfile .profile-action:hover,
+#tabProfile .profile-action:focus-visible {
+    border-color: var(--room-accent);
+    background: var(--room-control-hover);
+}
+
+#tabProfile .profile-action:disabled {
+    opacity: 0.5;
+    cursor: wait;
+}
+
+#tabProfile #shortcutsTable td {
+    padding: 12px;
 }
 
 .form-check-input {
@@ -1680,6 +1731,15 @@ body {
     right: auto;
     left: 8px;
     color: var(--room-switch-ink);
+}
+
+:root[lang='ru'] .form-switch.form-switch-md::after {
+    content: 'ВЫКЛ';
+    font-size: 0.55rem;
+}
+
+:root[lang='ru'] .form-switch.form-switch-md:has(.form-check-input:checked)::after {
+    content: 'ВКЛ';
 }
 
 .title {
@@ -4091,6 +4151,12 @@ body {
     border-radius: 16px !important;
     box-shadow: var(--box-shadow) !important;
 }
+/* Keep dialogs responsive; only the popup is shortened, not background activity. */
+.swal2-popup.animate__animated {
+    --animate-duration: 0.2s;
+    animation-duration: 0.2s;
+}
+
 
 .swal2-popup .swal2-styled:focus {
     box-shadow: none !important;
@@ -4112,38 +4178,6 @@ body {
 
 .popup-template-copy--left {
     text-align: left;
-}
-
-.username-in-use {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    padding: 4px 6px;
-}
-.username-in-use__icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    background: rgba(255, 193, 7, 0.15);
-    color: #ffc107;
-    font-size: 24px;
-}
-.username-in-use__title {
-    margin: 0;
-    font-size: 16px;
-    font-weight: 600;
-    color: #fff;
-}
-.username-in-use__text {
-    margin: 0;
-    font-size: 14px;
-    line-height: 1.5;
-    color: whitesmoke;
-    max-width: 320px;
 }
 
 .swal2-input {
@@ -4549,9 +4583,9 @@ select option {
     -webkit-animation-fill-mode: forwards;
     -moz-animation-fill-mode: forwards;
     animation-fill-mode: forwards;
-    -webkit-animation-duration: 1s;
-    -moz-animation-duration: 1s;
-    animation-duration: 1s;
+    -webkit-animation-duration: 0.2s;
+    -moz-animation-duration: 0.2s;
+    animation-duration: 0.2s;
 }
 
 p,
@@ -6298,7 +6332,7 @@ button:hover {
     border-radius: 10px;
     background: rgba(#19bb5c, 0.65);
     transition-property: height background-color;
-    transition-duration: 1s;
+    transition-duration: 0.2s;
 }
 
 /*--------------------------------------------------------------

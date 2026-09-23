@@ -1185,8 +1185,8 @@ module.exports = {
             htmlInjection: process.env.BRAND_HTML_INJECTION !== 'false',
 
             app: {
-                language: process.env.UI_LANGUAGE || 'en',
-                translationMode: process.env.UI_TRANSLATION_MODE || 'google', // auto (native else Google) | native (no Google) | google (default, always Google)
+                language: 'ru',
+                translationMode: 'native', // Bodrik FM provides only human-maintained Russian and English.
                 name: process.env.APP_NAME || 'MiroTalk SFU',
                 title:
                     process.env.APP_TITLE ||
@@ -1477,7 +1477,7 @@ module.exports = {
                 broadcastingButton: process.env.SHOW_BROADCASTING !== 'false',
                 lobbyButton: process.env.SHOW_LOBBY !== 'false',
                 joinLockButton: process.env.SHOW_JOIN_LOCK !== 'false',
-                sendEmailInvitation: process.env.SHOW_EMAIL_INVITE !== 'false',
+                sendEmailInvitation: false,
                 micOptionsButton: process.env.SHOW_MIC_OPTIONS !== 'false',
                 tabRTMPStreamingBtn: process.env.SHOW_RTMP_TAB !== 'false',
                 tabNotificationsBtn: process.env.SHOW_NOTIFICATIONS_TAB !== 'false',
@@ -1520,7 +1520,7 @@ module.exports = {
                 muteVideoButton: process.env.SHOW_MUTE_VIDEO !== 'false',
                 muteAudioButton: process.env.SHOW_MUTE_AUDIO !== 'false',
                 audioVolumeInput: process.env.SHOW_VOLUME_CONTROL !== 'false',
-                geolocationButton: process.env.SHOW_GEO_LOCATION !== 'false',
+                geolocationButton: false,
                 banButton: process.env.SHOW_BAN_BUTTON !== 'false',
                 ejectButton: process.env.SHOW_EJECT_BUTTON !== 'false',
                 presenterRoleButton: process.env.SHOW_PRESENTER_ROLE_BUTTON !== 'false',
@@ -1536,7 +1536,7 @@ module.exports = {
                 sendVideoButton: process.env.SHOW_SEND_VIDEO !== 'false',
                 muteAudioButton: process.env.SHOW_MUTE_AUDIO !== 'false',
                 audioVolumeInput: process.env.SHOW_VOLUME_CONTROL !== 'false',
-                geolocationButton: process.env.SHOW_GEO_LOCATION !== 'false',
+                geolocationButton: false,
                 banButton: process.env.SHOW_BAN_BUTTON !== 'false',
                 ejectButton: process.env.SHOW_EJECT_BUTTON !== 'false',
                 presenterRoleButton: process.env.SHOW_PRESENTER_ROLE_BUTTON !== 'false',
@@ -1573,7 +1573,7 @@ module.exports = {
                 sendFileAllButton: process.env.SHOW_SEND_FILE_ALL !== 'false',
                 ejectAllButton: process.env.SHOW_EJECT_ALL !== 'false',
                 sendFileButton: process.env.SHOW_SEND_FILE !== 'false',
-                geoLocationButton: process.env.SHOW_GEO_LOCATION !== 'false',
+                geoLocationButton: false,
                 banButton: process.env.SHOW_BAN_BUTTON !== 'false',
                 ejectButton: process.env.SHOW_EJECT_BUTTON !== 'false',
                 presenterRoleButton: process.env.SHOW_PRESENTER_ROLE_BUTTON !== 'false',

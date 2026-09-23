@@ -485,6 +485,7 @@ class RoomClient {
         this.audioConsumers = new Map();
 
         this.masterOutputVolume = 1; // 0..1 master speaker volume, multiplied with each per-peer volume
+        this.bodrikMusicVolume = 1;
 
         this.peers = new Map();
         this.consumers = new Map();
@@ -580,12 +581,30 @@ class RoomClient {
             const data = {
                 room_id: this.room_id,
                 peer_info: this.peer_info,
+                rejoin_secret: this.getRejoinSecret(),
             };
             await this.join(data);
             this.initSockets();
             this._isConnected = true;
             successCallback();
         });
+    }
+    /** Persist a cryptographic tab proof across reloads, scoped to this private room. */
+    getRejoinSecret() {
+        const key = `bodrik-rejoin:${this.room_id}`;
+        try {
+            const saved = window.sessionStorage.getItem(key);
+            if (saved) return saved;
+        } catch (error) {
+            console.warn('Unable to read meeting tab proof', error);
+        }
+        const secret = window.crypto.randomUUID();
+        try {
+            window.sessionStorage.setItem(key, secret);
+        } catch (error) {
+            console.warn('Unable to persist meeting tab proof', error);
+        }
+        return secret;
     }
 
     // ####################################################
@@ -663,11 +682,6 @@ class RoomClient {
                 if (room === 'isBanned') {
                     console.warn('00-WARNING ----> You are Banned from the Room!');
                     return this.isBanned();
-                }
-
-                if (room === 'isNameInUse') {
-                    console.warn('00-WARNING ----> Username already in use');
-                    return this.userNameAlreadyInRoom();
                 }
 
                 // ##########################################
@@ -759,7 +773,7 @@ class RoomClient {
             console.log('07.1 ----> My Peer info', my_peer_info);
             isPresenter = my_peer_info.peer_presenter;
             this.peer_info.peer_presenter = isPresenter;
-            this.getId('isUserPresenter').innerText = isPresenter;
+            this.getId('isUserPresenter').innerText = presenterLabel(isPresenter);
             window.localStorage.isReconnected = false;
 
             // GLOBAL LOBBY ENABLED
@@ -877,10 +891,6 @@ class RoomClient {
             if (room.thereIsPolls) {
                 this.socket.emit('updatePoll');
             }
-            // Host protected enabled in the server side
-            if (room.hostProtected) {
-                RoomURL = window.location.origin + '/join/' + room_id;
-            }
 
             // Share Media Data on Join
             if (
@@ -940,12 +950,10 @@ class RoomClient {
 
         console.log('07.2 Participants Count ---->', participantsCount);
 
-        if (BUTTONS.popup.shareRoomPopup && notify && participantsCount == 1) {
+        if (!this.rejoining && BUTTONS.popup.shareRoomPopup && notify && participantsCount == 1) {
             shareRoom();
-        } else {
-            if (this.isScreenAllowed) {
-                this.shareScreen();
-            }
+        } else if (!this.rejoining) {
+            if (this.isScreenAllowed) this.shareScreen();
             sound('joined');
         }
     }
@@ -1069,8 +1077,9 @@ class RoomClient {
             }
         );
 
-        this.producerTransport.on('connectionstatechange', async (state) => {
-            console.log(`Producer Transport state changed to: ${state}`, { id: this.producerTransport.id });
+        const transport = this.producerTransport;
+        transport.on('connectionstatechange', async (state) => {
+            console.log(`Producer Transport state changed to: ${state}`, { id: transport.id });
 
             switch (state) {
                 case 'connecting':
@@ -1082,14 +1091,17 @@ class RoomClient {
                 case 'disconnected':
                     console.warn('⚠️ Producer Transport disconnected', { id: this.producerTransport.id });
                     console.warn('⚠️ Producer Attempting ICE restart...');
-                    try {
-                        await this.restartProducerIce();
-                    } catch (error) {
-                        console.error('❌ Producer ICE restart failed', error.message);
+                    if (!this.socket.connected) {
+                        console.info('Deferring producer ICE restart until signaling reconnects');
+                        break;
+                    }
+                    if (!await this.restartTransportWithRetry(transport, 'Producer')) {
+                        this.readmitAfterTransportFailure(transport);
                     }
                     break;
                 case 'failed':
-                    console.warn('❌ Producer Transport failed', { id: this.producerTransport.id });
+                    console.warn('❌ Producer Transport failed', { id: transport.id });
+                    this.readmitAfterTransportFailure(transport);
                     break;
                 default:
                     console.log('Producer transport connection state changed', {
@@ -1147,8 +1159,9 @@ class RoomClient {
             }
         });
 
-        this.consumerTransport.on('connectionstatechange', async (state) => {
-            console.log(`Consumer Transport state changed to: ${state}`, { id: this.consumerTransport.id });
+        const transport = this.consumerTransport;
+        transport.on('connectionstatechange', async (state) => {
+            console.log(`Consumer Transport state changed to: ${state}`, { id: transport.id });
 
             switch (state) {
                 case 'connecting':
@@ -1160,14 +1173,17 @@ class RoomClient {
                 case 'disconnected':
                     console.warn('⚠️ Consumer Transport disconnected', { id: this.consumerTransport.id });
                     console.warn('⚠️ Consumer Attempting ICE restart...');
-                    try {
-                        await this.restartConsumerIce();
-                    } catch (error) {
-                        console.error('❌ Consumer ICE restart failed', error.message);
+                    if (!this.socket.connected) {
+                        console.info('Deferring consumer ICE restart until signaling reconnects');
+                        break;
+                    }
+                    if (!await this.restartTransportWithRetry(transport, 'Consumer')) {
+                        this.readmitAfterTransportFailure(transport);
                     }
                     break;
                 case 'failed':
-                    console.warn('❌ Consumer Transport failed', { id: this.consumerTransport.id });
+                    console.warn('❌ Consumer Transport failed', { id: transport.id });
+                    this.readmitAfterTransportFailure(transport);
                     break;
                 default:
                     console.log('Consumer transport connection state changed', {
@@ -1250,19 +1266,6 @@ class RoomClient {
             }
         }
 
-        console.error('❌ Failed to reconnect after multiple attempts.');
-        transport.close();
-
-        popupHtmlMessage(
-            null,
-            image.network,
-            `${transportType} Transport`,
-            'Unable to reconnect. Please check your network.',
-            'center',
-            false,
-            true
-        );
-
         return false;
     }
 
@@ -1275,7 +1278,7 @@ class RoomClient {
     }
 
     async restartIce() {
-        if (this.iceRestarting) return;
+        if (this.iceRestarting) return false;
 
         console.warn('Restart ICE...', {
             producerTransportConnectionState: this.producerTransport.connectionState,
@@ -1284,11 +1287,14 @@ class RoomClient {
 
         try {
             this.iceRestarting = true;
-            await this.restartProducerIce();
-            await this.restartConsumerIce();
+            const producerRecovered = await this.restartProducerIce();
+            const consumerRecovered = await this.restartConsumerIce();
+            if (!producerRecovered || !consumerRecovered) throw new Error('transport ICE recovery failed');
             console.log('✅ Restart ICE done');
+            return true;
         } catch (error) {
             console.error('❌ Restart ICE error', error);
+            return false;
         } finally {
             this.iceRestarting = false;
         }
@@ -1300,7 +1306,6 @@ class RoomClient {
 
     initSockets() {
         this.socket.io.on('reconnect_attempt', this.handleSocketReconnectAttempt);
-        this.socket.io.on('reconnect', this.handleSocketReconnect);
         this.socket.io.on('reconnect_failed', this.handleSocketReconnectFailed);
         this.socket.on('connect', this.handleSocketConnect);
         this.socket.on('connect_error', this.handleSocketConnectionError);
@@ -1320,6 +1325,7 @@ class RoomClient {
         this.socket.on('cmd', this.handleCmdData);
         this.socket.on('peerAction', this.handlePeerAction);
         this.socket.on('updatePeerInfo', this.handleUpdatePeerInfo);
+        this.socket.on('bodrikMusicVolume', this.handleBodrikMusicVolume);
         this.socket.on('setPresenterRole', this.handleSetPresenterRole);
         this.socket.on('fileInfo', this.handleFileInfoData);
         this.socket.on('file', this.handleFileData);
@@ -1359,31 +1365,45 @@ class RoomClient {
     // ####################################################
 
     handleSocketConnect = () => {
-        console.log('SocketOn Connected to signaling server!');
+        console.info('[Recovery] signaling connected', { socketId: this.socket.id, recovered: this.socket.recovered });
+        // Manager reconnect fires before the namespace socket receives its id and
+        // recovery state. Only the Socket connect event can decide how to resume.
+        if (this.recoveryDisconnectedAt != null) {
+            console.info('[Recovery] namespace reconnected', {
+                socketId: this.socket.id,
+                recovered: this.socket.recovered,
+                elapsedMs: Date.now() - this.recoveryDisconnectedAt,
+            });
+            this.handleReconnect();
+        }
     };
 
     handleSocketDisconnect = (reason) => {
-        console.log(`SocketOn Disconnect Reason: ${reason}`);
+        this.recoveryDisconnectedAt = Date.now();
+        console.warn('[Recovery] signaling disconnected', { socketId: this.socket.id, reason });
         this.handleDisconnect(reason);
     };
 
     handleSocketConnectionError = (err) => {
-        console.log(`SocketOn Disconnect Error: ${err.message}`);
+        console.warn('[Recovery] connection error', { message: err.message, type: err.type });
     };
 
     handleSocketReconnectAttempt = (attempt) => {
-        console.log(`SocketOn Reconnect Attempt: ${attempt}`);
+        console.info('[Recovery] reconnect attempt', { attempt, elapsedMs: Date.now() - this.recoveryDisconnectedAt });
         this.handleReconnectAttempt(attempt);
-    };
-
-    handleSocketReconnect = () => {
-        console.log('SocketOn Reconnected to signaling server!');
-        this.handleReconnect();
     };
 
     handleSocketReconnectFailed = () => {
         console.error('SocketOn Reconnect failed');
         this.handleReconnectFailed();
+    };
+    handleBodrikMusicVolume = ({ volume }) => {
+        const value = Number(volume);
+        if (!Number.isFinite(value)) return;
+        this.bodrikMusicVolume = Math.min(1, Math.max(0, value));
+        this.getOutputAudioElements()
+            .filter((element) => element.dataset.bodrikMusic === 'true')
+            .forEach((element) => this.applyOutputVolume(element));
     };
 
     handleConsumerClosed = ({ consumer_id, consumer_kind }) => {
@@ -1397,9 +1417,21 @@ class RoomClient {
         );
         if (transport && !transport.closed) {
             console.warn('SocketOn Closing transport', { transport_id });
-            transport.close();
+            this.readmitAfterTransportFailure(transport);
+            if (!transport.closed) transport.close();
         }
     };
+
+    /** Recover media when signaling survived but the current WebRTC transport did not. */
+    readmitAfterTransportFailure(transport) {
+        if (!this.socket.connected || !this._isConnected) return;
+        if (transport !== this.producerTransport && transport !== this.consumerTransport) return;
+        this.needsReadmission = true;
+        if (this.rejoinInProgress) return;
+        this._isConnected = false;
+        this.showReconnectAlert();
+        this.handleReconnect();
+    }
 
     handleSetVideoOff = (data) => {
         if (!isBroadcastingEnabled || (isBroadcastingEnabled && data.peer_presenter)) {
@@ -1439,6 +1471,12 @@ class RoomClient {
 
     handleNewProducers = async (data, reconcile = false) => {
         if (data.length > 0) {
+            // The music peer may publish while this client is still loading mediasoup.
+            // joinAllowed requests all producers once the receive transport is ready.
+            if (!this.device || !this.consumerTransport) {
+                console.debug('Deferring producers until receive transport is ready');
+                return;
+            }
             if (!reconcile) {
                 console.log('SocketOn New producers', {
                     data,
@@ -1790,6 +1828,7 @@ class RoomClient {
         return this.reconnectBanner;
     }
 
+    /** Render the reconnect notice using the selected meeting language. */
     renderReconnectBanner({
         title,
         message,
@@ -1826,17 +1865,18 @@ class RoomClient {
             banner.iconWrap.style.display = 'inline-flex';
         }
 
+        const t = (key, namespace = 'labels') => window.i18n?.t(key, namespace) || key;
         if (banner.icon) banner.icon.className = icon;
-        if (banner.title) banner.title.textContent = title;
-        if (banner.message) banner.message.textContent = message;
+        if (banner.title) banner.title.textContent = t(title);
+        if (banner.message) banner.message.textContent = t(message);
 
         if (banner.meta) {
-            banner.meta.textContent = meta;
+            banner.meta.textContent = t(meta);
             banner.meta.style.display = meta ? 'inline-flex' : 'none';
         }
 
         if (banner.action) {
-            banner.action.textContent = actionLabel || 'Join Room';
+            banner.action.textContent = t(actionLabel || 'Join Room', 'buttons');
             banner.action.style.display = actionLabel ? 'inline-flex' : 'none';
             banner.action.onclick = typeof onAction === 'function' ? () => onAction() : null;
         }
@@ -1882,10 +1922,11 @@ class RoomClient {
         hide();
     }
 
-    showReconnectAlert(reason) {
+    /** Show a readable interruption notice while signaling retries. */
+    showReconnectAlert() {
         this.renderReconnectBanner({
             title: 'Connection lost',
-            message: `${reason || 'Network issue'}.`,
+            message: 'Network connection interrupted.',
             meta: 'Retrying',
             icon: 'fa-solid fa-plug',
             state: 'reconnecting',
@@ -1901,8 +1942,8 @@ class RoomClient {
             icon: 'fa-solid fa-triangle-exclamation',
             state: 'failed',
             showSpinner: false,
-            actionLabel: 'Join Room',
-            onAction: () => this.refreshBrowser(),
+            actionLabel: 'Try again',
+            onAction: () => this.retryMeetingConnection(),
         });
     }
 
@@ -1928,7 +1969,7 @@ class RoomClient {
         endRoomSession();
 
         window.localStorage.isReconnected = true;
-        console.log('Disconnected.');
+        console.log('Disconnected.', reason);
 
         // Immediately save recording if there is one, a paused one included.
         if (this.isRecording() || this.hasActiveRecorder()) {
@@ -1938,7 +1979,7 @@ class RoomClient {
         this.serverAwayShown = false;
         this._isConnected = false;
 
-        this.showReconnectAlert(reason);
+        this.showReconnectAlert();
     }
 
     handleReconnectAttempt(attempt) {
@@ -1946,10 +1987,53 @@ class RoomClient {
         this.attemptReconnect(attempt);
     }
 
-    handleReconnect() {
-        this._isConnected = true;
-        this.closeReconnectAlert(true);
-        setTimeout(() => this.refreshBrowser(), 1400);
+    async handleReconnect() {
+        if (this.rejoinInProgress) return;
+        this.rejoinInProgress = true;
+        const reconnectId = this.socket.id;
+        console.info('[Recovery] meeting recovery started', {
+            socketId: reconnectId,
+            recovered: this.socket.recovered,
+            elapsedMs: Date.now() - this.recoveryDisconnectedAt,
+        });
+        try {
+            if (!this.socket.recovered || this.needsReadmission) {
+                await window.BodrikNetworkRecovery.rejoin(this);
+            } else {
+                const iceRecovered = await this.restartIce();
+                if (!iceRecovered || this.needsReadmission) await window.BodrikNetworkRecovery.rejoin(this);
+                else {
+                    this.socket.emit('getProducers');
+                    try {
+                        await this.reconcileConsumers();
+                    } catch (error) {
+                        console.warn('Initial consumer reconciliation after recovery failed', error);
+                    }
+                    this.startConsumerReconcile();
+                }
+            }
+            if (!this.socket.connected || this.socket.id !== reconnectId) return;
+            this.needsReadmission = false;
+            this._isConnected = true;
+            startRoomSession();
+            this.closeReconnectAlert(true);
+            console.info('Recovered meeting without reloading the page');
+        } catch (error) {
+            if (!this.socket.connected || this.socket.id !== reconnectId) return;
+            console.error('In-place meeting recovery failed', error);
+            this.needsReadmission = true;
+            this._isConnected = false;
+            this.showMaxAttemptsAlert();
+        } finally {
+            this.rejoinInProgress = false;
+            if (this.socket.connected && this.socket.id !== reconnectId) this.handleReconnect();
+        }
+    }
+
+    /** Retry signaling or readmit this tab without navigating to a pre-join screen. */
+    retryMeetingConnection() {
+        if (this.socket.connected) this.handleReconnect();
+        else this.socket.connect();
     }
 
     handleReconnectFailed() {
@@ -1959,13 +2043,17 @@ class RoomClient {
         }
     }
 
+    /** Display the current attempt and the next retry delay in the selected language. */
     updateReconnectAlert(delay, attempt = 1) {
         const seconds = Math.max(1, Math.round(delay / 1000));
 
+        const t = (key) => window.i18n?.t(key, 'labels') || key;
         this.renderReconnectBanner({
             title: 'Reconnecting',
-            message: `Attempt ${attempt} of ${this.maxReconnectAttempts}.`,
-            meta: `Retry in ${seconds}s`,
+            message: t('Attempt {attempt} of {max}.')
+                .replace('{attempt}', attempt)
+                .replace('{max}', this.maxReconnectAttempts),
+            meta: t('Retry in {seconds}s').replace('{seconds}', seconds),
             icon: 'fa-solid fa-rotate-right',
             state: 'reconnecting',
             showSpinner: true,
@@ -1986,7 +2074,7 @@ class RoomClient {
         this.renderReconnectBanner({
             title: 'Back online',
             message: 'Connection restored.',
-            meta: 'Reloading',
+            meta: 'Media restored',
             icon: 'fa-solid fa-wifi',
             state: 'restored',
             showSpinner: false,
@@ -2061,6 +2149,11 @@ class RoomClient {
 
     getReconnectDirectJoinURL() {
         const sfu_peer_info = this.getPeerInfoFromLocalStorage();
+        const publicRoomMatch = window.location.pathname.match(/^\/room\/([^/]+)$/);
+        if (publicRoomMatch) {
+            return `${window.location.origin}/join/${encodeURIComponent(decodeURIComponent(publicRoomMatch[1]))}`;
+        }
+
         const { peer_audio, peer_video, peer_screen, peer_token } = sfu_peer_info ? sfu_peer_info : this.peer_info;
         const baseUrl = `${window.location.origin}/join`;
         const queryParams = {
@@ -2082,27 +2175,6 @@ class RoomClient {
     // ####################################################
     // CHECK USER
     // ####################################################
-
-    userNameAlreadyInRoom() {
-        this.sound('alert');
-        Swal.fire({
-            allowOutsideClick: false,
-            allowEscapeKey: false,
-            background: swalBackground,
-            position: 'center',
-            title: 'Username already in use',
-            html: renderRoomTemplate('popupUsernameInUseTemplate'),
-            showDenyButton: false,
-            confirmButtonText: `${icons.user} Change username`,
-            showClass: { popup: 'animate__animated animate__fadeInDown' },
-            hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-        }).then((result) => {
-            if (result.isConfirmed) {
-                endRoomSession();
-                openURL((window.location.href = '/join/' + this.room_id));
-            }
-        });
-    }
 
     // ####################################################
     // HANDLE ROOM BROADCASTING
@@ -2165,15 +2237,15 @@ class RoomClient {
                 await this.produce(mediaType.audio, microphoneSelect.value);
                 console.log('09 ----> START AUDIO MEDIA');
             }
-            if (this._moderator.audio_start_muted) {
-                await this.sleep(300);
+            if (this._moderator.audio_start_muted || this.rejoiningMuted) {
+                if (!this.rejoiningMuted) await this.sleep(300);
                 await this.pauseAudioProducer();
             }
         } else {
             if (isEnumerateAudioDevices && !audioProducerExist) {
                 await this.produce(mediaType.audio, microphoneSelect.value);
                 console.log('09 ----> START AUDIO MEDIA');
-                await this.sleep(300);
+                if (!this.rejoiningMuted) await this.sleep(300);
                 await this.pauseAudioProducer();
             } else {
                 setColor(startAudioButton, 'red');
@@ -2315,6 +2387,8 @@ class RoomClient {
             console.log('Supported Constraints', navigator.mediaDevices.getSupportedConstraints());
 
             const track = audio ? stream.getAudioTracks()[0] : stream.getVideoTracks()[0];
+            // A muted microphone must never transmit even briefly during a hard readmission.
+            if (audio && this.rejoiningMuted) track.enabled = false;
 
             if (screen) {
                 /*
@@ -3269,7 +3343,7 @@ class RoomClient {
                 p = document.createElement('p');
                 p.id = this.peer_id + '__name';
                 p.className = html.userName;
-                this.setPeerNameWithPresenter(p, isPresenter, this.peer_name + ' (me)');
+                this.setPeerNameWithPresenter(p, isPresenter, this.peer_name + this.meSuffix());
 
                 ri = this.createElement(this.peer_id + '__recIndicator', 'span', 'rec-indicator');
                 ri.innerHTML = '🔴 ';
@@ -4007,6 +4081,9 @@ class RoomClient {
         const remotePeerAudio = peer_info.peer_audio;
         const remotePeerAudioVolume = peer_info.peer_audio_volume;
         const remotePrivacyOn = peer_info.peer_video_privacy;
+        if (peer_info.peer_bot && Number.isFinite(Number(peer_info.peer_music_volume))) {
+            this.bodrikMusicVolume = Math.min(1, Math.max(0, Number(peer_info.peer_music_volume)));
+        }
         const remotePeerPresenter = peer_info.peer_presenter;
 
         switch (type) {
@@ -4098,6 +4175,7 @@ class RoomClient {
                 pv.value = 100;
 
                 // Build dropdown items
+                pv.dataset.volumeKey = peer_info.peer_uuid || remotePeerId;
                 BUTTONS.consumerVideo.pinVideoButton &&
                     !this.isMobileDevice &&
                     eVc.appendChild(this.createResponsiveDropdownItem(pn, 'Pin Video', 'compact'));
@@ -4402,6 +4480,7 @@ class RoomClient {
         pv.max = 100;
         pv.value = 100;
 
+        pv.dataset.volumeKey = peer_info.peer_uuid || peer_id;
         if (remotePeer) {
             sf = this.createButton('remotePeer___' + peer_id + '___sendFile', html.sendFile);
             sm = this.createButton('remotePeer___' + peer_id + '___sendMsg', html.sendMsg);
@@ -4430,7 +4509,7 @@ class RoomClient {
         p = document.createElement('p');
         p.id = peer_id + '__name';
         p.className = html.userName;
-        this.setPeerNameWithPresenter(p, peer_presenter, peer_name + (remotePeer ? '' : ' (me) '));
+        this.setPeerNameWithPresenter(p, peer_presenter, peer_name + (remotePeer ? '' : this.meSuffix() + ' '));
 
         if (!remotePeer) {
             ri = this.createElement(peer_id + '__recIndicator', 'span', 'rec-indicator');
@@ -4672,7 +4751,6 @@ class RoomClient {
                 this.socket.off('editorUpdate');
                 this.socket.off('breakoutRoom');
                 this.socket.io.off('reconnect_attempt');
-                this.socket.io.off('reconnect');
                 this.socket.io.off('reconnect_failed');
             }
         };
@@ -4971,7 +5049,8 @@ class RoomClient {
         const audioStatus = this.getPeerAudioBtn(peer_id); // producer, consumers
         const audioVolume = this.getPeerAudioVolumeBar(peer_id); // consumers
         if (audioStatus) audioStatus.className = status ? html.audioOn : html.audioOff;
-        if (audioVolume) status ? show(audioVolume) : hide(audioVolume);
+        // Guests should be able to set a listener volume even while a peer's mic is off.
+        if (audioVolume) show(audioVolume);
     }
 
     setIsAudio(peer_id, status) {
@@ -6667,7 +6746,9 @@ class RoomClient {
         this.chatMessageTimeLast = currentTime;
 
         chatMessage.value = filterXSS(chatMessage.value.trim());
-        const peer_msg = this.formatMsg(chatMessage.value);
+        const peer_msg = window.BodrikChatImage?.parseMessage(chatMessage.value)
+            ? chatMessage.value
+            : this.formatMsg(chatMessage.value);
         if (!peer_msg) {
             return this.cleanMessage();
         }
@@ -7068,7 +7149,6 @@ class RoomClient {
             ? `<span class="message-data-time">${time}, ${safeFromName} ( me ) </span>`
             : `<span class="message-data-time">${time}, ${safeFromName} </span>`;
 
-        const formatMessage = this.formatMsg(getMsg);
         const speechButton = this.isSpeechSynthesisSupported
             ? `<button 
                     id="msg-speech-${chatMessagesId}" 
@@ -7169,8 +7249,28 @@ class RoomClient {
                 this.streamMessage(message, getMsg, 100);
             } else {
                 // Process the message for other senders
-                message.innerHTML = this.processMessage(getMsg);
-                hljs.highlightAll();
+                const chatImage = window.BodrikChatImage?.parseMessage(msg);
+                if (chatImage) {
+                    const link = document.createElement('a');
+                    link.href = chatImage.url;
+                    link.target = '_blank';
+                    link.rel = 'noopener noreferrer';
+                    const img = document.createElement('img');
+                    img.src = chatImage.url;
+                    img.alt = 'Картинка из чата';
+                    img.style.cssText = 'max-width:260px;max-height:240px;object-fit:contain;border-radius:8px';
+                    link.appendChild(img);
+                    message.replaceChildren(link);
+                    if (chatImage.caption) {
+                        const caption = document.createElement('span');
+                        caption.className = 'bodrik-image-caption';
+                        caption.textContent = chatImage.caption;
+                        message.appendChild(caption);
+                    }
+                } else {
+                    message.innerHTML = this.processMessage(getMsg);
+                    hljs.highlightAll();
+                }
             }
         }
 
@@ -10288,7 +10388,7 @@ class RoomClient {
                                 if (isPresenter || res.peerCounts == 1) {
                                     isPresenter = true;
                                     this.peer_info.peer_presenter = isPresenter;
-                                    this.getId('isUserPresenter').innerText = isPresenter;
+                                    this.getId('isUserPresenter').innerText = presenterLabel(isPresenter);
                                     data.password = room_password;
                                     this.socket.emit('roomAction', data);
                                     if (popup) this.roomStatus(action);
@@ -11096,14 +11196,22 @@ class RoomClient {
     setAV(audioElementId, volumeElementId, volumeValue, isConsumer = false) {
         const volumeInput = this.getId(volumeElementId);
         const audioPlayer = this.getId(audioElementId);
-        const volume = volumeValue / 100;
-
         if (volumeInput && audioPlayer) {
+            const producerVolumeValue = volumeValue;
+            const identity = volumeInput.dataset.volumeKey;
+            const storageKey = identity ? `bodrik-peer-volume:${this.room_id}:${identity}` : null;
+            audioPlayer.dataset.bodrikMusic = identity === 'bodrik-music' ? 'true' : 'false';
+            if (storageKey) {
+                const saved = localStorage.getItem(storageKey);
+                const stored = saved === null ? NaN : Number(saved);
+                if (Number.isFinite(stored) && stored >= 0 && stored <= 100) volumeValue = stored;
+            }
+            const volume = volumeValue / 100;
             console.log('Setting audio volume:', volumeValue);
             volumeInput.value = volumeValue;
             if (!audioPlayer.muted) {
                 if (isConsumer) {
-                    this.toggleVolumeInput(volumeInput, volumeValue);
+                    this.toggleVolumeInput(volumeInput, producerVolumeValue);
                 }
                 this.setAudioVolume(audioPlayer, volume);
             } else {
@@ -11132,14 +11240,22 @@ class RoomClient {
                 ? !audioPlayer.muted && audioPlayer.volume > 0
                 : this.peer_info.peer_audio;
 
-            isAudioEnabled ? show(inputElement) : hide(inputElement);
-            inputElement.value = 100;
+            isConsumer || isAudioEnabled ? show(inputElement) : hide(inputElement);
+            const savedVolume = localStorage.getItem(
+                `bodrik-peer-volume:${this.room_id}:${inputElement.dataset.volumeKey}`,
+            );
+            const parsedVolume = savedVolume === null ? NaN : Number(savedVolume);
+            inputElement.value = Number.isFinite(parsedVolume) ? parsedVolume : 100;
 
             let volumeUpdateTimeout;
 
             const updateVolume = () => {
                 const volume = inputElement.value / 100;
                 this.setAudioVolume(audioPlayer, volume);
+                const identity = inputElement.dataset.volumeKey;
+                if (identity) {
+                    localStorage.setItem(`bodrik-peer-volume:${this.room_id}:${identity}`, inputElement.value);
+                }
 
                 // Update producer audio volume
                 if (!isConsumer) this.peer_info.peer_audio_volume = inputElement.value;
@@ -11204,7 +11320,10 @@ class RoomClient {
         if (!audioPlayer) return;
 
         const peerVolume = audioPlayer.dataset.peerVolume !== undefined ? Number(audioPlayer.dataset.peerVolume) : 1;
-        const volume = Math.min(1, Math.max(0, (isNaN(peerVolume) ? 1 : peerVolume) * this.masterOutputVolume));
+        const musicVolume = audioPlayer.dataset.bodrikMusic === 'true' ? this.bodrikMusicVolume : 1;
+        const volume = Math.min(
+            1, Math.max(0, (isNaN(peerVolume) ? 1 : peerVolume) * this.masterOutputVolume * musicVolume)
+        );
 
         const gainNode = this.getOutputGainNode(audioPlayer, volume);
         if (gainNode) {
@@ -11544,7 +11663,7 @@ class RoomClient {
             isPresenter = is_presenter;
             this.peer_info.peer_presenter = is_presenter;
             const presenterEl = this.getId('isUserPresenter');
-            if (presenterEl) presenterEl.innerText = is_presenter;
+            if (presenterEl) presenterEl.innerText = presenterLabel(is_presenter);
             // Apply presenter/guest permissions without re-running the room auto-setup, so the
             // room state (broadcasting, lobby, recording, moderator) set by the original presenter
             // is preserved instead of being reset to this peer's local defaults.
@@ -11576,6 +11695,11 @@ class RoomClient {
         const badge = document.createElement('i');
         badge.className = 'fa-solid fa-user-shield presenter-name-badge';
         return badge;
+    }
+
+    /** Translate the suffix identifying this browser's participant tile. */
+    meSuffix() {
+        return ' ' + (window.i18n?.t('(me)', 'labels') || '(me)');
     }
 
     setPeerNameWithPresenter(nameEl, is_presenter, displayName) {
@@ -11869,14 +11993,8 @@ class RoomClient {
                 this.transcription.handleTranscript(cmd);
                 break;
             case 'geoLocation':
-                this.confirmPeerGeoLocation(cmd);
-                break;
             case 'geoLocationOK':
-                this.handleGeoPeerLocation(cmd);
-                break;
             case 'geoLocationKO':
-                this.sound('alert');
-                this.userLog('warning', cmd.data, 'top-end', 5000);
                 break;
             case 'ejectAll':
                 this.handleEjectAllFromRoom(cmd);
@@ -12608,7 +12726,10 @@ class RoomClient {
                 category === 'AI ASSISTANT'
                     ? 'Assistant replies are visible only to you'
                     : peer_id === 'all'
-                      ? `Everyone in room ${participants}`
+                      ? (window.i18n?.t('Everyone in room {count}', 'labels') || 'Everyone in room {count}').replace(
+                            '{count}',
+                            participants
+                        )
                       : `${status}`;
             return `
                 <a data-toggle="modal" data-target="#view_info">
@@ -12698,7 +12819,7 @@ class RoomClient {
         const displayName = peer_id === 'all' ? 'Public chat' : peer_name;
 
         // Native (human) translation for dynamically-set strings; falls back to English when inactive.
-        const t = (s) => (window.i18n && typeof window.i18n.t === 'function' ? window.i18n.t(s) : s);
+        const t = (s) => (window.i18n && typeof window.i18n.t === 'function' ? window.i18n.t(s, 'labels') : s);
 
         const chatMsg = this.getId('chatMessage');
         if (chatMsg) {
@@ -12707,7 +12828,10 @@ class RoomClient {
         }
 
         const emptyTitle = document.querySelector('.empty-chat-title');
-        if (emptyTitle) emptyTitle.textContent = t('Start with {name}').replace('{name}', t(displayName));
+        if (emptyTitle) {
+            emptyTitle.textContent =
+                peer_id === 'all' ? t('Start with Public chat') : t('Start with {name}').replace('{name}', displayName);
+        }
 
         const clickedElement = event ? event.target : null;
         if (!event || (clickedElement.tagName != 'BUTTON' && clickedElement.tagName != 'I')) {
@@ -13036,6 +13160,13 @@ class RoomClient {
     updatePeerInfo(peer_name, peer_id, type, status, emit = true, presenter = false) {
         if (emit) {
             switch (type) {
+                case 'name': {
+                    this.peer_name = status;
+                    this.peer_info.peer_name = status;
+                    const name = this.getId(peer_id + '__name');
+                    if (name) this.setPeerNameWithPresenter(name, this.peer_info.peer_presenter, `${status}${this.meSuffix()}`);
+                    break;
+                }
                 case 'audio':
                     this.setIsAudio(peer_id, status);
                     break;
@@ -13071,12 +13202,18 @@ class RoomClient {
                 peer_id: peer_id,
                 type: type,
                 status: status,
+                peer_presenter: this.peer_info.peer_presenter,
                 broadcast: true,
             };
             this.socket.emit('updatePeerInfo', data);
         } else {
             const canUpdateMediaStatus = !isBroadcastingEnabled || (isBroadcastingEnabled && presenter);
             switch (type) {
+                case 'name': {
+                    const name = this.getId(peer_id + '__name');
+                    if (name) this.setPeerNameWithPresenter(name, presenter, status);
+                    break;
+                }
                 case 'audio':
                     if (canUpdateMediaStatus) this.setPeerAudio(peer_id, status);
                     break;
@@ -14598,64 +14735,6 @@ class RoomClient {
             console.error('Error: ' + err);
             this.userLog('error', 'Snapshot room error ' + err.message, 'top-end', 6000);
         }
-    }
-
-    // ####################################################
-    // ROOM NOTIFICATIONS
-    // ####################################################
-
-    cleanNotifications() {
-        getId('notifyEmailInput').value = '';
-        getId('switchNotifyUserJoin').checked = false;
-        return true;
-    }
-
-    saveNotifications(validate = true) {
-        if (validate && !this.isValidNotifications()) return;
-
-        const data = this.getNotificationsData();
-
-        if (!data) return;
-
-        this.setNotificationsData(data);
-    }
-
-    setNotificationsData(data) {
-        this.socket.emit('updateRoomNotifications', data, (response) => {
-            response.error
-                ? this.cleanNotifications() && this.userLog('warning', response.error, 'top-end', 6000)
-                : this.roomMessage('save_room_notifications', true);
-        });
-    }
-
-    isValidNotifications() {
-        const notifyEmailInput = getId('notifyEmailInput');
-        if (!this.isValidEmail(notifyEmailInput.value)) {
-            notifyEmailInput.value = '';
-            this.userLog('warning', 'Email not valid', 'top-end', 6000);
-            return false;
-        }
-        return true;
-    }
-
-    getNotificationsData() {
-        const notifyEmailInput = getId('notifyEmailInput');
-        const switchNotifyUserJoin = getId('switchNotifyUserJoin');
-
-        return {
-            peer_name: this.peer_name,
-            peer_uuid: this.peer_uuid,
-            notifications: {
-                mode: {
-                    email: notifyEmailInput.value,
-                    //slack...
-                },
-                events: {
-                    join: switchNotifyUserJoin.checked,
-                    // leave...
-                },
-            },
-        };
     }
 
     // ####################################################

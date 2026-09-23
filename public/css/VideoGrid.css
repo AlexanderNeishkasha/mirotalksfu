@@ -215,6 +215,11 @@
 }
 
 /* Mobile floating menubar when appended to body */
+/* Keep the participant toolbar responsive without changing other room animations. */
+.videoMenuBar.animate__animated {
+    --animate-duration: 0.12s;
+    animation-duration: 0.12s;
+}
 .videoMenuBar.mobile-floating {
     z-index: 2;
     position: fixed;

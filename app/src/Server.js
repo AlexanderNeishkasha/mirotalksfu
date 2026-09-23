@@ -98,7 +98,11 @@ const { assignFallbackPresenter } = require('./PresenterManager');
 const ServerApi = require('./ServerApi');
 const Logger = require('./Logger');
 const Validator = require('./Validator');
+const { bindRejoinSecret, findDisconnectedRejoinPeers } = require('./BodrikRejoin');
+const { isNamedPresenter } = require('./BodrikPresenterIdentity');
+const { startRecoveryHeartbeat } = require('./BodrikRecoveryHeartbeat');
 const HtmlInjector = require('./HtmlInjector');
+const { browserConsoleScript } = require('./BodrikBrowserConsole');
 const log = new Logger('Server');
 const yaml = require('js-yaml');
 const swaggerUi = require('swagger-ui-express');
@@ -109,6 +113,8 @@ const Mattermost = require('./Mattermost');
 const restrictAccessByIP = require('./middleware/IpWhitelist');
 const { applyEmbedHeaders, embedAllowedOrigins, embedCsp } = require('./middleware/EmbedHeaders');
 const packageJson = require('../../package.json');
+const { createAvatarUploadHandler } = require('./BodrikAvatarUpload');
+const { createChatImageUploadHandler, startChatImageCleanup } = require('./BodrikChatImageUpload');
 
 // Login attempts limit
 const rateLimit = require('express-rate-limit');
@@ -301,7 +307,14 @@ const io = socketIo(server, {
     maxHttpBufferSize: 1e7,
     transports: ['websocket'],
     cors: corsOptions,
+    connectionStateRecovery: {
+        maxDisconnectionDuration: 120000,
+        skipMiddlewares: false,
+    },
 });
+
+const stopRecoveryHeartbeat = startRecoveryHeartbeat(io);
+server.on('close', stopRecoveryHeartbeat);
 
 const host = config?.server?.hostUrl || `http://localhost:${config?.server?.listen?.port || 3010}`;
 const trustProxy = Boolean(config?.server?.trustProxy);
@@ -648,6 +661,12 @@ function startServer() {
     app.set('trust proxy', trustProxy); // Enables trust for proxy headers (e.g., X-Forwarded-For) based on the trustProxy setting
     app.use(helmet.noSniff()); // Enable content type sniffing prevention
     app.use(applyEmbedHeaders); // Apply iframe embedding restrictions (CSP frame-ancestors / X-Frame-Options)
+    // Serve the environment-specific console policy before static assets, without caching across environments.
+    app.get('/js/bodrik-console.js', (req, res) => {
+        res.set('Cache-Control', 'no-store')
+            .type('application/javascript')
+            .send(browserConsoleScript(process.env.NODE_ENV));
+    });
     // Use all static files from the public folder
     app.use(
         express.static(dir.public, {
@@ -660,6 +679,40 @@ function startServer() {
     );
     app.use(cors(corsOptions));
     app.use(compression());
+    app.post(
+        '/api/bodrik/avatar',
+        rateLimit({
+            windowMs: 60 * 60 * 1000,
+            max: 20,
+            standardHeaders: true,
+            legacyHeaders: false,
+            keyGenerator: ipKeyGenerator,
+        }),
+        express.raw({ type: ['image/jpeg', 'image/png', 'image/webp'], limit: '256kb' }),
+        createAvatarUploadHandler({
+            directory: process.env.BODRIK_AVATAR_DIR || path.join(dir.public, 'uploads', 'avatars'),
+            verifyToken: isValidToken,
+        })
+    );
+    const chatImageDirectory = path.join(dir.public, 'uploads', 'chat');
+    server.on('close', startChatImageCleanup(chatImageDirectory));
+    app.post(
+        '/api/bodrik/chat-image',
+        rateLimit({
+            windowMs: 60 * 60 * 1000,
+            max: 30,
+            standardHeaders: true,
+            legacyHeaders: false,
+            keyGenerator: ipKeyGenerator,
+        }),
+        express.raw({ type: ['image/jpeg', 'image/png', 'image/webp'], limit: '5mb' }),
+        createChatImageUploadHandler({
+            directory: chatImageDirectory,
+            verifyToken: isValidToken,
+            decodeToken,
+            getRoom: (roomId) => roomList.get(roomId),
+        })
+    );
     app.use(express.json({ limit: '50mb' })); // Handles JSON payloads
     app.use(express.urlencoded({ extended: true, limit: '50mb' })); // Handles URL-encoded payloads
     app.use(express.raw({ type: 'video/webm', limit: '50mb' })); // Handles raw binary data
@@ -808,16 +861,11 @@ function startServer() {
             const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
             if (token) {
                 try {
-                    const { username } = decodeToken(token);
-                    const user = hostCfg.users.find((u) => u.username === username || u.displayname === username);
-                    const displayname = user?.displayname || username;
-                    log.debug('Host protected get Profile', { username, displayname });
+                    decodeToken(token);
                     return res.json({
-                        name: displayname,
-                        peer_name: {
-                            force: true,
-                            name: true,
-                        },
+                        email: false,
+                        name: false,
+                        peer_name: { force: false, email: false, name: false },
                     });
                 } catch (err) {
                     log.warn('Profile token decode error', err.message);
@@ -864,7 +912,12 @@ function startServer() {
 
     // UI buttons configuration
     app.get('/config', (req, res) => {
-        res.status(200).json({ message: config?.ui?.buttons || false });
+        res.set('Cache-Control', 'no-store')
+            .status(200)
+            .json({
+                message: config?.ui?.buttons || false,
+                inviteBaseUrl: process.env.BODRIK_INVITE_BASE_URL || '',
+            });
     });
 
     // Brand configuration
@@ -1089,10 +1142,27 @@ function startServer() {
                     const validToken = await isValidToken(token);
 
                     if (!validToken) {
+                        const requestedInvitation = req.query.invite;
+                        try {
+                            const invitation = new URL(requestedInvitation);
+                            const slug = decodeURIComponent(invitation.pathname.slice('/join/'.length));
+                            if (
+                                invitation.protocol === 'https:' &&
+                                invitation.host === req.get('host') &&
+                                invitation.pathname.startsWith('/join/') &&
+                                Validator.isValidRoomName(slug)
+                            ) {
+                                res.set('Cache-Control', 'no-store');
+                                return res.redirect(307, `/join/${encodeURIComponent(slug)}`);
+                            }
+                        } catch {}
                         return res.status(401).json({ message: 'Invalid Token' });
                     }
 
-                    const { username, password, presenter } = checkXSS(decodeToken(token));
+                    const { username, password, presenter, room: tokenRoom } = checkXSS(decodeToken(token));
+                    if (tokenRoom && tokenRoom !== room) {
+                        return res.status(401).json({ message: 'Token room mismatch' });
+                    }
 
                     peerUsername = username;
                     peerPassword = password;
@@ -1156,6 +1226,18 @@ function startServer() {
         return res.redirect('/');
     });
 
+    // Refreshing the clean in-room URL re-enters through the canonical invitation exchange.
+    app.get('/room/:slug', (req, res) => {
+        const { slug } = checkXSS(req.params);
+        const inviteBaseUrl = process.env.BODRIK_INVITE_BASE_URL;
+        if (!slug || !inviteBaseUrl || !Validator.isValidRoomName(slug)) {
+            return res.status(404).send('Not found');
+        }
+        const invitation = `${inviteBaseUrl.replace(/\/$/, '')}/${encodeURIComponent(slug)}`;
+        res.set('Cache-Control', 'no-store');
+        return res.redirect(307, invitation);
+    });
+
     // join room by id
     app.get('/join/:roomId', async (req, res) => {
         //
@@ -1170,6 +1252,13 @@ function startServer() {
             log.warn('/join/:roomId invalid', roomId);
             return res.redirect('/');
         }
+        const inviteBaseUrl = process.env.BODRIK_INVITE_BASE_URL;
+        if (inviteBaseUrl) {
+            const invitation = `${inviteBaseUrl.replace(/\/$/, '')}/${encodeURIComponent(roomId)}`;
+            res.set('Cache-Control', 'no-store');
+            return res.redirect(307, invitation);
+        }
+
 
         const allowRoomAccess = isAllowedRoomAccess('/join/:roomId', req, hostCfg, roomList, roomId);
 
@@ -1224,10 +1313,7 @@ function startServer() {
 
     // handle login if user_auth enabled
     app.get('/login', (req, res) => {
-        if (hostCfg.protected || hostCfg.user_auth) {
-            return htmlInjector.injectHtml(views.login, res);
-        }
-        res.redirect('/');
+        res.redirect(302, process.env.BODRIK_BYE_URL);
     });
 
     // handle logged on host protected
@@ -2220,7 +2306,7 @@ function startServer() {
     // ####################################################
 
     function startServer() {
-        server.listen(config?.server?.listen?.port || 3010, () => {
+        server.listen(config?.server?.listen?.port || 3010, config?.server?.listen?.ip || '127.0.0.1', () => {
             log.log(
                 `%c
     
@@ -2341,6 +2427,19 @@ function startServer() {
     // ####################################################
 
     io.on('connection', (socket) => {
+        log.info('[Recovery] socket connected', {
+            socket_id: socket.id,
+            recovered: socket.recovered,
+            room_id: socket.data.room_id || null,
+            peer_present: Boolean(socket.data.room_id && roomList.get(socket.data.room_id)?.getPeer(socket.id)),
+        });
+        if (socket.recovered && socket.data.room_id) {
+            socket.room_id = socket.data.room_id;
+            log.info('[Reconnect] - restored socket session', {
+                room_id: socket.room_id,
+                socket_id: socket.id,
+            });
+        }
         socket.on('clientError', (error) => {
             try {
                 log.error('Client error', error.message);
@@ -2376,6 +2475,7 @@ function startServer() {
             }
 
             socket.room_id = room_id;
+            socket.data.room_id = room_id;
 
             if (roomList.has(socket.room_id)) {
                 callback({ error: 'already exists' });
@@ -2410,7 +2510,7 @@ function startServer() {
 
             const data = checkXSS(dataObject);
 
-            log.debug('User joined', data);
+            log.debug('User joined', { room_id: socket.room_id });
 
             if (!Validator.isValidRoomName(socket.room_id)) {
                 log.warn('[Join] - Invalid room name', socket.room_id);
@@ -2433,6 +2533,7 @@ function startServer() {
 
             let is_presenter = peer_presenter;
 
+            let authenticatedUsername = peer_name;
             // User Auth required or detect token, we check if peer valid
             if (hostCfg.user_auth || peer_token) {
                 // Check JWT
@@ -2445,8 +2546,12 @@ function startServer() {
                             return cb('unauthorized');
                         }
 
-                        const { username, password, presenter } = checkXSS(decodeToken(peer_token));
+                        const { username, password, presenter, room: tokenRoom } = checkXSS(decodeToken(peer_token));
+                        if (tokenRoom && tokenRoom !== socket.room_id) {
+                            return cb('unauthorized');
+                        }
 
+                        authenticatedUsername = username;
                         const isPeerValid = await isAuthPeer(username, password);
 
                         if (!isPeerValid) {
@@ -2462,7 +2567,7 @@ function startServer() {
                             join_first and token-based presenter flags are ignored
                         */
                         if (socket.room_id.includes('_breakout_')) {
-                            is_presenter = hostCfg?.presenters?.list?.includes(peer_name) || false;
+                            is_presenter = tokenPresenter && (hostCfg?.presenters?.list?.includes(peer_name) || false);
                         } else {
                             is_presenter =
                                 tokenPresenter || (hostCfg?.presenters?.join_first && room?.getPeersCount() === 0);
@@ -2487,7 +2592,7 @@ function startServer() {
                 }
 
                 if (!hostCfg.users_from_db) {
-                    const roomAllowedForUser = isRoomAllowedForUser('[Join]', peer_name, room.id);
+                    const roomAllowedForUser = isRoomAllowedForUser('[Join]', authenticatedUsername, room.id);
                     if (!roomAllowedForUser) {
                         log.warn('[Join] - Room not allowed for this peer', { peer_name, room_id: room.id });
                         return cb('notAllowed');
@@ -2511,18 +2616,32 @@ function startServer() {
                 return cb('isBanned');
             }
 
-            const usernameExists = [...room.getPeers().values()].some(
-                (peer) => peer.id !== socket.id && peer.peer_name === peer_name
-            );
-            if (usernameExists) return cb('isNameInUse');
-
-            // Remove old peer with same socket.id before adding new one
             const existingPeer = room.getPeer(socket.id);
+            const oldPeers = findDisconnectedRejoinPeers(room, io.sockets.sockets, data.rejoin_secret, socket.id);
+            const newPeer = new Peer(socket.id, data);
+            // Only the validated admission token, never an editable nickname, controls token-based roles.
+            newPeer.bodrikTokenAuthenticated = Boolean(peer_token);
+            bindRejoinSecret(newPeer, data.rejoin_secret);
             if (existingPeer) {
-                room.removePeer(socket.id);
+                // Replacing the last peer must not close the room's router between admissions.
+                existingPeer.close();
+                room.delPeer(existingPeer);
             }
-
-            room.addPeer(new Peer(socket.id, data));
+            room.addPeer(newPeer);
+            for (const oldPeer of oldPeers) {
+                const wasPresenter = isPeerPresenter(socket.room_id, oldPeer.id, oldPeer.peer_name, oldPeer.peer_uuid);
+                room.removePeer(oldPeer.id);
+                if (presenters[socket.room_id]) delete presenters[socket.room_id][oldPeer.id];
+                room.broadCast(socket.id, 'removeMe', {
+                    ...removeMeData(room, oldPeer.peer_name, wasPresenter),
+                    peer_id: oldPeer.id,
+                });
+                log.info('[Recovery] replaced disconnected tab peer', {
+                    room_id: socket.room_id,
+                    old_socket_id: oldPeer.id,
+                    new_socket_id: socket.id,
+                });
+            }
 
             const activeRooms = getActiveRooms();
 
@@ -2548,7 +2667,7 @@ function startServer() {
              */
             const isBreakoutRoom = socket.room_id.includes('_breakout_');
             if (
-                hostCfg?.presenters?.list?.includes(peer_name) ||
+                isNamedPresenter(newPeer, hostCfg?.presenters?.list) ||
                 (!isBreakoutRoom &&
                     hostCfg?.presenters?.join_first &&
                     Object.keys(presenters[socket.room_id]).length === 0) ||
@@ -2621,21 +2740,6 @@ function startServer() {
             };
 
             const firstJoin = room.getPeersCount() === 1;
-            const guestJoin = room.getPeersCount() === 2;
-
-            // SCENARIO: Notify when the first user join room and is awaiting assistance (global email alert)
-            if (firstJoin && !widget.alert.enabled) {
-                nodemailer.sendEmailAlert('join', emailPayload);
-            }
-
-            // SCENARIO: Notify when the first guest user join room and presenter in (room email notification)
-            if (guestJoin) {
-                const notifications = room.getRoomNotifications();
-                log.debug('Room notifications on guest join', { notifications: notifications });
-                if (notifications?.mode?.email && notifications?.events?.join) {
-                    nodemailer.sendEmailNotifications('join', emailPayload, notifications);
-                }
-            }
 
             // SCENARIO: Notify when a user joins the widget room for expert assistance
             if (firstJoin && widget.enabled && widget.alert && widget.alert.enabled && widget.roomId === room.id) {
@@ -3642,6 +3746,15 @@ function startServer() {
             const data = checkXSS(dataObject);
 
             if (!Validator.isValidData(data)) return;
+            if (data.type === 'name') {
+                const name = String(data.status || '').trim();
+                if (!name || name.length > 32) return;
+                data.status = name;
+                data.peer_name = name;
+                data.peer_id = socket.id;
+                data.peer_presenter = peer.peer_info.peer_presenter;
+            }
+
 
             peer.updatePeerInfo(data);
 
@@ -3649,31 +3762,6 @@ function startServer() {
                 log.debug('updatePeerInfo broadcast data');
                 room.broadCast(socket.id, 'updatePeerInfo', data);
             }
-        });
-
-        socket.on('updateRoomNotifications', (dataObject, cb) => {
-            if (!roomExists(socket)) return;
-
-            if (config.integrations?.email?.notify !== true) {
-                const message =
-                    'Email notifications are disabled by the admin. Enable this feature in your self-hosted instance for full functionality.';
-                log.debug(message);
-                return cb({ error: message });
-            }
-
-            const data = checkXSS(dataObject);
-
-            if (!Validator.isValidData(data)) return;
-
-            const room = getRoom(socket);
-
-            const isPresenter = isPeerPresenter(socket.room_id, socket.id, data.peer_name, data.peer_uuid);
-
-            if (!isPresenter) return;
-
-            room.updateRoomNotifications(data);
-
-            return cb({ message: true });
         });
 
         socket.on('updateRoomModerator', (dataObject) => {
@@ -5020,6 +5108,16 @@ function startServer() {
         });
 
         socket.on('disconnect', (reason) => {
+            const recoverable = ['transport close', 'transport error', 'ping timeout'].includes(reason);
+            const disconnectedAt = Date.now();
+            log.info('[Recovery] socket disconnected', {
+                socket_id: socket.id,
+                room_id: socket.room_id || null,
+                reason,
+                recoverable,
+                peer_present: Boolean(socket.room_id && roomList.get(socket.room_id)?.getPeer(socket.id)),
+            });
+            const cleanup = () => {
             if (!roomExists(socket)) {
                 // Clean up socket listeners even if room doesn't exist
                 socket.removeAllListeners();
@@ -5027,6 +5125,13 @@ function startServer() {
             }
 
             const { room, peer } = getRoomAndPeer(socket);
+            if (!peer) {
+                // A newer admission already replaced this disconnected tab peer.
+                socket.room_id = null;
+                socket.removeAllListeners();
+                return;
+            }
+
 
             const { peer_name, peer_uuid } = peer || {};
 
@@ -5102,6 +5207,27 @@ function startServer() {
 
             // Clean up all socket event listeners to prevent memory leaks
             socket.removeAllListeners();
+            };
+
+            if (recoverable) {
+                setTimeout(() => {
+                    const active = io.sockets.sockets.get(socket.id);
+                    log.info('[Recovery] grace expired', {
+                        socket_id: socket.id,
+                        room_id: socket.room_id || null,
+                        elapsed_ms: Date.now() - disconnectedAt,
+                        recovered: Boolean(active?.connected && active.recovered),
+                        peer_present: Boolean(socket.room_id && roomList.get(socket.room_id)?.getPeer(socket.id)),
+                    });
+                    if (active?.connected && active.recovered) {
+                        log.info('[Reconnect] - kept recovered peer', { socket_id: socket.id });
+                        return;
+                    }
+                    cleanup();
+                }, 120000);
+                return;
+            }
+            cleanup();
         });
 
         socket.on('exitRoom', (_, callback) => {
@@ -5370,7 +5496,7 @@ function startServer() {
             // 2. Static presenter list — verify against server-side registered name, not user input
             const room = roomList.get(room_id);
             const peer = room?.getPeer(peer_id);
-            if (peer && hostCfg?.presenters?.list?.includes(peer.peer_info.peer_name)) {
+            if (isNamedPresenter(peer, hostCfg?.presenters?.list)) {
                 log.debug('isPeerPresenter Check (static list)', {
                     room_id: room_id,
                     peer_id: peer_id,

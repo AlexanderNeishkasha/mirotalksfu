@@ -636,6 +636,55 @@
     overflow-x: hidden;
     /* border: 1px solid lime; */
 }
+/* Pending images expand the opaque composer upward; the history remains scrollable. */
+.chat.bodrik-image-pending .chat-history {
+    min-height: 0 !important;
+}
+
+.chat.bodrik-image-pending .chat-message {
+    position: relative;
+    background: var(--msger-bg) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.bodrik-chat-image-preview:not(:empty) {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--chat-toolbar-surface);
+}
+
+.bodrik-chat-image-preview button {
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.14);
+    color: #fff;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.bodrik-chat-image-preview button:hover,
+.bodrik-chat-image-preview button:focus-visible {
+    background: rgba(255, 255, 255, 0.26);
+}
+
+.bodrik-image-caption {
+    display: block;
+    margin-top: 8px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
 
 /* Modern chat input wrapper */
 .chat-input-wrapper {
