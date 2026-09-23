@@ -36,8 +36,8 @@ RUN node --check app/src/Room.js \
     && grep -Fq "let RoomURL = window.location.origin" public/js/Room.js \
     && grep -Fq "RoomURL = invitation.toString()" public/js/Room.js \
     && cp app/src/config.template.js app/src/config.js \
-    && node --test app/src/BodrikMusic.test.js app/src/BodrikAvatarUpload.test.js app/src/BodrikRejoin.test.js app/src/BodrikChatImageUpload.test.js app/src/BodrikBrowserConsole.test.js app/src/BodrikPresenterIdentity.test.js app/src/BodrikRecoveryHeartbeat.test.js public/js/BodrikNetworkRecovery.test.cjs \
-    && rm app/src/BodrikMusic.test.js app/src/BodrikAvatarUpload.test.js app/src/BodrikRejoin.test.js app/src/BodrikChatImageUpload.test.js app/src/BodrikBrowserConsole.test.js app/src/BodrikPresenterIdentity.test.js app/src/BodrikRecoveryHeartbeat.test.js public/js/BodrikNetworkRecovery.test.cjs \
+    && node --test app/src/BodrikMusic.test.js app/src/BodrikAvatarUpload.test.js app/src/BodrikRejoin.test.js app/src/BodrikChatImageUpload.test.js app/src/BodrikBrowserConsole.test.js app/src/BodrikPresenterIdentity.test.js app/src/BodrikRecoveryHeartbeat.test.js public/js/BodrikNetworkRecovery.test.cjs public/js/BodrikRoomRecovery.test.cjs \
+    && rm app/src/BodrikMusic.test.js app/src/BodrikAvatarUpload.test.js app/src/BodrikRejoin.test.js app/src/BodrikChatImageUpload.test.js app/src/BodrikBrowserConsole.test.js app/src/BodrikPresenterIdentity.test.js app/src/BodrikRecoveryHeartbeat.test.js public/js/BodrikNetworkRecovery.test.cjs public/js/BodrikRoomRecovery.test.cjs \
     && mkdir -p public/uploads/avatars public/uploads/chat \
     && chown -R node:node public/uploads
 USER node
