@@ -8958,7 +8958,7 @@ function showAbout() {
     sound('open');
 
     const revision = BRAND.about?.sourceRevision;
-    const sourceRef = /^[a-f0-9]{40}$/.test(revision) ? revision : 'bodrik';
+    const sourceRef = /^[a-f0-9]{40}$/.test(revision) ? revision : 'main';
     const sourceUrl = `https://github.com/AlexanderNeishkasha/mirotalksfu/tree/${sourceRef}`;
     const sourceLabel = window.i18n?.t('Source code', 'labels') || 'Source code';
     const sourceLink = `<p><a href="${sourceUrl}" target="_blank" rel="noopener noreferrer">${sourceLabel}</a></p>`;
