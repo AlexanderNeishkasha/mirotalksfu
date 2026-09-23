@@ -1,38 +1,42 @@
-# syntax=docker/dockerfile:1.6
+# syntax=docker/dockerfile:1.7
 
-# Use Node.js 24 LTS slim image as base
-FROM node:24-slim
-
-# Set working directory
+# Build the checked-out Bodrik fork directly; the private deployment pins its Git commit.
+FROM node:24.15.0-slim
 WORKDIR /src
-
-# Environment
-ENV NODE_ENV=production
-ENV MEDIASOUP_SKIP_WORKER_PREBUILT_DOWNLOAD=true
-
-# Install system dependencies
+ENV NODE_ENV=production \
+    MEDIASOUP_SKIP_WORKER_PREBUILT_DOWNLOAD=true
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 \
-    python3-pip \
-    build-essential \
-    ffmpeg \
+        build-essential ffmpeg python3 python3-pip \
     && rm -rf /var/lib/apt/lists/*
-
-# Install dependencies (cache npm)
 COPY package*.json ./
-RUN --mount=type=cache,target=/root/.npm \
-    npm ci --omit=dev
-
-# Avoid recursive chown, which duplicates /src into a costly overlayfs layer.
-# Dependencies remain root-owned and readable; application files are owned by node.
+RUN --mount=type=cache,target=/root/.npm npm ci && npm prune --omit=dev
 COPY --chown=node:node app ./app
 COPY --chown=node:node public ./public
-
-# Copy config template → config
-COPY --chown=node:node app/src/config.template.js app/src/config.js
-
-# Run as the non-root "node" user (uid/gid 1000) shipped with the base image
+RUN node --check app/src/Room.js \
+    && node --check app/src/Server.js \
+    && node --check app/src/ServerApi.js \
+    && node --check app/src/BodrikMusic.js \
+    && node --check app/src/BodrikPlayback.js \
+    && node --check app/src/BodrikAvatarUpload.js \
+    && node --check app/src/BodrikBrowserConsole.js \
+    && node --check app/src/BodrikPresenterIdentity.js \
+    && node --check app/src/BodrikRecoveryHeartbeat.js \
+    && node --check public/js/BodrikNetworkRecovery.js \
+    && node --check public/js/BodrikProfile.js \
+    && node --check public/js/BodrikTheme.js \
+    && node --check public/js/I18n.js \
+    && node -e "const fs=require('node:fs'); for(const lang of ['en','ru']) JSON.parse(fs.readFileSync('public/lang/'+lang+'.json')); if(fs.readdirSync('public/lang').filter(name=>name.endsWith('.json')).length!==2) process.exit(1)" \
+    && node --check public/js/RoomClient.js \
+    && node --check public/js/Room.js \
+    && node --check app/src/BodrikRejoin.js \
+    && node --check app/src/BodrikChatImageUpload.js \
+    && node --check public/js/BodrikChatImage.js \
+    && grep -Fq "let RoomURL = window.location.origin" public/js/Room.js \
+    && grep -Fq "RoomURL = invitation.toString()" public/js/Room.js \
+    && cp app/src/config.template.js app/src/config.js \
+    && node --test app/src/BodrikMusic.test.js app/src/BodrikAvatarUpload.test.js app/src/BodrikRejoin.test.js app/src/BodrikChatImageUpload.test.js app/src/BodrikBrowserConsole.test.js app/src/BodrikPresenterIdentity.test.js app/src/BodrikRecoveryHeartbeat.test.js public/js/BodrikNetworkRecovery.test.cjs \
+    && rm app/src/BodrikMusic.test.js app/src/BodrikAvatarUpload.test.js app/src/BodrikRejoin.test.js app/src/BodrikChatImageUpload.test.js app/src/BodrikBrowserConsole.test.js app/src/BodrikPresenterIdentity.test.js app/src/BodrikRecoveryHeartbeat.test.js public/js/BodrikNetworkRecovery.test.cjs \
+    && mkdir -p public/uploads/avatars public/uploads/chat \
+    && chown -R node:node public/uploads
 USER node
-
-# Default command
 CMD ["npm", "start"]
