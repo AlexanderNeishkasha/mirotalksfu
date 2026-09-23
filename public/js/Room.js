@@ -8953,8 +8953,15 @@ window.addEventListener('beforeunload', (e) => {
 // ABOUT
 // ####################################################
 
+/** Show meeting credits and a link to the public source for the running fork. */
 function showAbout() {
     sound('open');
+
+    const revision = BRAND.about?.sourceRevision;
+    const sourceRef = /^[a-f0-9]{40}$/.test(revision) ? revision : 'bodrik';
+    const sourceUrl = `https://github.com/AlexanderNeishkasha/mirotalksfu/tree/${sourceRef}`;
+    const sourceLabel = window.i18n?.t('Source code', 'labels') || 'Source code';
+    const sourceLink = `<p><a href="${sourceUrl}" target="_blank" rel="noopener noreferrer">${sourceLabel}</a></p>`;
 
     Swal.fire({
         background: swalBackground,
@@ -8964,7 +8971,7 @@ function showAbout() {
         title: BRAND.about?.title && BRAND.about.title.trim() !== '' ? BRAND.about.title : 'WebRTC SFU v2.4.71',
         html: renderRoomTemplate('popupAboutTemplate', {
             html: {
-                aboutContent: BRAND.about.html,
+                aboutContent: `${BRAND.about.html}${sourceLink}`,
             },
         }),
         showClass: { popup: 'animate__animated animate__fadeInDown' },

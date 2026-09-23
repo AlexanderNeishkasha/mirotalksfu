@@ -18,8 +18,10 @@ To build from the checked-out `bodrik` source, run `docker build -t mirotalk-sfu
 Runtime settings depend on the deployment; refer to `.env.template` for upstream
 configuration names. Never commit real `.env` files, certificates or tokens.
 For reproducibility, select an explicit fork commit rather than building an
-unreviewed moving branch. The deployed source revision should be discoverable
-from the meeting service; that link will be verified before production cutover.
+unreviewed moving branch. The meeting's About dialog links to this fork; set
+`MIROTALK_SOURCE_REVISION` to the deployed 40-character fork commit SHA at runtime
+so the link points to the exact corresponding source. Without that setting it
+links to the moving `bodrik` branch. Verify the link before production cutover.
 
 When updating from upstream, review changes on the separate `upstream` remote and
 merge or cherry-pick deliberately. Do not overwrite the `bodrik` branch with the

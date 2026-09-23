@@ -1303,6 +1303,7 @@ module.exports = {
              * Supports HTML content for flexible formatting.
              */
             about: {
+                sourceRevision: process.env.MIROTALK_SOURCE_REVISION || '',
                 imageUrl: process.env.ABOUT_IMAGE_URL || '../images/mirotalk-logo.gif',
                 title: `WebRTC SFU v${packageJson.version}`,
                 html: `
