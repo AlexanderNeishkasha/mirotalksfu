@@ -2910,8 +2910,10 @@ class RoomClient {
     // ####################################################
 
     getAudioConstraints(deviceId) {
-        // If custom RNNoise is enabled but not supported, fall back to built-in WebRTC noise suppression
-        const useBuiltInNoiseSuppression = !BUTTONS.settings.customNoiseSuppression || !this.isRNNoiseSupported;
+        // Use the browser fallback only when noise suppression is enabled but RNNoise is unavailable.
+        const useBuiltInNoiseSuppression =
+            localStorageSettings.mic_noise_suppression &&
+            (!BUTTONS.settings.customNoiseSuppression || !this.isRNNoiseSupported);
 
         const audioConstraints = {
             echoCancellation: true,
@@ -4715,6 +4717,10 @@ class RoomClient {
             this.stopConsumerReconcile();
             if (this.consumerTransport) this.consumerTransport.close();
             if (this.producerTransport) this.producerTransport.close();
+            if (this._outputAudioContext) {
+                this._outputAudioContext.close().catch((err) => console.warn('Close output AudioContext', err));
+                this._outputAudioContext = null;
+            }
             if (this.socket) {
                 this.socket.off('disconnect');
                 this.socket.off('transportClosed');
@@ -11327,20 +11333,15 @@ class RoomClient {
 
         const gainNode = this.getOutputGainNode(audioPlayer, volume);
         if (gainNode) {
+            audioPlayer.muted = false;
+            audioPlayer.volume = 1;
             gainNode.gain.value = volume;
             return;
         }
 
-        if (this.isMobileDevice) {
-            audioPlayer.muted = volume === 0;
-            if (!audioPlayer.muted) {
-                // Adjust playback rate as volume on mobile devices
-                audioPlayer.playbackRate = Math.max(0.1, volume);
-            }
-        } else {
-            // Set volume directly on desktop devices
-            audioPlayer.volume = volume;
-        }
+        // HTMLMediaElement.volume works on most browsers; unsupported mobile browsers use Web Audio above.
+        audioPlayer.muted = volume === 0;
+        audioPlayer.volume = volume;
     }
 
     canSetElementVolume() {
@@ -11371,9 +11372,9 @@ class RoomClient {
     getOutputGainNode(elem, volume) {
         if (elem._outputGainNode) return elem._outputGainNode;
 
-        // Web Audio routing is engaged lazily and only where HTMLMediaElement.volume is
-        // read-only (iOS), so the default full-volume output path stays untouched elsewhere.
-        if (volume >= 1 || elem._outputGainUnavailable || this.canSetElementVolume()) return null;
+        // Mobile browsers may report writable volume without applying it to remote media.
+        // Route through Web Audio when attenuation is needed; keep full-volume playback untouched.
+        if (volume >= 1 || elem._outputGainUnavailable || (!this.isMobileDevice && this.canSetElementVolume())) return null;
 
         const audioContext = this.getOutputAudioContext();
         if (!audioContext) {

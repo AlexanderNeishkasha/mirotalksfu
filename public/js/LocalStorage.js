@@ -35,7 +35,7 @@ class LocalStorage {
             moderator_polls_cant_create: false, // Only presenter can create/edit/delete polls
             moderator_disconnect_all_on_leave: false, // Disconnect all participants on leave room
             dominant_speaker_focus: false, // Focus on dominant speaker
-            mic_noise_suppression: true, // Noise suppression using RNNoise
+            mic_noise_suppression: false, // Noise suppression, using RNNoise or browser fallback
             speaker_volume: 100, // master output volume 0-100
             video_fps: 0, // default 1280x768 30fps
             aspect_ratio: 0, // default (adaptive)
@@ -46,7 +46,7 @@ class LocalStorage {
             pitch_bar: true, // volume indicator
             sounds: true, // room notify sounds
             show_camera_off_participants: true, // show participants with the camera off in the grid
-            keep_buttons_visible: false, // Keep buttons always visible
+            keep_buttons_visible: true, // Keep buttons always visible
             chat_pin: true, // Auto pin chat on open
             keyboard_shortcuts: false, // keyboard shortcuts
             host_only_recording: false, // presenter
@@ -148,8 +148,16 @@ class LocalStorage {
     // GET LOCAL STORAGE
     // ####################################################
 
+    /** Disable previously saved noise suppression once, preserving subsequent user choices. */
     getLocalStorageSettings() {
-        return this.getObjectLocalStorage('SFU_SETTINGS');
+        const settings = this.getObjectLocalStorage('SFU_SETTINGS');
+        const migrationKey = 'BODRIK_NOISE_DEFAULT_OFF_V1';
+        if (settings && !localStorage.getItem(migrationKey)) {
+            settings.mic_noise_suppression = false;
+            this.setSettings(settings);
+            localStorage.setItem(migrationKey, '1');
+        }
+        return settings;
     }
 
     getLocalStorageInitConfig() {
