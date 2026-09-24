@@ -13,6 +13,7 @@
         "lint": "node scripts/lint.mjs",
         "check:syntax": "node scripts/check-source.mjs",
         "test:bodrik": "node scripts/test-bodrik.mjs",
+        "test:music-integration": "node scripts/test-bodrik.mjs --music-integration",
         "format:check": "node scripts/format.mjs check",
         "format:write": "node scripts/format.mjs write",
         "mailpit:up": "docker-compose -f docker-compose-mailpit.yml up -d",

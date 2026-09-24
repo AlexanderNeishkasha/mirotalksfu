@@ -13,7 +13,7 @@ copyright notices are retained; the code is licensed under [GNU AGPL-3.0](LICENS
 The upstream maintainers are not responsible for this fork's integration.
 
 For local checks, run `npm ci`, `npm run lint` (ESLint, syntax and language JSON),
-`npm run test:bodrik`, and `npm test` (upstream Mocha tests). ESLint applies
+`npm run test:bodrik`, and `npm test` (upstream Mocha tests). The real RTP/FFmpeg test is separate: run `npm run test:music-integration` on Linux with a built mediasoup worker and FFmpeg. ESLint applies
 safe rules to legacy files and stronger rules to new integration modules;
 it does not use Next.js/React rules. `npm run format:check` checks first-party
 server/browser sources and dictionaries; pass paths to check only changed files.
