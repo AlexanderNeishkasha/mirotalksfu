@@ -1,0 +1,3 @@
+#!/bin/sh
+# Validate the public fork before its commit can be referenced by dm_radio.
+exec node scripts/pre-push.mjs
