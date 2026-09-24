@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 
 const source = fs.readFileSync(require('node:path').join(__dirname, 'RoomClient.js'), 'utf8');
-const methods = source.slice(source.indexOf('    applyOutputVolume(audioPlayer) {'), source.indexOf('    handlePeerAudio(cmd) {'));
+const methods = source.slice(source.indexOf('    applyOutputVolume(audioPlayer) {'), source.indexOf('    addVolumeEventListeners(inputElement, updateVolumeCallback) {'));
 const Volume = vm.runInNewContext(`(class { ${methods} })`, { window: {} });
 
 /** Create a remote audio player with an inspectable gain node. */

@@ -3315,11 +3315,8 @@ function startServer() {
                     delete data.redirect;
                     break;
                 case 'peerAudio':
-                    // Keep producer volume to update consumer on join room...
-                    if (data.audioProducerId) {
-                        peer.updatePeerInfo({ type: data.type, volume: data.volume * 100 });
-                    }
-                    break;
+                    // Legacy clients must not change participant volume for the whole room.
+                    return;
                 default:
                     break;
                 //...

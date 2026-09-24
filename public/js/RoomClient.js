@@ -3295,7 +3295,7 @@ class RoomClient {
     }
 
     async handleProducer(id, type, stream) {
-        let elem, vb, vp, ts, d, p, i, au, pip, ha, fs, pm, pb, pn, pv, mv, st, dw, ri;
+        let elem, vb, vp, ts, d, p, i, au, pip, ha, fs, pm, pb, pn, mv, st, dw, ri;
         switch (type) {
             case mediaType.video:
             case mediaType.screen:
@@ -3368,14 +3368,6 @@ class RoomClient {
                 pb.style.height = '1%';
                 pm.appendChild(pb);
 
-                pv = document.createElement('input');
-                pv.id = this.peer_id + '___pVolume';
-                pv.type = 'range';
-                pv.min = 0;
-                pv.max = 100;
-                pv.value = 100;
-
-                BUTTONS.producerVideo.audioVolumeInput && vb.appendChild(pv);
                 BUTTONS.producerVideo.muteAudioButton && vb.appendChild(au);
                 BUTTONS.producerVideo.videoPrivacyButton && !isScreen && vb.appendChild(vp);
                 BUTTONS.producerVideo.snapShotButton && vb.appendChild(ts);
@@ -3418,7 +3410,6 @@ class RoomClient {
                 this.handleDropdownEvents(myDropdownDiv, myDropdownBtn, myDropdownContent);
 
                 vb.appendChild(myDropdownDiv);
-                BUTTONS.producerVideo.audioVolumeInput && vb.appendChild(pv);
                 BUTTONS.producerVideo.muteAudioButton && vb.appendChild(au);
                 BUTTONS.producerVideo.videoPrivacyButton && !isScreen && vb.appendChild(vp);
                 BUTTONS.producerVideo.snapShotButton && vb.appendChild(ts);
@@ -3470,14 +3461,6 @@ class RoomClient {
                 BUTTONS.producerVideo.drawingButton && isScreen && this.handleDW(dw.id, d.id);
                 this.handlePN(elem.id, pn.id, d.id, isScreen);
                 this.handleZV(elem.id, d.id, this.peer_id);
-                this.handlePV(id, pv.id);
-
-                this.setAV(
-                    this.audioConsumers.get(this.peer_id + '___pVolume'),
-                    this.peer_id + '___pVolume',
-                    this.peer_info.peer_audio_volume
-                );
-
                 if (!isScreen) this.handleVP(elem.id, vp.id);
 
                 this.popupPeerInfo(p.id, this.peer_info);
@@ -3513,12 +3496,6 @@ class RoomClient {
                 this.localAudioEl.appendChild(elem);
 
                 await this.attachMediaStream(elem, stream, type, 'Producer');
-
-                const audioConsumerId = this.peer_id + '___pVolume';
-                this.audioConsumers.set(audioConsumerId, elem.id);
-
-                this.setAV(elem.id, audioConsumerId, this.peer_info.peer_audio_volume);
-                this.handlePV(elem.id, audioConsumerId);
 
                 console.log('[addProducer] audio-element-count', this.localAudioEl.childElementCount);
                 break;
@@ -4347,7 +4324,7 @@ class RoomClient {
                 this.audioConsumers.set(audioConsumerId, id);
 
                 // Use helper function to set audio volume
-                this.setAV(id, audioConsumerId, remotePeerAudioVolume, true);
+                this.setAV(id, audioConsumerId, remotePeerAudioVolume);
                 this.handleCV(audioConsumerId);
 
                 this.setPeerAudio(remotePeerId, remotePeerAudio);
@@ -4539,7 +4516,8 @@ class RoomClient {
         BUTTONS.videoOff.pinVideoButton &&
             !this.isMobileDevice &&
             eVc.appendChild(this.createResponsiveDropdownItem(pn, 'Pin', 'compact'));
-        BUTTONS.videoOff.audioVolumeInput &&
+        remotePeer &&
+            BUTTONS.videoOff.audioVolumeInput &&
             eVc.appendChild(this.createResponsiveDropdownRangeItem(pv, 'Volume', 'fa-volume-high'));
         if (remotePeer) {
             BUTTONS.videoOff.presenterRoleButton &&
@@ -4561,7 +4539,7 @@ class RoomClient {
         this.handleDropdownEvents(eDiv, eBtn, eVc);
 
         vb.appendChild(eDiv);
-        BUTTONS.videoOff.audioVolumeInput && vb.appendChild(pv);
+        remotePeer && BUTTONS.videoOff.audioVolumeInput && vb.appendChild(pv);
         BUTTONS.videoOff.muteAudioButton && vb.appendChild(au);
         if (BUTTONS.videoOff.pinVideoButton && !this.isMobileDevice) vb.appendChild(pn);
         if (!remotePeer) vb.appendChild(st);
@@ -4602,8 +4580,6 @@ class RoomClient {
             this.handleKO(ko.id, peer_id);
             this.handleHFG(hg.id, peer_id);
             this.handleRole(role.id, peer_id, peer_presenter);
-        } else {
-            this.handlePV(this.audioConsumers.get(pv.id), pv.id);
         }
 
         this.handleVB(d.id, vb.id);
@@ -11192,18 +11168,13 @@ class RoomClient {
     // ####################################################
 
     handleCV(volumeInputId) {
-        this.handleVolumeControl(null, volumeInputId, true); // Consumer
+        this.handleVolumeControl(volumeInputId);
     }
 
-    handlePV(audioElementId, volumeInputId) {
-        this.handleVolumeControl(audioElementId, volumeInputId, false); // Producer
-    }
-
-    setAV(audioElementId, volumeElementId, volumeValue, isConsumer = false) {
+    setAV(audioElementId, volumeElementId, volumeValue) {
         const volumeInput = this.getId(volumeElementId);
         const audioPlayer = this.getId(audioElementId);
         if (volumeInput && audioPlayer) {
-            const producerVolumeValue = volumeValue;
             const identity = volumeInput.dataset.volumeKey;
             const storageKey = identity ? `bodrik-peer-volume:${this.room_id}:${identity}` : null;
             audioPlayer.dataset.bodrikMusic = identity === 'bodrik-music' ? 'true' : 'false';
@@ -11216,9 +11187,6 @@ class RoomClient {
             console.log('Setting audio volume:', volumeValue);
             volumeInput.value = volumeValue;
             if (!audioPlayer.muted) {
-                if (isConsumer) {
-                    this.toggleVolumeInput(volumeInput, producerVolumeValue);
-                }
                 this.setAudioVolume(audioPlayer, volume);
             } else {
                 console.log('Audio player is muted, volume not adjusted.');
@@ -11226,34 +11194,16 @@ class RoomClient {
         }
     }
 
-    toggleVolumeInput(volumeInput, volumeValue) {
-        /* 
-            If the producer has changed the volume from the default value of 100,
-            disable the volume input control on the consumer side to prevent further adjustments.
-            Otherwise, keep the input enabled if the volume is still at 100.
-        */
-        volumeInput.disabled = volumeValue < 100;
-    }
-
-    handleVolumeControl(audioElementId, volumeInputId, isConsumer = true) {
-        const audioPlayer = this.getId(isConsumer ? this.audioConsumers.get(volumeInputId) : audioElementId);
+    handleVolumeControl(volumeInputId) {
+        const audioPlayer = this.getId(this.audioConsumers.get(volumeInputId));
         const inputElement = this.getId(volumeInputId);
 
         if (inputElement && audioPlayer) {
-            //
-            // Check if audio is enabled/disabled
-            const isAudioEnabled = isConsumer
-                ? !audioPlayer.muted && audioPlayer.volume > 0
-                : this.peer_info.peer_audio;
-
-            isConsumer || isAudioEnabled ? show(inputElement) : hide(inputElement);
             const savedVolume = localStorage.getItem(
                 `bodrik-peer-volume:${this.room_id}:${inputElement.dataset.volumeKey}`,
             );
             const parsedVolume = savedVolume === null ? NaN : Number(savedVolume);
             inputElement.value = Number.isFinite(parsedVolume) ? parsedVolume : 100;
-
-            let volumeUpdateTimeout;
 
             const updateVolume = () => {
                 const volume = inputElement.value / 100;
@@ -11263,29 +11213,6 @@ class RoomClient {
                     localStorage.setItem(`bodrik-peer-volume:${this.room_id}:${identity}`, inputElement.value);
                 }
 
-                // Update producer audio volume
-                if (!isConsumer) this.peer_info.peer_audio_volume = inputElement.value;
-
-                // Clear any existing timeout to prevent sending too frequently
-                if (volumeUpdateTimeout) {
-                    clearTimeout(volumeUpdateTimeout);
-                }
-
-                // Set a timeout to send the update after 0.5 second
-                volumeUpdateTimeout = setTimeout(() => {
-                    // Prepare the command to update peer volume
-                    const cmd = {
-                        type: 'peerAudio',
-                        peer_name: this.peer_name,
-                        [isConsumer ? 'audioConsumerId' : 'audioProducerId']: isConsumer
-                            ? this.audioConsumers.get(volumeInputId)
-                            : this.audioProducerId,
-                        volumeInputId: volumeInputId,
-                        volume: volume,
-                        broadcast: true,
-                    };
-                    this.emitCmd(cmd);
-                }, 500); // 0.5 second delay
             };
 
             this.addVolumeEventListeners(inputElement, updateVolume);
@@ -11400,49 +11327,6 @@ class RoomClient {
             elem._outputGainUnavailable = true;
             return null;
         }
-    }
-
-    handlePeerAudio(cmd) {
-        console.log('handlePeerAudio', { cmd });
-
-        const { volumeInputId, audioProducerId, audioConsumerId, volume } = cmd;
-
-        const volumeInput = this.getId(volumeInputId);
-
-        if (!volumeInput) return;
-
-        volumeInput.value = volume * 100;
-
-        if (audioProducerId) {
-            this.handleConsumerAudio(audioProducerId, volume);
-            this.toggleVolumeInput(volumeInput, volumeInput.value);
-        }
-
-        if (audioConsumerId) this.handleProducerAudio(audioConsumerId, volume);
-    }
-
-    handleConsumerAudio(audioProducerId, volume) {
-        const consumerAudioId = this.getConsumerIdByProducerId(audioProducerId);
-        if (!consumerAudioId) return;
-
-        const consumerAudioPlayer = this.getId(consumerAudioId);
-        if (!consumerAudioPlayer) return;
-
-        this.setAudioVolume(consumerAudioPlayer, volume);
-
-        console.log('handleConsumerPeerAudio', { consumerAudioId, consumerAudioPlayer });
-    }
-
-    handleProducerAudio(audioConsumerId, volume) {
-        const producerAudioId = this.getProducerIdByConsumerId(audioConsumerId);
-        if (!producerAudioId) return;
-
-        const producerAudioPlayer = this.getId(producerAudioId);
-        if (!producerAudioPlayer) return;
-
-        this.setAudioVolume(producerAudioPlayer, volume);
-
-        console.log('handleProducerPeerAudio', { producerAudioId, producerAudioPlayer });
     }
 
     addVolumeEventListeners(inputElement, updateVolumeCallback) {
@@ -12005,9 +11889,6 @@ class RoomClient {
                 break;
             case 'ejectAll':
                 this.handleEjectAllFromRoom(cmd);
-                break;
-            case 'peerAudio':
-                this.handlePeerAudio(cmd);
                 break;
             default:
                 break;

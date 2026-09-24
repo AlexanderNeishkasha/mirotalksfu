@@ -91,10 +91,6 @@ module.exports = class Peer {
                 this.peer_info.peer_recording = data.status;
                 this.peer_recording = data.status;
                 break;
-            case 'peerAudio':
-                this.peer_info.peer_audio_volume = data.volume;
-                this.peer_audio_volume = data.volume;
-                break;
             case 'lobby':
                 this.peer_info.peer_lobby = data.status;
                 this.peer_lobby = data.status;
