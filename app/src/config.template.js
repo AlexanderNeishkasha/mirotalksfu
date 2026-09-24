@@ -1296,15 +1296,9 @@ module.exports = {
                 buttonLabel: process.env.LOGIN_BUTTON_LABEL || 'Login',
             },
 
-            /**
-             * About/Credits Section
-             * ---------------------
-             * Contains author information, version, and support links.
-             * Supports HTML content for flexible formatting.
-             */
+            /** About dialog for the meeting, with the deployed source revision. */
             about: {
                 sourceRevision: process.env.MIROTALK_SOURCE_REVISION || '',
-                imageUrl: process.env.ABOUT_IMAGE_URL || '../images/mirotalk-logo.gif',
                 title: `WebRTC SFU v${packageJson.version}`,
                 html: `
                     <div class="about-content">
@@ -1321,33 +1315,6 @@ module.exports = {
                             <i class="fas fa-info-circle" aria-hidden="true"></i>
                             <span>${process.env.SUPPORT_TEXT || 'About'}</span>
                         </a>
-                        <dl class="about-details">
-                            <div>
-                                <dt>${process.env.AUTHOR_LABEL || 'Author'}</dt>
-                                <dd>
-                                    <a
-                                        id="linkedin-button"
-                                        data-umami-event="Linkedin button"
-                                        href="${process.env.LINKEDIN_URL || 'https://www.linkedin.com/in/miroslav-pejic-976a07101/'}"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                    >${process.env.AUTHOR_NAME || 'Miroslav Pejic'}</a>
-                                </dd>
-                            </div>
-                            <div>
-                                <dt>${process.env.EMAIL_LABEL || 'Email'}</dt>
-                                <dd>
-                                    <a
-                                        id="email-button"
-                                        data-umami-event="Email button"
-                                        href="mailto:${process.env.CONTACT_EMAIL || 'miroslav.pejic.85@gmail.com'}?subject=${process.env.EMAIL_SUBJECT || 'MiroTalk SFU info'}"
-                                    >${process.env.CONTACT_EMAIL || 'miroslav.pejic.85@gmail.com'}</a>
-                                </dd>
-                            </div>
-                        </dl>
-                        <footer class="about-footer">
-                            &copy; ${new Date().getFullYear()} ${process.env.COPYRIGHT_TEXT || 'MiroTalk SFU. All rights reserved.'}
-                        </footer>
                     </div>
                 `,
             },

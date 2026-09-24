@@ -1,6 +1,6 @@
 'use strict';
 
-const brandDataKey = 'brandData';
+const brandDataKey = 'brandData-bodrik-2';
 const brandData = window.sessionStorage.getItem(brandDataKey);
 
 const title = document.getElementById('title');
@@ -100,7 +100,6 @@ let BRAND = {
         buttonLabel: 'Login',
     },
     about: {
-        imageUrl: '../images/mirotalk-logo.gif',
         title: '<strong>WebRTC SFU v2.4.71</strong>',
         html: `
             <div class="about-content">
@@ -117,33 +116,6 @@ let BRAND = {
                     <i class="fas fa-info-circle" aria-hidden="true"></i>
                     <span>About</span>
                 </a>
-                <dl class="about-details">
-                    <div>
-                        <dt>Author</dt>
-                        <dd>
-                            <a
-                                id="linkedin-button"
-                                data-umami-event="Linkedin button"
-                                href="https://www.linkedin.com/in/miroslav-pejic-976a07101/"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                            >Miroslav Pejic</a>
-                        </dd>
-                    </div>
-                    <div>
-                        <dt>Email</dt>
-                        <dd>
-                            <a
-                                id="email-button"
-                                data-umami-event="Email button"
-                                href="mailto:miroslav.pejic.85@gmail.com?subject=MiroTalk SFU info"
-                            >miroslav.pejic.85@gmail.com</a>
-                        </dd>
-                    </div>
-                </dl>
-                <footer class="about-footer">
-                    &copy; ${new Date().getFullYear()} MiroTalk SFU. All rights reserved.
-                </footer>
             </div>
         `,
     },

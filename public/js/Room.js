@@ -8953,7 +8953,7 @@ window.addEventListener('beforeunload', (e) => {
 // ABOUT
 // ####################################################
 
-/** Show meeting credits and a link to the public source for the running fork. */
+/** Show meeting details and the corresponding public source for this deployment. */
 function showAbout() {
     sound('open');
 
@@ -8966,8 +8966,6 @@ function showAbout() {
     Swal.fire({
         background: swalBackground,
         position: 'center',
-        imageUrl: BRAND.about?.imageUrl && BRAND.about.imageUrl.trim() !== '' ? BRAND.about.imageUrl : image.about,
-        customClass: { image: 'img-about' },
         title: BRAND.about?.title && BRAND.about.title.trim() !== '' ? BRAND.about.title : 'WebRTC SFU v2.4.71',
         html: renderRoomTemplate('popupAboutTemplate', {
             html: {
