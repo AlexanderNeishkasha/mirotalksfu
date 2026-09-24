@@ -36,6 +36,8 @@ class LocalStorage {
             moderator_disconnect_all_on_leave: false, // Disconnect all participants on leave room
             dominant_speaker_focus: false, // Focus on dominant speaker
             mic_noise_suppression: false, // Noise suppression, using RNNoise or browser fallback
+            mic_echo_cancellation: false, // Browser echo cancellation
+            mic_auto_gain_control: false, // Browser automatic gain control
             speaker_volume: 100, // master output volume 0-100
             video_fps: 0, // default 1280x768 30fps
             aspect_ratio: 0, // default (adaptive)

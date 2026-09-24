@@ -70,6 +70,7 @@ dev dependencies: {
 const express = require('express');
 const { auth, requiresAuth } = require('express-openid-connect');
 const { withFileLock } = require('./MutexManager');
+const { admittedPeer } = require('./BodrikJoinDiagnostics');
 const { PassThrough } = require('stream');
 const { S3Client } = require('@aws-sdk/client-s3');
 const { Upload } = require('@aws-sdk/lib-storage');
@@ -2774,6 +2775,10 @@ function startServer() {
             }
 
             cb(roomJson);
+            log.info(
+                '[Join] admitted peer',
+                admittedPeer(room.id, peer.peer_info, data.diagnostics, socket.handshake.headers['user-agent'])
+            );
         });
 
         socket.on('getRouterRtpCapabilities', (_, callback) => {

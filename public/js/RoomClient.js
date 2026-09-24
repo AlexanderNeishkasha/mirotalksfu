@@ -581,6 +581,7 @@ class RoomClient {
             const data = {
                 room_id: this.room_id,
                 peer_info: this.peer_info,
+                diagnostics: collectBodrikJoinDiagnostics(parserResult, publicRoomSlug, deviceType),
                 rejoin_secret: this.getRejoinSecret(),
             };
             await this.join(data);
@@ -2916,8 +2917,8 @@ class RoomClient {
             (!BUTTONS.settings.customNoiseSuppression || !this.isRNNoiseSupported);
 
         const audioConstraints = {
-            echoCancellation: true,
-            autoGainControl: true,
+            echoCancellation: localStorageSettings.mic_echo_cancellation === true,
+            autoGainControl: localStorageSettings.mic_auto_gain_control === true,
             noiseSuppression: useBuiltInNoiseSuppression,
         };
         /* 

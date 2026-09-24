@@ -3709,6 +3709,17 @@ function handleSelects() {
         lS.setSettings(localStorageSettings);
         e.target.blur();
     };
+    bindBodrikMicSettings({
+        echoInput: switchEchoCancellation,
+        gainInput: switchAutoGainControl,
+        settings: localStorageSettings,
+        storage: lS,
+        getRoomClient: () => rc,
+        onError: (error) => {
+            console.error('Microphone processing setting failed', error);
+            userLog('error', 'Could not update microphone processing', 'top-end');
+        },
+    });
     switchKeepButtonsVisible.onchange = (e) => {
         isButtonsBarOver = isKeepButtonsVisible = e.currentTarget.checked;
         localStorageSettings.keep_buttons_visible = isButtonsBarOver;
@@ -4538,6 +4549,8 @@ function loadSettingsFromLocalStorage() {
 
     switchDominantSpeakerFocus.checked = localStorageSettings.dominant_speaker_focus;
     switchNoiseSuppression.checked = localStorageSettings.mic_noise_suppression;
+    switchEchoCancellation.checked = localStorageSettings.mic_echo_cancellation === true;
+    switchAutoGainControl.checked = localStorageSettings.mic_auto_gain_control === true;
 
     setSpeakerVolume(localStorageSettings.speaker_volume !== undefined ? localStorageSettings.speaker_volume : 100);
 
@@ -5721,24 +5734,19 @@ function setupQuickDeviceSwitchDropdowns() {
         const showPushToTalk = BUTTONS.settings.pushToTalk;
         const showDominantSpeakerFocus = rc.dominantSpeaker;
 
-        if (showNoiseSuppression || showPushToTalk || showDominantSpeakerFocus) {
-            appendMenuDivider(audioMenu);
-            appendMenuHeader(audioMenu, 'fas fa-ear-listen', 'Microphone Controls');
+        appendMenuDivider(audioMenu);
+        appendMenuHeader(audioMenu, 'fas fa-ear-listen', 'Microphone Controls');
 
-            if (showNoiseSuppression) {
-                appendMenuToggle(audioMenu, 'deviceMenuNoiseSuppression', 'Noise cancellation', switchNoiseSuppression);
-            }
-            if (showPushToTalk) {
-                appendMenuToggle(audioMenu, 'deviceMenuPushToTalk', 'Push to talk', switchPushToTalk);
-            }
-            if (showDominantSpeakerFocus) {
-                appendMenuToggle(
-                    audioMenu,
-                    'deviceMenuDominantSpeakerFocus',
-                    'Speaker Focus',
-                    switchDominantSpeakerFocus
-                );
-            }
+        if (showNoiseSuppression) {
+            appendMenuToggle(audioMenu, 'deviceMenuNoiseSuppression', 'Noise cancellation', switchNoiseSuppression);
+        }
+        appendMenuToggle(audioMenu, 'deviceMenuEchoCancellation', 'Echo cancellation', switchEchoCancellation);
+        appendMenuToggle(audioMenu, 'deviceMenuAutoGainControl', 'Automatic gain control', switchAutoGainControl);
+        if (showPushToTalk) {
+            appendMenuToggle(audioMenu, 'deviceMenuPushToTalk', 'Push to talk', switchPushToTalk);
+        }
+        if (showDominantSpeakerFocus) {
+            appendMenuToggle(audioMenu, 'deviceMenuDominantSpeakerFocus', 'Speaker Focus', switchDominantSpeakerFocus);
         }
 
         appendMenuDivider(audioMenu);
@@ -5859,6 +5867,8 @@ function setupQuickDeviceSwitchDropdowns() {
     if (speakerSelect) speakerSelect.addEventListener('change', rebuildAudioMenu);
     [
         [switchNoiseSuppression, 'deviceMenuNoiseSuppression'],
+        [switchEchoCancellation, 'deviceMenuEchoCancellation'],
+        [switchAutoGainControl, 'deviceMenuAutoGainControl'],
         [switchPushToTalk, 'deviceMenuPushToTalk'],
         [switchDominantSpeakerFocus, 'deviceMenuDominantSpeakerFocus'],
     ].forEach(([settingsSwitch, menuSwitchId]) => {
