@@ -30,11 +30,17 @@ for (const ref of refs) {
     }
 }
 if (!changed.size) process.exit(0);
-const files = [...changed].filter((name) => /^(app\/src|public\/js)\/.*\.[cm]?js$|^public\/lang\/.*\.json$/.test(name));
+const files = [...changed].filter((name) =>
+    /^(app\/src|public\/js|scripts)\/.*\.[cm]?js$|^public\/lang\/.*\.json$/.test(name)
+);
 const fresh = [...added].filter((name) => /\.(?:[cm]?js|json|html)$/.test(name));
 if ([...files, ...fresh].some((name) => !/^[\w./-]+$/.test(name))) throw new Error('Unsafe source path in push');
 const npmOptions = { stdio: 'inherit', shell: process.platform === 'win32' };
-if (files.length) execFileSync('npm', ['run', 'lint', '--', ...files], npmOptions);
+if (changed.has('eslint.config.mjs') || changed.has('package.json')) {
+    execFileSync('npm', ['run', 'lint'], npmOptions);
+} else if (files.length) {
+    execFileSync('npm', ['run', 'lint', '--', ...files], npmOptions);
+}
 if (fresh.length) execFileSync('npm', ['run', 'format:check', '--', ...fresh], npmOptions);
 if (
     [...changed].some((name) =>
