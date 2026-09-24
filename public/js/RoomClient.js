@@ -11333,7 +11333,8 @@ class RoomClient {
 
         const gainNode = this.getOutputGainNode(audioPlayer, volume);
         if (gainNode) {
-            audioPlayer.muted = false;
+            // A MediaStream source reads the track directly; mute the HTML element to avoid double playback.
+            audioPlayer.muted = audioPlayer._outputStreamGain || volume === 0;
             audioPlayer.volume = 1;
             gainNode.gain.value = volume;
             return;
@@ -11383,10 +11384,15 @@ class RoomClient {
         }
 
         try {
-            const source = audioContext.createMediaElementSource(elem);
+            // Remote tracks must not also play through the HTML element on mobile devices.
+            const streamSource = this.isMobileDevice && elem.srcObject && audioContext.createMediaStreamSource;
+            const source = streamSource
+                ? audioContext.createMediaStreamSource(elem.srcObject)
+                : audioContext.createMediaElementSource(elem);
             const gainNode = audioContext.createGain();
             source.connect(gainNode);
             gainNode.connect(audioContext.destination);
+            elem._outputStreamGain = Boolean(streamSource);
             elem._outputGainNode = gainNode;
             return gainNode;
         } catch (err) {

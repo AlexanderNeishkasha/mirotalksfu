@@ -27,24 +27,43 @@ test('mobile music applies Studio master times listener volume without changing 
     client.bodrikMusicVolume = 0;
     client.applyOutputVolume(audio);
     assert.equal(gain.gain.value, 0);
+    assert.equal(audio.muted, true);
     client.bodrikMusicVolume = 1;
     client.applyOutputVolume(audio);
     assert.equal(gain.gain.value, 0.4);
 });
 
-test('mobile tries Web Audio despite HTML volume appearing writable', () => {
+test('mobile peers route remote tracks through gain without double playback', () => {
     const client = new Volume();
     client.isMobileDevice = true;
+    client.masterOutputVolume = 1;
+    client.bodrikMusicVolume = 1;
     client.canSetElementVolume = () => true;
+    let sourceCreated = 0;
     client.getOutputAudioContext = () => ({
-        createMediaElementSource: () => ({ connect() {} }),
+        createMediaStreamSource: () => {
+            sourceCreated++;
+            return { connect() {} };
+        },
+        createMediaElementSource: () => { throw new Error('should use stream'); },
         createGain: () => ({ gain: { value: 1 }, connect() {} }),
         destination: {},
     });
     const audio = player();
-    assert.ok(client.getOutputGainNode(audio, 0.4));
-    assert.ok(audio._outputGainNode);
-    assert.equal(client.getOutputGainNode(audio, 1), audio._outputGainNode);
+    audio.srcObject = {};
+    audio.dataset.bodrikMusic = 'false';
+    client.applyOutputVolume(audio);
+    assert.equal(sourceCreated, 1);
+    assert.equal(audio._outputGainNode.gain.value, 0.5);
+    assert.equal(audio.muted, true);
+    audio.dataset.peerVolume = '0';
+    client.applyOutputVolume(audio);
+    assert.equal(audio._outputGainNode.gain.value, 0);
+    assert.equal(audio.muted, true);
+    audio.dataset.peerVolume = '0.25';
+    client.applyOutputVolume(audio);
+    assert.equal(audio._outputGainNode.gain.value, 0.25);
+    assert.equal(sourceCreated, 1);
 });
 
 test('desktop continues using HTML volume when no gain is needed', () => {

@@ -17,7 +17,7 @@ class LocalStorage {
 
         this.SFU_SETTINGS = {
             share_on_join: true, // popup message on join
-            show_chat_on_msg: true, // show chat on new message
+            show_chat_on_msg: false, // keep chat closed when a new message arrives
             transcript_show_on_msg: true, // show transcript on new message
             transcript_send_to_all: true, // send transcript to all participants
             speech_in_msg: false, // speech incoming message
@@ -148,14 +148,20 @@ class LocalStorage {
     // GET LOCAL STORAGE
     // ####################################################
 
-    /** Disable previously saved noise suppression once, preserving subsequent user choices. */
+    /** Apply one-time defaults to saved settings without overriding later user choices. */
     getLocalStorageSettings() {
         const settings = this.getObjectLocalStorage('SFU_SETTINGS');
-        const migrationKey = 'BODRIK_NOISE_DEFAULT_OFF_V1';
-        if (settings && !localStorage.getItem(migrationKey)) {
-            settings.mic_noise_suppression = false;
+        if (!settings) return settings;
+
+        const migrations = [
+            ['BODRIK_NOISE_DEFAULT_OFF_V1', 'mic_noise_suppression'],
+            ['BODRIK_CHAT_AUTO_OPEN_OFF_V1', 'show_chat_on_msg'],
+        ];
+        for (const [key, setting] of migrations) {
+            if (localStorage.getItem(key)) continue;
+            settings[setting] = false;
             this.setSettings(settings);
-            localStorage.setItem(migrationKey, '1');
+            localStorage.setItem(key, '1');
         }
         return settings;
     }
