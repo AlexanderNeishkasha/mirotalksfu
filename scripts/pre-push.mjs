@@ -1,7 +1,8 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
-/** Run first-party checks for source included in the pushed commits; fail closed on errors. */
+// Run first-party checks for source included in the pushed commits; fail closed on errors.
+/** Read Git's changed refs without hiding an unavailable revision. */
 function git(args) {
     return execFileSync('git', args, { encoding: 'utf8' }).trim();
 }
@@ -30,13 +31,15 @@ for (const ref of refs) {
 }
 if (!changed.size) process.exit(0);
 const files = [...changed].filter((name) => /^(app\/src|public\/js)\/.*\.[cm]?js$|^public\/lang\/.*\.json$/.test(name));
-if (files.length) execFileSync('npm', ['run', 'lint', '--', ...files], { stdio: 'inherit' });
 const fresh = [...added].filter((name) => /\.(?:[cm]?js|json|html)$/.test(name));
-if (fresh.length) execFileSync('npm', ['run', 'format:check', '--', ...fresh], { stdio: 'inherit' });
+if ([...files, ...fresh].some((name) => !/^[\w./-]+$/.test(name))) throw new Error('Unsafe source path in push');
+const npmOptions = { stdio: 'inherit', shell: process.platform === 'win32' };
+if (files.length) execFileSync('npm', ['run', 'lint', '--', ...files], npmOptions);
+if (fresh.length) execFileSync('npm', ['run', 'format:check', '--', ...fresh], npmOptions);
 if (
     [...changed].some((name) =>
         /^(app\/src|public\/js|public\/views|public\/lang|scripts)\/|^package(?:-lock)?\.json$/.test(name)
     )
 ) {
-    execFileSync('npm', ['run', 'test:bodrik'], { stdio: 'inherit' });
+    execFileSync('npm', ['run', 'test:bodrik'], npmOptions);
 }
