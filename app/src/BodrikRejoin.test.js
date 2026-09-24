@@ -11,8 +11,17 @@ const otherSecret = '87654321-1234-4123-8123-123456789abc';
 test('tab proof identifies only its own disconnected peer and is not serialized', () => {
     const old = { id: 'old', peer_name: 'Guest' };
     const stranger = { id: 'stranger', peer_name: 'Guest' };
-    const room = { getPeers: () => new Map([['old', old], ['stranger', stranger]]) };
-    const sockets = new Map([['old', {}], ['stranger', {}]]);
+    const room = {
+        getPeers: () =>
+            new Map([
+                ['old', old],
+                ['stranger', stranger],
+            ]),
+    };
+    const sockets = new Map([
+        ['old', {}],
+        ['stranger', {}],
+    ]);
 
     assert.equal(bindRejoinSecret(old, secret), true);
     assert.equal(bindRejoinSecret(stranger, otherSecret), true);
@@ -22,7 +31,12 @@ test('tab proof identifies only its own disconnected peer and is not serialized'
     assert.deepEqual(findDisconnectedRejoinPeers(room, sockets, secret, 'new'), [old]);
     const older = { id: 'older', peer_name: 'Guest' };
     bindRejoinSecret(older, secret);
-    room.getPeers = () => new Map([['old', old], ['older', older], ['stranger', stranger]]);
+    room.getPeers = () =>
+        new Map([
+            ['old', old],
+            ['older', older],
+            ['stranger', stranger],
+        ]);
     assert.deepEqual(findDisconnectedRejoinPeers(room, sockets, secret, 'new'), [old, older]);
     assert.deepEqual(findDisconnectedRejoinPeers(room, sockets, otherSecret, 'new'), []);
     assert.deepEqual(findDisconnectedRejoinPeers(room, sockets, 'not-a-proof', 'new'), []);

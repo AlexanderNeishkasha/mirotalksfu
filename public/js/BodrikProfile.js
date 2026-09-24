@@ -57,11 +57,15 @@ window.BodrikProfile = {
             0,
             0,
             size,
-            size,
+            size
         );
         bitmap.close();
         return new Promise((resolve, reject) =>
-            canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('Image conversion failed'))), 'image/webp', 0.82),
+            canvas.toBlob(
+                (blob) => (blob ? resolve(blob) : reject(new Error('Image conversion failed'))),
+                'image/webp',
+                0.82
+            )
         );
     },
 };

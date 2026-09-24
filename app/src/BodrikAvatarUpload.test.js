@@ -11,8 +11,14 @@ function response() {
     return {
         code: 200,
         body: null,
-        status(code) { this.code = code; return this; },
-        json(body) { this.body = body; return this; },
+        status(code) {
+            this.code = code;
+            return this;
+        },
+        json(body) {
+            this.body = body;
+            return this;
+        },
     };
 }
 
@@ -29,7 +35,15 @@ test('avatar upload requires a valid meeting token and image signature', async (
     const webp = Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(4), Buffer.from('WEBP'), Buffer.alloc(8)]);
 
     assert.equal((await invoke(handler, { headers: { 'content-type': 'image/webp' }, body: webp })).code, 401);
-    assert.equal((await invoke(handler, { headers: { authorization: 'Bearer valid', 'content-type': 'image/webp' }, body: Buffer.from('bad image') })).code, 400);
+    assert.equal(
+        (
+            await invoke(handler, {
+                headers: { authorization: 'Bearer valid', 'content-type': 'image/webp' },
+                body: Buffer.from('bad image'),
+            })
+        ).code,
+        400
+    );
 
     const uploaded = await invoke(handler, {
         headers: { authorization: 'Bearer valid', 'content-type': 'image/webp' },

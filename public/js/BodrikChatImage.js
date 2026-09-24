@@ -46,7 +46,9 @@ window.BodrikChatImage = (() => {
     /** Extract an image from a clipboard paste inside the chat, including Firefox file lists. */
     function paste(event) {
         const clipboard = event.clipboardData;
-        const item = [...(clipboard?.items || [])].find((entry) => entry.kind === 'file' && entry.type.startsWith('image/'));
+        const item = [...(clipboard?.items || [])].find(
+            (entry) => entry.kind === 'file' && entry.type.startsWith('image/')
+        );
         const image = item?.getAsFile() || [...(clipboard?.files || [])].find((file) => file.type.startsWith('image/'));
         if (!image) return false;
         event.preventDefault();
@@ -88,5 +90,14 @@ window.BodrikChatImage = (() => {
     }
 
     init();
-    return { attach, clear, paste, parseMessage, upload, get pending() { return pending; } };
+    return {
+        attach,
+        clear,
+        paste,
+        parseMessage,
+        upload,
+        get pending() {
+            return pending;
+        },
+    };
 })();

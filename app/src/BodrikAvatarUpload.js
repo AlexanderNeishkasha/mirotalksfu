@@ -6,8 +6,18 @@ const path = require('node:path');
 
 const TYPES = new Map([
     ['image/jpeg', { extension: 'jpg', signature: (data) => data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff }],
-    ['image/png', { extension: 'png', signature: (data) => data.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex')) }],
-    ['image/webp', { extension: 'webp', signature: (data) => data.subarray(0, 4).toString() === 'RIFF' && data.subarray(8, 12).toString() === 'WEBP' }],
+    [
+        'image/png',
+        { extension: 'png', signature: (data) => data.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex')) },
+    ],
+    [
+        'image/webp',
+        {
+            extension: 'webp',
+            signature: (data) =>
+                data.subarray(0, 4).toString() === 'RIFF' && data.subarray(8, 12).toString() === 'WEBP',
+        },
+    ],
 ]);
 
 /** Creates an authenticated handler for small, browser-normalized avatar images. */
@@ -18,7 +28,11 @@ function createAvatarUploadHandler({ directory, verifyToken, publicPrefix = '/up
             if (!token || !(await verifyToken(token))) return res.status(401).json({ error: 'Unauthorized' });
 
             const body = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
-            const type = TYPES.get(String(req.headers['content-type'] || '').split(';')[0].toLowerCase());
+            const type = TYPES.get(
+                String(req.headers['content-type'] || '')
+                    .split(';')[0]
+                    .toLowerCase()
+            );
             if (!type || body.length < 12 || body.length > 256 * 1024 || !type.signature(body)) {
                 return res.status(400).json({ error: 'Invalid avatar image' });
             }

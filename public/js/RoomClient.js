@@ -1096,7 +1096,7 @@ class RoomClient {
                         console.info('Deferring producer ICE restart until signaling reconnects');
                         break;
                     }
-                    if (!await this.restartTransportWithRetry(transport, 'Producer')) {
+                    if (!(await this.restartTransportWithRetry(transport, 'Producer'))) {
                         this.readmitAfterTransportFailure(transport);
                     }
                     break;
@@ -1178,7 +1178,7 @@ class RoomClient {
                         console.info('Deferring consumer ICE restart until signaling reconnects');
                         break;
                     }
-                    if (!await this.restartTransportWithRetry(transport, 'Consumer')) {
+                    if (!(await this.restartTransportWithRetry(transport, 'Consumer'))) {
                         this.readmitAfterTransportFailure(transport);
                     }
                     break;
@@ -4748,7 +4748,10 @@ class RoomClient {
             if (!offline) this.event(_EVENTS.exitRoom);
         };
         if (!offline && this.socket?.connected) {
-            this.socket.request('exitRoom', {}, 1500).catch((error) => console.warn('Exit Room', error)).finally(done);
+            this.socket
+                .request('exitRoom', {}, 1500)
+                .catch((error) => console.warn('Exit Room', error))
+                .finally(done);
         } else done();
     }
 
@@ -11201,7 +11204,7 @@ class RoomClient {
 
         if (inputElement && audioPlayer) {
             const savedVolume = localStorage.getItem(
-                `bodrik-peer-volume:${this.room_id}:${inputElement.dataset.volumeKey}`,
+                `bodrik-peer-volume:${this.room_id}:${inputElement.dataset.volumeKey}`
             );
             const parsedVolume = savedVolume === null ? NaN : Number(savedVolume);
             inputElement.value = Number.isFinite(parsedVolume) ? parsedVolume : 100;
@@ -11213,7 +11216,6 @@ class RoomClient {
                 if (identity) {
                     localStorage.setItem(`bodrik-peer-volume:${this.room_id}:${identity}`, inputElement.value);
                 }
-
             };
 
             this.addVolumeEventListeners(inputElement, updateVolume);
@@ -11256,7 +11258,8 @@ class RoomClient {
         const peerVolume = audioPlayer.dataset.peerVolume !== undefined ? Number(audioPlayer.dataset.peerVolume) : 1;
         const musicVolume = audioPlayer.dataset.bodrikMusic === 'true' ? this.bodrikMusicVolume : 1;
         const volume = Math.min(
-            1, Math.max(0, (isNaN(peerVolume) ? 1 : peerVolume) * this.masterOutputVolume * musicVolume)
+            1,
+            Math.max(0, (isNaN(peerVolume) ? 1 : peerVolume) * this.masterOutputVolume * musicVolume)
         );
 
         const gainNode = this.getOutputGainNode(audioPlayer, volume);
@@ -11303,7 +11306,8 @@ class RoomClient {
 
         // Mobile browsers may report writable volume without applying it to remote media.
         // Route through Web Audio when attenuation is needed; keep full-volume playback untouched.
-        if (volume >= 1 || elem._outputGainUnavailable || (!this.isMobileDevice && this.canSetElementVolume())) return null;
+        if (volume >= 1 || elem._outputGainUnavailable || (!this.isMobileDevice && this.canSetElementVolume()))
+            return null;
 
         const audioContext = this.getOutputAudioContext();
         if (!audioContext) {
@@ -13053,7 +13057,12 @@ class RoomClient {
                     this.peer_name = status;
                     this.peer_info.peer_name = status;
                     const name = this.getId(peer_id + '__name');
-                    if (name) this.setPeerNameWithPresenter(name, this.peer_info.peer_presenter, `${status}${this.meSuffix()}`);
+                    if (name)
+                        this.setPeerNameWithPresenter(
+                            name,
+                            this.peer_info.peer_presenter,
+                            `${status}${this.meSuffix()}`
+                        );
                     break;
                 }
                 case 'audio':

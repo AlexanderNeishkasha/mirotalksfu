@@ -37,21 +37,35 @@ class BodrikMusic {
         this.ssrc = randomInt(1, 0x7fffffff);
         try {
             if (process.env.BODRIK_MUSIC_ENABLED === 'true') {
-                this.playback = new BodrikPlayback(this.room.id, null,
-                    (mediaUrl, position) => this.spawn(this.ffmpegPath,
-                        playbackArgs(this.transport.tuple.localPort, this.sourcePort, this.ssrc, mediaUrl, position),
-                        { stdio: ['ignore', 'ignore', 'pipe'] }),
+                this.playback = new BodrikPlayback(
+                    this.room.id,
+                    null,
+                    (mediaUrl, position) =>
+                        this.spawn(
+                            this.ffmpegPath,
+                            playbackArgs(
+                                this.transport.tuple.localPort,
+                                this.sourcePort,
+                                this.ssrc,
+                                mediaUrl,
+                                position
+                            ),
+                            { stdio: ['ignore', 'ignore', 'pipe'] }
+                        ),
                     {
                         setConferenceActive: (active) => this.setConferenceActive(active),
                         setVolume: (volume) => this.setVolume(volume),
-                    }).start();
+                    }
+                ).start();
             } else {
                 await this.createPeer();
                 this.process = this.spawn(this.ffmpegPath, ffmpegArgs(this.transport.tuple.localPort, this.ssrc), {
                     stdio: ['ignore', 'ignore', 'pipe'],
                 });
                 let stderr = '';
-                this.process.stderr?.on('data', (chunk) => { stderr = (stderr + chunk.toString()).slice(-4096); });
+                this.process.stderr?.on('data', (chunk) => {
+                    stderr = (stderr + chunk.toString()).slice(-4096);
+                });
                 this.process.once('error', (error) => this.failed(error));
                 this.process.once('exit', (code, signal) => {
                     if (!this.stopping) this.failed(new Error(`FFmpeg exited: ${code ?? signal}; ${stderr}`));
@@ -67,13 +81,19 @@ class BodrikMusic {
     async createPeer() {
         if (this.peer || this.stopping) return;
         this.transport = await this.room.router.createPlainTransport({
-            listenInfo: { protocol: 'udp', ip: '127.0.0.1' }, rtcpMux: true, comedia: true,
+            listenInfo: { protocol: 'udp', ip: '127.0.0.1' },
+            rtcpMux: true,
+            comedia: true,
         });
         this.peer = new Peer(PEER_ID, { peer_info: peerInfo(this.masterVolume) });
         this.peer.addTransport(this.transport);
         this.room.addPeer(this.peer);
         const producerId = await this.room.produce(
-            PEER_ID, this.transport.id, rtpParameters(this.ssrc), 'audio', 'audioType'
+            PEER_ID,
+            this.transport.id,
+            rtpParameters(this.ssrc),
+            'audio',
+            'audioType'
         );
         this.producer = this.peer.getProducer(producerId);
         this.room.broadCast(PEER_ID, 'setVideoOff', this.peer.peer_info);
@@ -95,8 +115,11 @@ class BodrikMusic {
         this.peer.close();
         this.room.delPeer(this.peer);
         this.room.broadCast(PEER_ID, 'removeMe', {
-            room_id: this.room.id, peer_id: PEER_ID, peer_name: peerInfo().peer_name,
-            peer_counts: this.room.getPeersCount(), isPresenter: false,
+            room_id: this.room.id,
+            peer_id: PEER_ID,
+            peer_name: peerInfo().peer_name,
+            peer_counts: this.room.getPeersCount(),
+            isPresenter: false,
         });
         this.peer = null;
         this.producer = null;
@@ -152,14 +175,16 @@ function peerInfo(masterVolume = 1) {
 
 function rtpParameters(ssrc) {
     return {
-        codecs: [{
-            mimeType: 'audio/opus',
-            payloadType: PAYLOAD_TYPE,
-            clockRate: CLOCK_RATE,
-            channels: 2,
-            parameters: { useinbandfec: 1, stereo: 1, 'sprop-stereo': 1 },
-            rtcpFeedback: [],
-        }],
+        codecs: [
+            {
+                mimeType: 'audio/opus',
+                payloadType: PAYLOAD_TYPE,
+                clockRate: CLOCK_RATE,
+                channels: 2,
+                parameters: { useinbandfec: 1, stereo: 1, 'sprop-stereo': 1 },
+                rtcpFeedback: [],
+            },
+        ],
         encodings: [{ ssrc }],
         rtcp: { cname: `bodrik-music-${ssrc}`, reducedSize: true },
     };
@@ -171,10 +196,29 @@ function ffmpegArgs(port, ssrc) {
     const melody = steppedFrequency([261.63, 329.63, 392.0, 523.25, 493.88, 392.0, 329.63, 293.66], 0.5);
     const source = `aevalsrc=exprs=0.11*${envelope}*sin(2*PI*${bass}*t)|0.09*${envelope}*sin(2*PI*${melody}*t):s=${CLOCK_RATE}:c=stereo`;
     return [
-        '-hide_banner', '-loglevel', 'warning', '-re', '-f', 'lavfi', '-i', source,
-        '-ac', '2', '-ar', String(CLOCK_RATE), '-c:a', 'libopus', '-b:a', '128k',
-        '-payload_type', String(PAYLOAD_TYPE), '-ssrc', String(ssrc),
-        '-f', 'rtp', `rtp://127.0.0.1:${port}?pkt_size=1200`,
+        '-hide_banner',
+        '-loglevel',
+        'warning',
+        '-re',
+        '-f',
+        'lavfi',
+        '-i',
+        source,
+        '-ac',
+        '2',
+        '-ar',
+        String(CLOCK_RATE),
+        '-c:a',
+        'libopus',
+        '-b:a',
+        '128k',
+        '-payload_type',
+        String(PAYLOAD_TYPE),
+        '-ssrc',
+        String(ssrc),
+        '-f',
+        'rtp',
+        `rtp://127.0.0.1:${port}?pkt_size=1200`,
     ];
 }
 
@@ -182,24 +226,57 @@ function playbackArgs(port, sourcePort, ssrc, mediaUrl, position, nowMs = Date.n
     const sequence = Math.floor(nowMs / 20) % 65536;
     const timestampOffset = nowMs / 1000;
     return [
-        '-hide_banner', '-loglevel', 'warning', '-re', '-ss', String(position), '-i', mediaUrl,
-        '-vn', '-af', `aresample=${CLOCK_RATE}:async=1000:first_pts=0`, '-ac', '2',
-        '-c:a', 'libopus', '-application:a', 'audio', '-frame_duration:a', '20', '-vbr:a', 'on',
-        '-fec:a', '1', '-packet_loss:a', '5', '-b:a', '160k',
-        '-payload_type', String(PAYLOAD_TYPE), '-ssrc', String(ssrc),
-        '-output_ts_offset', String(timestampOffset), '-seq', String(sequence),
-        '-f', 'rtp', `rtp://127.0.0.1:${port}?localport=${sourcePort}&pkt_size=1200`,
+        '-hide_banner',
+        '-loglevel',
+        'warning',
+        '-re',
+        '-ss',
+        String(position),
+        '-i',
+        mediaUrl,
+        '-vn',
+        '-af',
+        `aresample=${CLOCK_RATE}:async=1000:first_pts=0`,
+        '-ac',
+        '2',
+        '-c:a',
+        'libopus',
+        '-application:a',
+        'audio',
+        '-frame_duration:a',
+        '20',
+        '-vbr:a',
+        'on',
+        '-fec:a',
+        '1',
+        '-packet_loss:a',
+        '5',
+        '-b:a',
+        '160k',
+        '-payload_type',
+        String(PAYLOAD_TYPE),
+        '-ssrc',
+        String(ssrc),
+        '-output_ts_offset',
+        String(timestampOffset),
+        '-seq',
+        String(sequence),
+        '-f',
+        'rtp',
+        `rtp://127.0.0.1:${port}?localport=${sourcePort}&pkt_size=1200`,
     ];
 }
 
 /** Build an FFmpeg expression that advances through notes over one repeating cycle. */
 function steppedFrequency(notes, secondsPerNote) {
     const cycle = notes.length * secondsPerNote;
-    return notes.slice(0, -1).reduceRight(
-        (fallback, note, index) =>
-            `if(lt(mod(t\\,${cycle})\\,${(index + 1) * secondsPerNote})\\,${note}\\,${fallback})`,
-        String(notes.at(-1))
-    );
+    return notes
+        .slice(0, -1)
+        .reduceRight(
+            (fallback, note, index) =>
+                `if(lt(mod(t\\,${cycle})\\,${(index + 1) * secondsPerNote})\\,${note}\\,${fallback})`,
+            String(notes.at(-1))
+        );
 }
 
 module.exports = { BodrikMusic, ffmpegArgs, playbackArgs, peerInfo, rtpParameters };

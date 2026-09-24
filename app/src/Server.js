@@ -1260,7 +1260,6 @@ function startServer() {
             return res.redirect(307, invitation);
         }
 
-
         const allowRoomAccess = isAllowedRoomAccess('/join/:roomId', req, hostCfg, roomList, roomId);
 
         if (allowRoomAccess) {
@@ -3757,7 +3756,6 @@ function startServer() {
                 data.peer_presenter = peer.peer_info.peer_presenter;
             }
 
-
             peer.updatePeerInfo(data);
 
             if (data.broadcast) {
@@ -5120,95 +5118,94 @@ function startServer() {
                 peer_present: Boolean(socket.room_id && roomList.get(socket.room_id)?.getPeer(socket.id)),
             });
             const cleanup = () => {
-            if (!roomExists(socket)) {
-                // Clean up socket listeners even if room doesn't exist
-                socket.removeAllListeners();
-                return;
-            }
+                if (!roomExists(socket)) {
+                    // Clean up socket listeners even if room doesn't exist
+                    socket.removeAllListeners();
+                    return;
+                }
 
-            const { room, peer } = getRoomAndPeer(socket);
-            if (!peer) {
-                // A newer admission already replaced this disconnected tab peer.
+                const { room, peer } = getRoomAndPeer(socket);
+                if (!peer) {
+                    // A newer admission already replaced this disconnected tab peer.
+                    socket.room_id = null;
+                    socket.removeAllListeners();
+                    return;
+                }
+
+                const { peer_name, peer_uuid } = peer || {};
+
+                const isPresenter = isPeerPresenter(socket.room_id, socket.id, peer_name, peer_uuid);
+
+                log.debug('[Disconnect] - peer name', { peer_name, reason });
+
+                if (webhook.enabled) {
+                    const data = {
+                        timestamp: log.getDateTime(false),
+                        room_id: socket.room_id,
+                        session_id: room?.getSessionId ? room.getSessionId() : undefined,
+                        peer: peer?.peer_info,
+                        reason: reason,
+                    };
+                    // Trigger a POST request when a user disconnects
+                    axios
+                        .post(webhook.url, { event: 'disconnect', data }, { timeout: 5000 })
+                        .then((response) => log.debug('Disconnect event tracked:', response.data))
+                        .catch((error) => log.error('Error tracking disconnect event:', error.message));
+                }
+
+                room.removePeer(socket.id);
+
+                room.broadCast(socket.id, 'removeMe', removeMeData(room, peer_name, isPresenter));
+
+                // Notify main room when a peer leaves a breakout room
+                if (socket.room_id.includes('_breakout_')) {
+                    notifyMainRoomBreakoutCountChanged(socket.room_id);
+                }
+
+                // Clean up this peer's presenter entry immediately
+                if (socket.room_id in presenters && socket.id in presenters[socket.room_id]) {
+                    delete presenters[socket.room_id][socket.id];
+                }
+
+                const fallbackPresenter = assignFallbackPresenter(
+                    socket.room_id,
+                    room,
+                    presenters,
+                    hostCfg?.presenters?.join_first
+                );
+                if (fallbackPresenter) {
+                    log.info('[Disconnect] - assigned fallback presenter', {
+                        room_id: socket.room_id,
+                        peer_id: fallbackPresenter.id,
+                        peer_name: fallbackPresenter.peer_name,
+                    });
+                }
+
+                if (room.getPeersCount() === 0) {
+                    //
+                    stopRTMPActiveStreams(isPresenter, room);
+
+                    roomList.delete(socket.room_id);
+
+                    delete presenters[socket.room_id];
+
+                    log.debug('[Disconnect] - Last peer - current presenters grouped by roomId', presenters);
+
+                    const activeRooms = getActiveRooms();
+
+                    log.debug('[Disconnect] - Last peer - current active rooms', activeRooms);
+
+                    const activeStreams = getRTMPActiveStreams();
+
+                    log.debug('[Disconnect] - Last peer - current active RTMP streams', activeStreams);
+                }
+
+                removeIP(socket);
+
                 socket.room_id = null;
+
+                // Clean up all socket event listeners to prevent memory leaks
                 socket.removeAllListeners();
-                return;
-            }
-
-
-            const { peer_name, peer_uuid } = peer || {};
-
-            const isPresenter = isPeerPresenter(socket.room_id, socket.id, peer_name, peer_uuid);
-
-            log.debug('[Disconnect] - peer name', { peer_name, reason });
-
-            if (webhook.enabled) {
-                const data = {
-                    timestamp: log.getDateTime(false),
-                    room_id: socket.room_id,
-                    session_id: room?.getSessionId ? room.getSessionId() : undefined,
-                    peer: peer?.peer_info,
-                    reason: reason,
-                };
-                // Trigger a POST request when a user disconnects
-                axios
-                    .post(webhook.url, { event: 'disconnect', data }, { timeout: 5000 })
-                    .then((response) => log.debug('Disconnect event tracked:', response.data))
-                    .catch((error) => log.error('Error tracking disconnect event:', error.message));
-            }
-
-            room.removePeer(socket.id);
-
-            room.broadCast(socket.id, 'removeMe', removeMeData(room, peer_name, isPresenter));
-
-            // Notify main room when a peer leaves a breakout room
-            if (socket.room_id.includes('_breakout_')) {
-                notifyMainRoomBreakoutCountChanged(socket.room_id);
-            }
-
-            // Clean up this peer's presenter entry immediately
-            if (socket.room_id in presenters && socket.id in presenters[socket.room_id]) {
-                delete presenters[socket.room_id][socket.id];
-            }
-
-            const fallbackPresenter = assignFallbackPresenter(
-                socket.room_id,
-                room,
-                presenters,
-                hostCfg?.presenters?.join_first
-            );
-            if (fallbackPresenter) {
-                log.info('[Disconnect] - assigned fallback presenter', {
-                    room_id: socket.room_id,
-                    peer_id: fallbackPresenter.id,
-                    peer_name: fallbackPresenter.peer_name,
-                });
-            }
-
-            if (room.getPeersCount() === 0) {
-                //
-                stopRTMPActiveStreams(isPresenter, room);
-
-                roomList.delete(socket.room_id);
-
-                delete presenters[socket.room_id];
-
-                log.debug('[Disconnect] - Last peer - current presenters grouped by roomId', presenters);
-
-                const activeRooms = getActiveRooms();
-
-                log.debug('[Disconnect] - Last peer - current active rooms', activeRooms);
-
-                const activeStreams = getRTMPActiveStreams();
-
-                log.debug('[Disconnect] - Last peer - current active RTMP streams', activeStreams);
-            }
-
-            removeIP(socket);
-
-            socket.room_id = null;
-
-            // Clean up all socket event listeners to prevent memory leaks
-            socket.removeAllListeners();
             };
 
             if (recoverable) {

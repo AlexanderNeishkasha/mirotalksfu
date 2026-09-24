@@ -16,11 +16,20 @@ test('chat images require an active room-bound token and a supported image', asy
         directory,
         verifyToken: async (token) => token === 'valid',
         decodeToken: () => ({ room: 'private-room' }),
-        getRoom: (id) => id === 'private-room' ? room : null,
+        getRoom: (id) => (id === 'private-room' ? room : null),
     });
     const png = Buffer.from('89504e470d0a1a0a0000000049454e44', 'hex');
     async function send(token, type, body) {
-        const res = { status(code) { this.code = code; return this; }, json(payload) { this.body = payload; return this; } };
+        const res = {
+            status(code) {
+                this.code = code;
+                return this;
+            },
+            json(payload) {
+                this.body = payload;
+                return this;
+            },
+        };
         await upload({ headers: { authorization: token ? `Bearer ${token}` : '', 'content-type': type }, body }, res);
         return res;
     }

@@ -7,7 +7,7 @@ const { browserConsoleScript } = require('./BodrikBrowserConsole');
 function runPolicy(environment) {
     const calls = [];
     const console = Object.fromEntries(
-        ['log', 'info', 'debug', 'warn', 'error'].map((level) => [level, () => calls.push(level)]),
+        ['log', 'info', 'debug', 'warn', 'error'].map((level) => [level, () => calls.push(level)])
     );
     vm.runInNewContext(browserConsoleScript(environment), { console });
     for (const method of ['log', 'info', 'debug', 'warn', 'error']) console[method]('test');

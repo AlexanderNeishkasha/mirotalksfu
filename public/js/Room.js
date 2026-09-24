@@ -62,7 +62,6 @@ socket.io.backoff.duration = function () {
     return Math.min(attempt === 0 ? 1000 : attempt === 1 ? 2000 : 3000 * 2 ** (attempt - 2), 15000);
 };
 
-
 let survey = {
     enabled: true,
     url: 'https://www.questionpro.com/t/AUs7VZq02P',
@@ -1416,7 +1415,6 @@ async function whoAreYou() {
         },
     });
 
-
     await window.i18n?.ready;
     Swal.fire({
         allowOutsideClick: false,
@@ -1456,7 +1454,6 @@ async function whoAreYou() {
             }
             setCookie(room_id + '_name', name, 30);
             peer_name = name;
-
         },
     }).then(async () => {
         if (!usernameEmoji.classList.contains('hidden')) {
@@ -1824,7 +1821,6 @@ function joinRoom(peer_name, room_id) {
 
 function roomIsReady() {
     startRoomSession();
-
 
     if (peer_avatar && isValidAvatarURL(peer_avatar)) {
         myProfileAvatar.setAttribute('src', peer_avatar);

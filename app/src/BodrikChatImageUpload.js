@@ -5,9 +5,18 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 
 const TYPES = new Map([
-    ['image/png', { extension: 'png', valid: (body) => body.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex')) }],
+    [
+        'image/png',
+        { extension: 'png', valid: (body) => body.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex')) },
+    ],
     ['image/jpeg', { extension: 'jpg', valid: (body) => body[0] === 0xff && body[1] === 0xd8 && body[2] === 0xff }],
-    ['image/webp', { extension: 'webp', valid: (body) => body.subarray(0, 4).toString() === 'RIFF' && body.subarray(8, 12).toString() === 'WEBP' }],
+    [
+        'image/webp',
+        {
+            extension: 'webp',
+            valid: (body) => body.subarray(0, 4).toString() === 'RIFF' && body.subarray(8, 12).toString() === 'WEBP',
+        },
+    ],
 ]);
 
 /** Accept a small verified image only from a participant currently joined with this room-bound token. */
@@ -23,7 +32,11 @@ function createChatImageUploadHandler({ directory, verifyToken, decodeToken, get
             }
 
             const body = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
-            const type = TYPES.get(String(req.headers['content-type'] || '').split(';')[0].toLowerCase());
+            const type = TYPES.get(
+                String(req.headers['content-type'] || '')
+                    .split(';')[0]
+                    .toLowerCase()
+            );
             if (!type || body.length < 12 || body.length > 5 * 1024 * 1024 || !type.valid(body)) {
                 return res.status(400).json({ error: 'Invalid image' });
             }
@@ -52,16 +65,19 @@ async function removeExpiredChatImages(directory, now = Date.now()) {
     for (const entry of entries) {
         if (!entry.isFile() || !/^[0-9a-f-]+\.(png|jpg|webp)$/.test(entry.name)) continue;
         const file = path.join(directory, entry.name);
-        const stat = await fs.stat(file).catch((error) => error.code === 'ENOENT' ? null : Promise.reject(error));
+        const stat = await fs.stat(file).catch((error) => (error.code === 'ENOENT' ? null : Promise.reject(error)));
         if (stat && now - stat.mtimeMs >= IMAGE_LIFETIME_MS) {
-            await fs.unlink(file).catch((error) => { if (error.code !== 'ENOENT') throw error; });
+            await fs.unlink(file).catch((error) => {
+                if (error.code !== 'ENOENT') throw error;
+            });
         }
     }
 }
 
 /** Schedule expiration for temporary images; return a shutdown cleanup callback. */
 function startChatImageCleanup(directory) {
-    const cleanup = () => removeExpiredChatImages(directory).catch((error) => console.error('Chat image cleanup failed', error));
+    const cleanup = () =>
+        removeExpiredChatImages(directory).catch((error) => console.error('Chat image cleanup failed', error));
     cleanup();
     const timer = setInterval(cleanup, 60 * 60 * 1000);
     timer.unref();

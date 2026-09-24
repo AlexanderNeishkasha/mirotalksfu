@@ -10,7 +10,8 @@
         const audioId = client.producerLabel.get('audioType');
         const audioProducer = client.producers.get(audioId);
         const wasMuted = !client.peer_info.peer_audio || Boolean(audioProducer?.paused);
-        const hadVideo = client.producerLabel.has('videoType') || Boolean(client.isVideoAllowed && client.peer_info.peer_video);
+        const hadVideo =
+            client.producerLabel.has('videoType') || Boolean(client.isVideoAllowed && client.peer_info.peer_video);
         client.rejoiningMuted = wasMuted;
 
         client.stopConsumerReconcile();

@@ -15,21 +15,29 @@ function fixture() {
     transport.id = 'plain';
     transport.tuple = { localPort: 45000 };
     transport.closed = false;
-    transport.close = () => { transport.closed = true; };
+    transport.close = () => {
+        transport.closed = true;
+    };
     const producer = new EventEmitter();
     producer.id = 'producer';
     producer.closed = false;
-    producer.close = () => { producer.closed = true; };
+    producer.close = () => {
+        producer.closed = true;
+    };
     const peers = new Map();
     const room = {
         id: 'room',
-        router: { createPlainTransport: async (options) => {
-            room.transportOptions = options;
-            return transport;
-        } },
+        router: {
+            createPlainTransport: async (options) => {
+                room.transportOptions = options;
+                return transport;
+            },
+        },
         addPeer: (peer) => peers.set(peer.id, peer),
         delPeer: (peer) => peers.delete(peer.id),
-        broadCast: (...args) => { room.broadcastArgs = args; },
+        broadCast: (...args) => {
+            room.broadcastArgs = args;
+        },
         produce: async (peerId, transportId, parameters, kind, type) => {
             room.produceArgs = { peerId, transportId, parameters, kind, type };
             peers.get(peerId).addProducer(producer.id, producer);
@@ -39,8 +47,14 @@ function fixture() {
     const process = new EventEmitter();
     process.stderr = new EventEmitter();
     process.exitCode = null;
-    process.kill = () => { process.exitCode = 0; process.killed = true; };
-    const spawn = (...args) => { room.spawnArgs = args; return process; };
+    process.kill = () => {
+        process.exitCode = 0;
+        process.killed = true;
+    };
+    const spawn = (...args) => {
+        room.spawnArgs = args;
+        return process;
+    };
     return { peers, process, producer, room, spawn, transport };
 }
 
@@ -66,13 +80,21 @@ test('fixture uses localhost stereo Opus RTP with a bot-marked peer', async () =
 
 test('real mediasoup PlainTransport receives the generated FFmpeg RTP fixture', async () => {
     const worker = await mediasoup.createWorker();
-    const router = await worker.createRouter({ mediaCodecs: [{
-        kind: 'audio', mimeType: 'audio/opus', preferredPayloadType: 111,
-        clockRate: 48000, channels: 2,
-    }] });
+    const router = await worker.createRouter({
+        mediaCodecs: [
+            {
+                kind: 'audio',
+                mimeType: 'audio/opus',
+                preferredPayloadType: 111,
+                clockRate: 48000,
+                channels: 2,
+            },
+        ],
+    });
     const peers = new Map();
     const room = {
-        id: 'integration-room', router,
+        id: 'integration-room',
+        router,
         addPeer: (peer) => peers.set(peer.id, peer),
         delPeer: (peer) => peers.delete(peer.id),
         broadCast: () => {},
@@ -94,37 +116,82 @@ test('real mediasoup PlainTransport receives the generated FFmpeg RTP fixture', 
 test('playback controller follows revisions and rejects non-backend media', async () => {
     const processes = [];
     let appliedVolume = null;
-    const controller = new BodrikPlayback('private-room', 45000, (url, position) => {
-        const process = new EventEmitter();
-        process.exitCode = null;
-        process.kill = () => { process.exitCode = 0; };
-        processes.push({ url, position, process });
-        return process;
-    }, { backendUrl: 'http://127.0.0.1:3001', secret: 'x'.repeat(32), setVolume: (volume) => { appliedVolume = volume; } });
-    await controller.apply({ output: 'conference', volume: 0.45, revision: 2, is_playing: true, position: 12.5,
-        track: { id: '7', media_url: '/media/song.mp3' } });
+    const controller = new BodrikPlayback(
+        'private-room',
+        45000,
+        (url, position) => {
+            const process = new EventEmitter();
+            process.exitCode = null;
+            process.kill = () => {
+                process.exitCode = 0;
+            };
+            processes.push({ url, position, process });
+            return process;
+        },
+        {
+            backendUrl: 'http://127.0.0.1:3001',
+            secret: 'x'.repeat(32),
+            setVolume: (volume) => {
+                appliedVolume = volume;
+            },
+        }
+    );
+    await controller.apply({
+        output: 'conference',
+        volume: 0.45,
+        revision: 2,
+        is_playing: true,
+        position: 12.5,
+        track: { id: '7', media_url: '/media/song.mp3' },
+    });
     assert.equal(processes[0].url, 'http://127.0.0.1:3001/media/song.mp3');
     assert.equal(processes[0].position, 12.5);
     assert.equal(appliedVolume, 0.45);
     controller.sourceStartedAt = Date.now();
-    await controller.apply({ output: 'conference', volume: 0.2, revision: 2, is_playing: true, position: 12.5,
-        track: { id: '7', media_url: '/media/song.mp3' } });
+    await controller.apply({
+        output: 'conference',
+        volume: 0.2,
+        revision: 2,
+        is_playing: true,
+        position: 12.5,
+        track: { id: '7', media_url: '/media/song.mp3' },
+    });
     assert.equal(appliedVolume, 0.2);
     assert.equal(processes.length, 1);
     controller.sourceStartedAt = Date.now();
-    await controller.apply({ output: 'conference', revision: 2, is_playing: true, position: 12.5,
-        track: { id: '7', media_url: '/media/song.mp3' } });
+    await controller.apply({
+        output: 'conference',
+        revision: 2,
+        is_playing: true,
+        position: 12.5,
+        track: { id: '7', media_url: '/media/song.mp3' },
+    });
     assert.equal(appliedVolume, 1);
     assert.equal(processes.length, 1);
     controller.sourceStartedAt = Date.now() - 10_000;
-    await controller.apply({ output: 'conference', volume: 0.45, revision: 2, is_playing: true, position: 13,
-        track: { id: '7', media_url: '/media/song.mp3' } });
+    await controller.apply({
+        output: 'conference',
+        volume: 0.45,
+        revision: 2,
+        is_playing: true,
+        position: 13,
+        track: { id: '7', media_url: '/media/song.mp3' },
+    });
     assert.equal(processes.length, 2);
     assert.equal(processes[0].process.exitCode, 0);
     await controller.apply({ output: 'conference', revision: 3, is_playing: false, position: 13, track: null });
     assert.equal(processes[1].process.exitCode, 0);
-    await assert.rejects(() => controller.apply({ output: 'conference', revision: 4, is_playing: true, position: 0,
-        track: { id: '8', media_url: 'https://evil.example/audio' } }), /unsafe/);
+    await assert.rejects(
+        () =>
+            controller.apply({
+                output: 'conference',
+                revision: 4,
+                is_playing: true,
+                position: 0,
+                track: { id: '8', media_url: 'https://evil.example/audio' },
+            }),
+        /unsafe/
+    );
     controller.stop();
 });
 

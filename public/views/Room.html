@@ -195,18 +195,42 @@
             <div id="initUser" class="init-user hidden">
                 <div
                     id="bodrikProfile"
-                    style="display:flex;align-items:center;justify-content:center;gap:14px;width:100%;margin:12px 0 6px"
+                    style="
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        gap: 14px;
+                        width: 100%;
+                        margin: 12px 0 6px;
+                    "
                 >
                     <img
                         id="bodrikProfileAvatar"
                         src="../images/logo.svg"
                         alt="Аватар"
-                        style="width:64px;height:64px;border-radius:50%;object-fit:cover;flex:0 0 64px"
+                        style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; flex: 0 0 64px"
                     />
-                    <button id="bodrikProfileAvatarButton" type="button" class="fas fa-camera" style="display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;min-width:190px;padding:10px 16px">
-                        <span style="font-family:inherit;margin-left:7px">Загрузить аватар</span>
+                    <button
+                        id="bodrikProfileAvatarButton"
+                        type="button"
+                        class="fas fa-camera"
+                        style="
+                            display: inline-flex;
+                            align-items: center;
+                            justify-content: center;
+                            white-space: nowrap;
+                            min-width: 190px;
+                            padding: 10px 16px;
+                        "
+                    >
+                        <span style="font-family: inherit; margin-left: 7px">Загрузить аватар</span>
                     </button>
-                    <input id="bodrikProfileAvatarInput" class="hidden" type="file" accept="image/png,image/jpeg,image/webp" />
+                    <input
+                        id="bodrikProfileAvatarInput"
+                        class="hidden"
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                    />
                 </div>
 
                 <div id="initVideoContainer" class="init-video-container">
@@ -476,12 +500,7 @@
                 </div>
             </div>
             <div id="exitDropdown">
-                <button
-                    id="exitButton"
-                    class="hidden"
-                    type="button"
-                    aria-label="Disconnect"
-                >
+                <button id="exitButton" class="hidden" type="button" aria-label="Disconnect">
                     <i class="fa-solid fa-phone-slash red" aria-hidden="true"></i>
                 </button>
             </div>
@@ -903,16 +922,38 @@
                                     </td>
                                 </tr>
                                 <tr>
-                                    <td><div class="title"><i class="fas fa-headphones"></i><p>Echo cancellation</p></div></td>
-                                    <td><div class="form-check form-switch form-switch-md title">
-                                        <input id="switchEchoCancellation" class="form-check-input" type="checkbox" />
-                                    </div></td>
+                                    <td>
+                                        <div class="title">
+                                            <i class="fas fa-headphones"></i>
+                                            <p>Echo cancellation</p>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="form-check form-switch form-switch-md title">
+                                            <input
+                                                id="switchEchoCancellation"
+                                                class="form-check-input"
+                                                type="checkbox"
+                                            />
+                                        </div>
+                                    </td>
                                 </tr>
                                 <tr>
-                                    <td><div class="title"><i class="fas fa-wave-square"></i><p>Automatic gain control</p></div></td>
-                                    <td><div class="form-check form-switch form-switch-md title">
-                                        <input id="switchAutoGainControl" class="form-check-input" type="checkbox" />
-                                    </div></td>
+                                    <td>
+                                        <div class="title">
+                                            <i class="fas fa-wave-square"></i>
+                                            <p>Automatic gain control</p>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="form-check form-switch form-switch-md title">
+                                            <input
+                                                id="switchAutoGainControl"
+                                                class="form-check-input"
+                                                type="checkbox"
+                                            />
+                                        </div>
+                                    </td>
                                 </tr>
                             </table>
                             <hr />
@@ -1575,8 +1616,15 @@
                         </div>
                         <img id="myProfileAvatar" />
                         <div class="profile-avatar-actions">
-                            <button id="myProfileAvatarUploadBtn" class="profile-action" type="button"><i class="fas fa-image"></i>Set avatar</button>
-                            <input id="myProfileAvatarFileInput" class="hidden" type="file" accept="image/png,image/jpeg,image/webp" />
+                            <button id="myProfileAvatarUploadBtn" class="profile-action" type="button">
+                                <i class="fas fa-image"></i>Set avatar
+                            </button>
+                            <input
+                                id="myProfileAvatarFileInput"
+                                class="hidden"
+                                type="file"
+                                accept="image/png,image/jpeg,image/webp"
+                            />
                             <button id="myProfileAvatarResetBtn" class="profile-action hidden" type="button">
                                 <i class="fas fa-rotate-left"></i>Reset avatar
                             </button>
@@ -1590,8 +1638,15 @@
                                         <p id="userName">UserName</p>
                                     </div>
                                     <div class="profile-name-edit">
-                                        <input id="myProfileNameInput" type="text" maxlength="32" aria-label="New nickname" />
-                                        <button id="myProfileNameSaveBtn" class="profile-action" type="button"><i class="fas fa-check"></i>Save</button>
+                                        <input
+                                            id="myProfileNameInput"
+                                            type="text"
+                                            maxlength="32"
+                                            aria-label="New nickname"
+                                        />
+                                        <button id="myProfileNameSaveBtn" class="profile-action" type="button">
+                                            <i class="fas fa-check"></i>Save
+                                        </button>
                                     </div>
                                 </td>
                             </tr>
@@ -2492,10 +2547,20 @@
                                         >
                                             <i class="fas fa-paperclip"></i>
                                         </button>
-                                        <button id="bodrikChatImageButton" class="chat-toolbar-btn" type="button" aria-label="Attach image">
+                                        <button
+                                            id="bodrikChatImageButton"
+                                            class="chat-toolbar-btn"
+                                            type="button"
+                                            aria-label="Attach image"
+                                        >
                                             <i class="fas fa-image"></i>
                                         </button>
-                                        <input id="bodrikChatImageInput" class="hidden" type="file" accept="image/png,image/jpeg,image/webp" />
+                                        <input
+                                            id="bodrikChatImageInput"
+                                            class="hidden"
+                                            type="file"
+                                            accept="image/png,image/jpeg,image/webp"
+                                        />
                                         <button
                                             id="chatSpeechStartButton"
                                             class="chat-toolbar-btn hidden"

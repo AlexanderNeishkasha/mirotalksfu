@@ -40,7 +40,10 @@ class BodrikPlayback {
         this.abort = new AbortController();
         try {
             const token = jwt.sign({}, this.secret, { subject: this.roomId, expiresIn: 30 });
-            const endpoint = new URL(`/api/internal/conferences/${encodeURIComponent(this.roomId)}/music`, this.backendUrl);
+            const endpoint = new URL(
+                `/api/internal/conferences/${encodeURIComponent(this.roomId)}/music`,
+                this.backendUrl
+            );
             const response = await this.fetch(endpoint, {
                 headers: { authorization: `Bearer ${token}` },
                 signal: this.abort.signal,
@@ -61,9 +64,7 @@ class BodrikPlayback {
     async apply(snapshot) {
         const conferenceActive = snapshot?.output === 'conference';
         const requestedVolume = Number(snapshot.volume);
-        const volume = Number.isFinite(requestedVolume)
-            ? Math.min(1, Math.max(0, requestedVolume))
-            : 1;
+        const volume = Number.isFinite(requestedVolume) ? Math.min(1, Math.max(0, requestedVolume)) : 1;
         this.setVolume(volume);
         if (!conferenceActive) await this.silence();
         await this.setConferenceActive(conferenceActive);
@@ -91,7 +92,9 @@ class BodrikPlayback {
         this.process = this.spawnProcess(media.toString(), position);
         const active = this.process;
         let stderr = '';
-        active.stderr?.on('data', (chunk) => { stderr = (stderr + chunk.toString()).slice(-4096); });
+        active.stderr?.on('data', (chunk) => {
+            stderr = (stderr + chunk.toString()).slice(-4096);
+        });
         active.once('error', (error) => this.processFailed(active, error));
         active.once('exit', (code, signal) => {
             if (!this.stopped && this.process === active && code !== 0) {
