@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 // Run first-party checks for source included in the pushed commits; fail closed on errors.
 /** Read Git's changed refs without hiding an unavailable revision. */
@@ -32,11 +32,13 @@ const formatFiles = [...changed].filter((name) =>
     )
 );
 if ([...files, ...formatFiles].some((name) => !/^[\w./-]+$/.test(name))) throw new Error('Unsafe source path in push');
+// Deleted source still triggers the suite, but cannot be passed to ESLint.
+const lintFiles = files.filter((name) => existsSync(name));
 const npmOptions = { stdio: 'inherit', shell: process.platform === 'win32' };
 if (changed.has('eslint.config.mjs') || changed.has('package.json')) {
     execFileSync('npm', ['run', 'lint'], npmOptions);
-} else if (files.length) {
-    execFileSync('npm', ['run', 'lint', '--', ...files], npmOptions);
+} else if (lintFiles.length) {
+    execFileSync('npm', ['run', 'lint', '--', ...lintFiles], npmOptions);
 }
 if (formatFiles.length) execFileSync('npm', ['run', 'format:check', '--', ...formatFiles], npmOptions);
 if (
