@@ -6457,12 +6457,12 @@ class RoomClient {
             return;
         }
 
-        chat.style.marginLeft = isParticipantsListHidden ? 0 : '300px';
-        chat.style.borderLeft = isParticipantsListHidden ? 'none' : '1px solid rgba(255, 255, 255, 0.08)';
-        if (this.isChatPinned) elemDisplay(chat.id, isParticipantsListHidden, 'flex');
-        if (!this.isChatPinned) elemDisplay(chat.id, true, 'flex');
+        const sideBySide = !this.isChatPinned && !this.isMobileDevice && window.innerWidth > 600;
+        chat.style.marginLeft = sideBySide && !isParticipantsListHidden ? '300px' : 0;
+        chat.style.borderLeft = sideBySide && !isParticipantsListHidden ? '1px solid rgba(255,255,255,.08)' : 'none';
+        elemDisplay(chat.id, isParticipantsListHidden || sideBySide, 'flex');
         this.toggleChatHistorySize(isParticipantsListHidden && (this.isChatPinned || this.isChatMaximized));
-        plist.style.width = this.isChatPinned || this.isMobileDevice ? '100%' : '300px';
+        plist.style.width = sideBySide ? '300px' : '100%';
         plist.style.position = this.isMobileDevice ? 'fixed' : 'absolute';
         this.updateChatFooterVisibility();
     }

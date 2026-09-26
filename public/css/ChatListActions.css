@@ -99,3 +99,21 @@
 .chat-list-actions > #chatHideParticipantsList:hover {
     background: #1d4ed8;
 }
+
+/* The full-screen mobile list has space for a compact single-row toolbar. */
+@media screen and (max-width: 600px) {
+    @container chat-panel (min-width: 420px) {
+        .chat-list-actions {
+            grid-template-columns: auto minmax(0, 1fr) 32px;
+        }
+
+        .chat-action-icon-btns {
+            grid-column: 2;
+            grid-row: 1;
+        }
+
+        .chat-list-actions > #chatHideParticipantsList {
+            grid-column: 3;
+        }
+    }
+}
