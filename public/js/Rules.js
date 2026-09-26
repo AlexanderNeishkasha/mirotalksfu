@@ -29,11 +29,9 @@ let BUTTONS = {
         chatButton: true,
         participantsButton: true,
         pollButton: true,
-        speechRecButton: true,
         breakoutRoomButton: true, // if presenter and if true
         editorButton: true,
         raiseHandButton: true,
-        transcriptionButton: true,
         whiteboardButton: true,
         documentPiPButton: true,
         snapshotRoomButton: true,
@@ -118,7 +116,6 @@ let BUTTONS = {
         chatSaveButton: true,
         chatEmojiButton: true,
         chatMarkdownButton: true,
-        chatSpeechStartButton: true,
         chatGPT: true,
         deepSeek: true,
     },
@@ -189,7 +186,6 @@ function handleRules(isPresenter, roomSetup = true) {
 
         // Hide presenter-only elements (covers demotion from presenter to guest)
         hide(editorUnlockBtn);
-        hide(transcriptionAllLi);
         hide(breakoutRoomButton);
 
         // VideoAI is presenter-only
@@ -219,7 +215,6 @@ function handleRules(isPresenter, roomSetup = true) {
         BUTTONS.settings.sendEmailInvitation = true;
 
         show(editorUnlockBtn);
-        show(transcriptionAllLi);
 
         BUTTONS.main.breakoutRoomButton && show(breakoutRoomButton);
         //...
@@ -389,7 +384,6 @@ function handleRulesBroadcasting() {
     //BUTTONS.main.emojiRoomButton = false,
     //BUTTONS.main.pollButton = false;
     BUTTONS.main.breakoutRoomButton = false;
-    BUTTONS.main.transcriptionButton = false;
     BUTTONS.main.settingsButton = false;
     BUTTONS.participantsList.saveInfoButton = false;
     BUTTONS.settings.lockRoomButton = false;
@@ -429,7 +423,6 @@ function handleRulesBroadcasting() {
     //elemDisplay('pollButton', false);
     //elemDisplay('breakoutRoomButton', false);
     //elemDisplay('editorButton', false);
-    elemDisplay('transcriptionButton', false);
     elemDisplay('lockRoomButton', false);
     elemDisplay('unlockRoomButton', false);
     elemDisplay('lobbyButton', false);

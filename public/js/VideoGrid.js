@@ -150,27 +150,6 @@ function resizeChatRoom() {
 }
 
 // ####################################################
-// RESPONSIVE TRANSCRIPTION
-// ####################################################
-
-function resizeTranscriptionRoom() {
-    if (
-        isMobileDevice ||
-        !Boolean(transcription.speechTranscription) ||
-        transcription.isHidden ||
-        transcription.isPinned
-    )
-        return;
-
-    const windowWidth = window.innerWidth;
-    const windowHeight = window.innerHeight;
-
-    windowWidth <= CUSTOM_BREAKPOINT || windowHeight <= CUSTOM_BREAKPOINT
-        ? transcription.maximize()
-        : transcription.minimize();
-}
-
-// ####################################################
 // WINDOW LOAD/RESIZE EVENT
 // ####################################################
 
@@ -184,7 +163,6 @@ window.addEventListener(
             resizeTimeout = requestAnimationFrame(function () {
                 resizeVideoMedia();
                 resizeChatRoom();
-                resizeTranscriptionRoom();
             });
         });
     },

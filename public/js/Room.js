@@ -393,8 +393,6 @@ try {
 
 let isExiting = false;
 
-let transcription;
-
 let quill = null;
 
 // ####################################################
@@ -438,10 +436,6 @@ async function initClient() {
     await getThemes();
     setTheme();
     window.BodrikTheme.connect(publicRoomSlug, applyTheme);
-
-    // Transcription
-    transcription = new Transcription();
-    transcription.init();
 
     if (!isMobileDevice) {
         refreshMainButtonsToolTipPlacement();
@@ -516,8 +510,6 @@ async function initClient() {
         setTippy('chatSendButton', 'Send', 'top');
         setTippy('showChatOnMsg', 'Show chat on new message comes', 'bottom');
         setTippy('speechIncomingMsg', 'Speech the incoming messages', 'bottom');
-        setTippy('chatSpeechStartButton', 'Start speech recognition', 'top');
-        setTippy('chatSpeechStopButton', 'Stop speech recognition', 'top');
         setTippy('chatEmojiButton', 'Emoji', 'top');
         setTippy('chatShowParticipantsListBtn', 'Toggle participants list', 'bottom');
         setTippy('chatMarkdownButton', 'Markdown', 'top');
@@ -556,20 +548,6 @@ async function initClient() {
         setTippy('participantsRaiseHandBtn', 'Toggle raise hands', 'bottom');
         setTippy('participantsUnreadMessagesBtn', 'Toggle unread messages', 'bottom');
         setTippy('participantsHiddenBtn', 'Hidden participants', 'bottom');
-        setTippy('transcriptionCloseBtn', 'Close', 'bottom');
-        setTippy('transcriptionTogglePinBtn', 'Toggle pin', 'bottom');
-        setTippy('transcriptionMaxBtn', 'Maximize', 'bottom');
-        setTippy('transcriptionMinBtn', 'Minimize', 'bottom');
-        setTippy('transcriptionSpeechStatus', 'Status', 'bottom');
-        setTippy('transcriptShowOnMsg', 'Show transcript on new message comes', 'bottom');
-        setTippy('transcriptSendToAll', 'When enabled, your transcription will be sent to all participants', 'bottom');
-        setTippy(
-            'transcriptWhisperMode',
-            'When enabled, uses server-side Whisper for higher accuracy transcription',
-            'bottom'
-        );
-        setTippy('transcriptionSpeechStart', 'Start transcription', 'top');
-        setTippy('transcriptionSpeechStop', 'Stop transcription', 'top');
     }
     setupWhiteboard();
     initEnumerateDevices();
@@ -1812,7 +1790,6 @@ function joinRoom(peer_name, room_id) {
             isScreenAllowed,
             joinRoomWithScreen,
             isSpeechSynthesisSupported,
-            transcription,
             roomIsReady
         );
         handleRoomClientEvents();
@@ -1857,16 +1834,6 @@ function roomIsReady() {
 
     !BUTTONS.poll.pollSaveButton && hide(pollSaveButton);
 
-    speechRecognition && BUTTONS.chat.chatSpeechStartButton
-        ? show(chatSpeechStartButton)
-        : (BUTTONS.chat.chatSpeechStartButton = false);
-
-    speechRecognition && BUTTONS.main.speechRecButton ? show(speechRecButton) : (BUTTONS.main.speechRecButton = false);
-
-    transcription.isSupported() && BUTTONS.main.transcriptionButton
-        ? show(transcriptionButton)
-        : (BUTTONS.main.transcriptionButton = false);
-
     show(chatCleanTextButton);
     show(chatPasteButton);
     show(chatSendButton);
@@ -1886,10 +1853,6 @@ function roomIsReady() {
         hide(breakoutTogglePin);
         hide(pollMaxButton);
         hide(pollMinButton);
-        transcription.maximize();
-        hide(transcriptionTogglePinBtn);
-        hide(transcriptionMaxBtn);
-        hide(transcriptionMinBtn);
     } else {
         //rc.makeDraggable(emojiPickerContainer, emojiPickerHeader);
         rc.makeDraggable(chatRoom, chatHeader);
@@ -1902,7 +1865,6 @@ function roomIsReady() {
         rc.makeDraggable(sendFileDiv, sendFileDragHandle);
         rc.makeDraggable(receiveFileDiv, receiveFileDragHandle);
         rc.makeDraggable(lobby, lobbyHeader);
-        rc.makeDraggable(transcriptionRoom, transcriptionHeader);
         rc.makeDraggable(breakoutToolbar, breakoutToolbarHandle);
         rc.makeDraggable(breakoutPanel, breakoutPanelHeader);
         if (navigator.getDisplayMedia || navigator.mediaDevices.getDisplayMedia) {
@@ -2576,12 +2538,6 @@ function handleButtons() {
     participantsButton.onclick = async () => {
         rc.toggleParticipants();
     };
-    // Voice Commands
-    speechRecButton.onclick = () => {
-        if (recognition) {
-            isSpeechRecRunning ? stopSpeech() : startSpeech();
-        }
-    };
     // Polls
     pollButton.onclick = () => {
         rc.togglePoll();
@@ -2701,33 +2657,6 @@ function handleButtons() {
     editorRedoBtn.onclick = () => {
         rc.editorRedo();
     };
-    transcriptionButton.onclick = () => {
-        transcription.toggle();
-    };
-    transcriptionCloseBtn.onclick = () => {
-        transcription.toggle();
-    };
-    transcriptionTogglePinBtn.onclick = () => {
-        transcription.togglePinUnpin();
-    };
-    transcriptionMaxBtn.onclick = () => {
-        transcription.maximize();
-    };
-    transcriptionMinBtn.onclick = () => {
-        transcription.minimize();
-    };
-    transcriptionAllBtn.onclick = () => {
-        transcription.startAll();
-    };
-    transcriptionGhostBtn.onclick = () => {
-        transcription.toggleBg();
-    };
-    transcriptionSaveBtn.onclick = () => {
-        transcription.save();
-    };
-    transcriptionCleanBtn.onclick = () => {
-        transcription.delete();
-    };
     chatHideParticipantsList.onclick = (e) => {
         rc.toggleShowParticipants(true);
     };
@@ -2802,18 +2731,6 @@ function handleButtons() {
         isChatMarkdownOn = !isChatMarkdownOn;
         chatMarkdownButton.classList.toggle('is-active', isChatMarkdownOn);
         chatMarkdownButton.setAttribute('aria-pressed', String(isChatMarkdownOn));
-    };
-    chatSpeechStartButton.onclick = () => {
-        startSpeech();
-    };
-    chatSpeechStopButton.onclick = () => {
-        stopSpeech();
-    };
-    transcriptionSpeechStart.onclick = () => {
-        transcription.start(true);
-    };
-    transcriptionSpeechStop.onclick = () => {
-        transcription.stop();
     };
     fullScreenButton.onclick = () => {
         rc.toggleRoomFullScreen();
@@ -3826,26 +3743,6 @@ function handleSelects() {
         lS.setSettings(localStorageSettings);
         e.target.blur();
     };
-    transcriptShowOnMsg.onchange = (e) => {
-        transcription.showOnMessage = e.currentTarget.checked;
-        rc.roomMessage('transcriptShowOnMsg', transcription.showOnMessage);
-        localStorageSettings.transcript_show_on_msg = transcription.showOnMessage;
-        lS.setSettings(localStorageSettings);
-        e.target.blur();
-    };
-    transcriptSendToAll.onchange = (e) => {
-        transcription.sendToAll = e.currentTarget.checked;
-        rc.roomMessage('transcriptSendToAll', transcription.sendToAll);
-        localStorageSettings.transcript_send_to_all = transcription.sendToAll;
-        lS.setSettings(localStorageSettings);
-        e.target.blur();
-    };
-    transcriptWhisperMode.onchange = (e) => {
-        const enabled = transcription.whisper.toggleMode(e.currentTarget.checked);
-        e.currentTarget.checked = enabled;
-        transcription.updateSelectorsVisibility();
-        e.target.blur();
-    };
     // whiteboard options
     wbDrawingColorEl.onchange = () => {
         wbCanvas.freeDrawingBrush.color = wbDrawingColorEl.value;
@@ -4058,13 +3955,6 @@ function handleKeyboardShortcuts() {
                         break;
                     }
                     emojiRoomButton.click();
-                    break;
-                case 'k':
-                    if (notPresenter && !BUTTONS.main.transcriptionButton) {
-                        userLog('warning', 'The presenter has disabled your ability to start transcription', 'top-end');
-                        break;
-                    }
-                    transcriptionButton.click();
                     break;
                 case 'p':
                     if (notPresenter && !BUTTONS.main.pollButton) {
@@ -4513,9 +4403,6 @@ function applySyntaxHighlighting() {
 
 function loadSettingsFromLocalStorage() {
     rc.showChatOnMessage = localStorageSettings.show_chat_on_msg;
-    transcription.showOnMessage = localStorageSettings.transcript_show_on_msg;
-    transcription.sendToAll =
-        localStorageSettings.transcript_send_to_all !== undefined ? localStorageSettings.transcript_send_to_all : true;
     rc.speechInMessages = localStorageSettings.speech_in_msg;
     isPitchBarEnabled = localStorageSettings.pitch_bar;
     isSoundEnabled = localStorageSettings.sounds;
@@ -4524,8 +4411,6 @@ function loadSettingsFromLocalStorage() {
     isShortcutsEnabled = localStorageSettings.keyboard_shortcuts;
     isBroadcastingEnabled = localStorageSettings.broadcasting;
     showChatOnMsg.checked = rc.showChatOnMessage;
-    transcriptShowOnMsg.checked = transcription.showOnMessage;
-    transcriptSendToAll.checked = transcription.sendToAll;
     speechIncomingMsg.checked = rc.speechInMessages;
     switchPitchBar.checked = isPitchBarEnabled;
     switchSounds.checked = isSoundEnabled;

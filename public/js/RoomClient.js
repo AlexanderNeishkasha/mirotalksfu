@@ -61,7 +61,6 @@ const icons = {
     room: '<i class="fas fa-home"></i>',
     chat: '<i class="fas fa-comments"></i>',
     user: '<i class="fas fa-user"></i>',
-    transcript: '<i class="fas fa-closed-captioning"></i>',
     speech: '<i class="fas fa-volume-high"></i>',
     share: '<i class="fas fa-share-alt"></i>',
     ptt: '<i class="fa-solid fa-hand-pointer"></i>',
@@ -135,7 +134,6 @@ const image = {
     network: '../images/network.gif',
     rtmp: '../images/rtmp.png',
     save: '../images/save.png',
-    transcription: '../images/transcription.png',
     back: '../images/back.png',
     blur: '../images/blur.png',
     blurLow: '../images/blur-low.png',
@@ -254,7 +252,6 @@ class RoomClient {
         isScreenAllowed,
         joinRoomWithScreen,
         isSpeechSynthesisSupported,
-        transcription,
         successCallback
     ) {
         this.room_id = room_id;
@@ -330,7 +327,6 @@ class RoomClient {
         // LiveAvatar Video AI
         this.videoAIContainer = null;
         this.videoAIElement = null;
-        this.videoAIRecognitionPersistent = false;
 
         this.dominantSpeaker = false;
         this.isAudioAllowed = isAudioAllowed;
@@ -417,8 +413,6 @@ class RoomClient {
         this.RoomIsLobby = false;
         this.RoomLobbyAccepted = false;
         this.lobbyPears = {};
-
-        this.transcription = transcription;
 
         // RTMP Streamer
         this.rtmpFileStreamer = false;
@@ -859,13 +853,6 @@ class RoomClient {
             }
             // Store ChatGPT enabled state for VideoAI fallback
             this.chatGPTEnabled = room.chatGPTEnabled || false;
-            // Whisper server-side transcription
-            this.whisperEnabled = room.whisperEnabled || false;
-            if (typeof transcription !== 'undefined' && transcription) {
-                transcription.whisper.isEnabled = this.whisperEnabled;
-                transcription.whisper.segmentMs = (room.whisperSegmentSeconds || 5) * 1000;
-                this.whisperEnabled ? show('transcriptWhisperLi') : hide('transcriptWhisperLi');
-            }
             // Check if VideoAI is enabled and hide to guests by default
             if (!isPresenter || !this.videoAIEnabled) {
                 VideoAI.enabled = false;
@@ -5860,7 +5847,7 @@ class RoomClient {
 
     getPinnedSidePanelWidth() {
         if (this.isEditorPinned || this.isBreakoutPinned) return 30;
-        if (this.isChatPinned || (this.isPollPinned && !this.isPollMaximized) || this.transcription.isPin()) return 25;
+        if (this.isChatPinned || (this.isPollPinned && !this.isPollMaximized)) return 25;
         return 0;
     }
 
@@ -6097,16 +6084,9 @@ class RoomClient {
     resizeVideoMenuBar() {
         const isPollDocked = this.isPollPinned && !this.isPollMaximized;
         const somethingPinned =
-            this.isVideoPinned ||
-            this.isChatPinned ||
-            this.isEditorPinned ||
-            isPollDocked ||
-            this.isBreakoutPinned ||
-            transcription.isPin();
+            this.isVideoPinned || this.isChatPinned || this.isEditorPinned || isPollDocked || this.isBreakoutPinned;
         const menuBarWidth =
-            this.isVideoPinned || this.isChatPinned || isPollDocked || this.isBreakoutPinned || transcription.isPin()
-                ? '75%'
-                : '70%';
+            this.isVideoPinned || this.isChatPinned || isPollDocked || this.isBreakoutPinned ? '75%' : '70%';
         const videoMenuBar = rc.getEcN('videoMenuBar');
         for (let i = 0; i < videoMenuBar.length; i++) {
             const menuBar = videoMenuBar[i];
@@ -6134,9 +6114,6 @@ class RoomClient {
         }
         if (this.isBreakoutPinned) {
             this.breakoutPin();
-        }
-        if (this.transcription.isPin()) {
-            this.transcription.pinned();
         }
     }
 
@@ -6534,9 +6511,6 @@ class RoomClient {
     }
 
     toggleChatPin() {
-        if (transcription.isPin()) {
-            return userLog('info', 'Please unpin the transcription that appears to be currently pinned', 'top-end');
-        }
         if (this.isPollPinned) {
             return userLog('info', 'Please unpin the poll that appears to be currently pinned', 'top-end');
         }
@@ -7794,9 +7768,6 @@ class RoomClient {
     }
 
     togglePollPin() {
-        if (transcription.isPin()) {
-            return userLog('info', 'Please unpin the transcription that appears to be currently pinned', 'top-end');
-        }
         if (this.isChatPinned) {
             return userLog('info', 'Please unpin the chat that appears to be currently pinned', 'top-end');
         }
@@ -7902,9 +7873,6 @@ class RoomClient {
     // ####################################################
 
     toggleBreakoutPin() {
-        if (transcription.isPin()) {
-            return userLog('info', 'Please unpin the transcription that appears to be currently pinned', 'top-end');
-        }
         if (this.isChatPinned) {
             return userLog('info', 'Please unpin the chat that appears to be currently pinned', 'top-end');
         }
@@ -8439,9 +8407,6 @@ class RoomClient {
     }
 
     toggleEditorPin() {
-        if (transcription.isPin()) {
-            return userLog('info', 'Please unpin the transcription that appears to be currently pinned', 'top-end');
-        }
         if (this.isPollPinned) {
             return userLog('info', 'Please unpin the poll that appears to be currently pinned', 'top-end');
         }
@@ -10528,32 +10493,6 @@ class RoomClient {
             case 'speechMessages':
                 this.userLog('info', `${icons.speech} Speech incoming messages ${status}`, 'top-end');
                 break;
-            case 'transcriptShowOnMsg':
-                active
-                    ? this.userLog(
-                          'info',
-                          `${icons.transcript} Transcript will be shown, when you receive a message`,
-                          'top-end'
-                      )
-                    : this.userLog(
-                          'info',
-                          `${icons.transcript} Transcript not will be shown, when you receive a message`,
-                          'top-end'
-                      );
-                break;
-            case 'transcriptSendToAll':
-                active
-                    ? this.userLog(
-                          'info',
-                          `${icons.transcript} Transcription will be sent to all participants`,
-                          'top-end'
-                      )
-                    : this.userLog(
-                          'info',
-                          `${icons.transcript} Transcription will not be sent to participants`,
-                          'top-end'
-                      );
-                break;
             case 'video_start_privacy':
                 this.userLog(
                     'info',
@@ -11881,12 +11820,6 @@ class RoomClient {
                 break;
             case 'roomEmoji':
                 this.handleRoomEmoji(cmd);
-                break;
-            case 'transcriptionAll':
-                this.transcription.handleTranscriptionAll(cmd);
-                break;
-            case 'transcript':
-                this.transcription.handleTranscript(cmd);
                 break;
             case 'geoLocation':
             case 'geoLocationOK':
@@ -13526,7 +13459,6 @@ class RoomClient {
         const interrupt = this.createButton('avatar__interrupt', html.stop);
         const fs = this.createButton('avatar__fs', html.fullScreen);
         const pin = this.createButton('avatar__pin', html.pin);
-        const mic = this.createButton('avatar__mic', html.audioOn);
         const ss = this.createButton('avatar__stopSession', html.kickOut);
 
         // Mute avatar audio (local only) toggle button
@@ -13576,7 +13508,6 @@ class RoomClient {
         this.isVideoFullScreenSupported && vb.appendChild(fs);
         vb.appendChild(muteAvatarAudioBtn);
         vb.appendChild(interrupt);
-        speechRecognition && vb.appendChild(mic);
         vb.appendChild(shareBtn);
         chatGPTToggleBtn && vb.appendChild(chatGPTToggleBtn);
         !this.isMobileDevice && vb.appendChild(pin);
@@ -13603,20 +13534,6 @@ class RoomClient {
 
         interrupt.onclick = () => {
             this.streamingInterrupt();
-        };
-
-        mic.onclick = () => {
-            if (!speechRecognition) {
-                return this.userLog('warning', 'Speech recognition is not supported in this browser', 'top-end', 6000);
-            }
-            if (this.videoAIRecording) {
-                this.videoAIRecognitionPersistent = false;
-                if (this.videoAISpeechRecognition) {
-                    this.videoAISpeechRecognition.stop();
-                }
-            } else {
-                this.startVideoAISpeechRecognition(mic);
-            }
         };
 
         ss.onclick = () => {
@@ -13898,12 +13815,6 @@ class RoomClient {
             case 'avatar.speak_ended':
                 console.log('Video AI: Avatar finished speaking');
                 break;
-            case 'user.transcription':
-                console.log('Video AI: User said:', event.text);
-                break;
-            case 'avatar.transcription':
-                console.log('Video AI: Avatar said:', event.text);
-                break;
             case 'session.stopped':
                 console.log('Video AI: Session stopped:', event.end_reason);
                 this.stopSession();
@@ -13963,70 +13874,6 @@ class RoomClient {
                     })
             );
         }, Promise.resolve());
-    }
-
-    startVideoAISpeechRecognition(micBtn) {
-        const SpeechAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechAPI) {
-            return this.userLog('warning', 'Speech recognition is not supported in this browser', 'top-end', 6000);
-        }
-
-        this.videoAIRecognitionPersistent = true;
-
-        this.videoAISpeechRecognition = new SpeechAPI();
-        this.videoAISpeechRecognition.lang = typeof currentLangCode !== 'undefined' ? currentLangCode : 'en-US';
-        this.videoAISpeechRecognition.continuous = false;
-        this.videoAISpeechRecognition.interimResults = false;
-        this.videoAISpeechRecognition.maxAlternatives = 1;
-
-        this.videoAISpeechRecognition.onstart = () => {
-            this.videoAIRecording = true;
-            setColor(micBtn, 'lime');
-            console.log('Video AI speech recognition started');
-        };
-
-        this.videoAISpeechRecognition.onresult = (e) => {
-            const transcript = e.results[0][0].transcript;
-            if (transcript) {
-                console.log('Video AI speech recognized:', transcript);
-                if (!isChatGPTOn) {
-                    if (!this.isChatOpen) this.toggleChat();
-                    this.showPeerAboutAndMessages('ChatGPT', 'ChatGPT');
-                }
-                chatMessage.value = transcript;
-                this.sendMessage();
-            }
-        };
-
-        this.videoAISpeechRecognition.onerror = (event) => {
-            console.error('Video AI speech recognition error:', event.error);
-            if (event.error !== 'no-speech') {
-                this.userLog('warning', `Speech recognition error: ${event.error}`, 'top-end', 6000);
-            }
-        };
-
-        this.videoAISpeechRecognition.onend = () => {
-            // Prevent stopping in the absence of speech...
-            if (this.videoAIRecognitionPersistent && VideoAI.active) {
-                this.videoAIRecording = false;
-                setTimeout(() => {
-                    if (this.videoAIRecognitionPersistent && VideoAI.active && !this.videoAIRecording) {
-                        this.startVideoAISpeechRecognition(micBtn);
-                    }
-                }, 2000);
-            } else {
-                this.videoAIRecording = false;
-                setColor(micBtn, 'white');
-                console.log('Video AI speech recognition stopped');
-            }
-        };
-
-        try {
-            this.videoAISpeechRecognition.start();
-        } catch (error) {
-            console.error('Video AI speech recognition start error:', error);
-            this.userLog('warning', 'Failed to start speech recognition', 'top-end', 6000);
-        }
     }
 
     streamingTask(message) {
@@ -14134,14 +13981,6 @@ class RoomClient {
             if (this.videoAIElement) this.videoAIElement.muted = false;
             VideoAI.muteParticipants = false;
         }
-
-        this.videoAIRecognitionPersistent = false;
-
-        if (this.videoAISpeechRecognition) {
-            this.videoAISpeechRecognition.stop();
-            this.videoAISpeechRecognition = null;
-        }
-        this.videoAIRecording = false;
 
         const videoAIElement = this.getId('videoAIElement');
         if (videoAIElement) {

@@ -282,9 +282,6 @@ function getRtmpTotalActiveStreamsCount() {
 const nodemailer = require('./lib/nodemailer');
 const { SCHEDULE_MEETING_LIMITS } = nodemailer;
 
-// Whisper transcription helpers (pure, unit-testable)
-const { resolveAudioExtension, decodeAudioPayload, filterTranscript } = require('./lib/whisper');
-
 // Slack API
 const CryptoJS = require('crypto-js');
 const qS = require('qs');
@@ -4464,71 +4461,6 @@ function startServer() {
                 // Handle general errors
                 log.error('DeepSeek Error', error);
                 cb({ message: `Error: ${error.message}` });
-            }
-        });
-
-        // https://platform.openai.com/docs/api-reference/audio/createTranscription
-        // Whisper speech-to-text (OpenAI API or any OpenAI-compatible self-hosted server)
-        socket.on('getWhisperTranscription', async ({ audio, mimeType, language }, cb) => {
-            if (!roomExists(socket)) {
-                return cb({ error: 'Room not found' });
-            }
-
-            const whisper = config?.integrations?.whisper;
-            if (!whisper?.enabled) {
-                return cb({ error: 'Whisper transcription is disabled. Please try again later!' });
-            }
-
-            try {
-                const maxBytes = whisper.maxAudioBytes || 25 * 1024 * 1024;
-
-                let buffer;
-                try {
-                    buffer = decodeAudioPayload(audio, maxBytes);
-                } catch (err) {
-                    if (err.message === 'Empty audio payload') return cb({ text: '' });
-                    if (err.message === 'Audio segment too large') return cb({ error: err.message });
-                    throw err;
-                }
-
-                const type = typeof mimeType === 'string' && mimeType.startsWith('audio/') ? mimeType : 'audio/webm';
-                const ext = resolveAudioExtension(type);
-
-                const FormData = require('form-data');
-                const form = new FormData();
-                form.append('file', buffer, { filename: `audio.${ext}`, contentType: type });
-                form.append('model', whisper.model || 'whisper-1');
-                form.append('response_format', 'verbose_json');
-
-                const lang = typeof language === 'string' && language ? language : whisper.language;
-                if (lang) form.append('language', lang);
-
-                const headers = { ...form.getHeaders() };
-                if (whisper.apiKey) headers['Authorization'] = `Bearer ${whisper.apiKey}`;
-
-                const base = (whisper.basePath || 'https://api.openai.com/v1/').replace(/\/?$/, '/');
-                const url = `${base}audio/transcriptions`;
-
-                const response = await axios.post(url, form, {
-                    headers,
-                    timeout: 30000,
-                    maxBodyLength: Infinity,
-                    maxContentLength: Infinity,
-                });
-
-                const raw = response.data && (response.data.text || response.data.transcript);
-                const rawText = typeof raw === 'string' ? raw.trim() : '';
-
-                // Filter out Whisper hallucinations that occur on silent/near-silent audio
-                const segments = Array.isArray(response.data?.segments) ? response.data.segments : [];
-                const text = filterTranscript(rawText, segments);
-
-                log.debug('Whisper transcription', { language: lang || 'auto', bytes: buffer.length, text });
-
-                cb({ text });
-            } catch (error) {
-                log.error('Whisper transcription error', error?.response?.data || error.message);
-                cb({ error: `Whisper error: ${error?.response?.data?.error?.message || error.message}` });
             }
         });
 

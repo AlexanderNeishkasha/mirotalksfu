@@ -111,7 +111,7 @@ test('leaving suppresses signaling and media recovery until exit cleanup', async
 
 /** Invalidate older cached client code that still displays recovery on leave. */
 test('the meeting loads the updated exit behavior', () => {
-    assert.match(view, /RoomClient\.js\?v=bodrik-19/);
+    assert.match(view, /RoomClient\.js\?v=bodrik-20/);
 });
 
 /** A lost socket still releases local media immediately instead of waiting for a dead acknowledgment. */

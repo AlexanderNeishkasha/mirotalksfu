@@ -32,7 +32,7 @@
 
         <!-- StyleSheet -->
         <link rel="stylesheet" href="../css/Root.css" />
-        <link rel="stylesheet" href="../css/Room.css?v=bodrik-6" />
+        <link rel="stylesheet" href="../css/Room.css?v=bodrik-7" />
         <link rel="stylesheet" href="../css/VideoGrid.css?v=bodrik-1" />
         <link rel="stylesheet" href="../css/GroupChat.css?v=bodrik-2" />
         <link rel="stylesheet" href="../css/Polls.css" />
@@ -126,14 +126,11 @@
 
         <script defer src="/socket.io/socket.io.js"></script>
         <script defer src="../sfu/MediasoupClient.js"></script>
-        <script defer src="../js/LocalStorage.js"></script>
-        <script defer src="../js/Rules.js?v=bodrik-2"></script>
+        <script defer src="../js/LocalStorage.js?v=bodrik-2"></script>
+        <script defer src="../js/Rules.js?v=bodrik-3"></script>
         <script defer src="../js/Helpers.js"></script>
-        <script defer src="../js/SpeechRec.js"></script>
-        <script defer src="../js/WhisperTranscription.js"></script>
-        <script defer src="../js/Transcription.js"></script>
         <script defer src="../js/VideoDrawing.js"></script>
-        <script defer src="../js/VideoGrid.js"></script>
+        <script defer src="../js/VideoGrid.js?v=bodrik-2"></script>
         <script defer src="../js/VirtualBackground.js"></script>
         <script defer src="../js/NodeProcessor.js"></script>
         <script defer src="../js/BodrikMicProcessing.js?v=1"></script>
@@ -142,11 +139,11 @@
         <script defer src="../js/WakeLock.js"></script>
         <script defer src="../js/RoomTemplate.js"></script>
         <script defer src="../js/BodrikNetworkRecovery.js?v=1"></script>
-        <script defer src="../js/RoomClient.js?v=bodrik-19"></script>
+        <script defer src="../js/RoomClient.js?v=bodrik-20"></script>
         <script defer src="../js/BodrikProfile.js?v=2"></script>
         <script defer src="../js/BodrikChatImage.js?v=3"></script>
         <script defer src="../js/BodrikTheme.js?v=2"></script>
-        <script defer src="../js/Room.js?v=bodrik-26"></script>
+        <script defer src="../js/Room.js?v=bodrik-27"></script>
     </head>
     <body>
         <noscript>You need to enable JavaScript to run this app.</noscript>
@@ -450,16 +447,10 @@
                         <!-- TOOLS -->
                         <div
                             class="device-menu-header extra-menu-group"
-                            data-buttons="speechRecButton,transcriptionButton,pollButton,editorButton,whiteboardButton,documentPiPButton,emojiRoomButton,breakoutRoomButton"
+                            data-buttons="pollButton,editorButton,whiteboardButton,documentPiPButton,emojiRoomButton,breakoutRoomButton"
                         >
                             TOOLS
                         </div>
-                        <button id="speechRecButton" class="hidden">
-                            <i id="speechRecIcon" class="fas fa-microphone-slash"></i> Voice Commands
-                        </button>
-                        <button id="transcriptionButton" class="hidden">
-                            <i class="fas fa-closed-captioning"></i> Transcription
-                        </button>
                         <button id="pollButton" class="hidden">
                             <i class="fas fa-square-poll-horizontal"></i> Poll
                         </button>
@@ -2416,9 +2407,9 @@
                                         <ul class="dropdown-menu text-start" aria-labelledby="chatDropDownMenu">
                                             <li>
                                                 <hr />
-                                                <div class="transcription-switch-row">
+                                                <div class="chat-settings-switch-row">
                                                     <i class="fa-solid fa-eye"></i>
-                                                    <label class="transcription-switch-label" for="showChatOnMsg"
+                                                    <label class="chat-settings-switch-label" for="showChatOnMsg"
                                                         >Show on msg</label
                                                     >
                                                     <div class="form-check form-switch form-switch-md">
@@ -2432,9 +2423,9 @@
                                                 </div>
                                             </li>
                                             <li id="speechMsgDiv">
-                                                <div class="transcription-switch-row">
+                                                <div class="chat-settings-switch-row">
                                                     <i class="fas fa-volume-high"></i>
-                                                    <label class="transcription-switch-label" for="speechIncomingMsg"
+                                                    <label class="chat-settings-switch-label" for="speechIncomingMsg"
                                                         >Speech msg</label
                                                     >
                                                     <div class="form-check form-switch form-switch-md">
@@ -2561,22 +2552,6 @@
                                             type="file"
                                             accept="image/png,image/jpeg,image/webp"
                                         />
-                                        <button
-                                            id="chatSpeechStartButton"
-                                            class="chat-toolbar-btn hidden"
-                                            type="button"
-                                            aria-label="Start speech recognition"
-                                        >
-                                            <i class="fas fa-microphone-slash"></i>
-                                        </button>
-                                        <button
-                                            id="chatSpeechStopButton"
-                                            class="chat-toolbar-btn hidden is-active"
-                                            type="button"
-                                            aria-label="Stop speech recognition"
-                                        >
-                                            <i class="fas fa-microphone"></i>
-                                        </button>
                                     </div>
                                     <div class="chat-compose-tool-group chat-text-tool-group" aria-label="Text actions">
                                         <button
@@ -2757,179 +2732,6 @@
             </div>
             <div class="editor" id="editor"></div>
         </section>
-
-        <section id="transcriptionRoom" class="transcription-room fadein">
-            <section id="transcriptionSection" class="transcription">
-                <header id="transcriptionHeader" class="transcription-header">
-                    <div class="transcription-header-title">
-                        <button
-                            id="transcriptionSpeechStatus"
-                            class="fas fa-microphone-alt transcription-title-mark"
-                            aria-label="Transcription status"
-                        ></button>
-                        <span class="transcription-title-text">Transcription</span>
-                    </div>
-                    <div class="transcription-header-options">
-                        <div class="transcription-tool-group" aria-label="Panel layout">
-                            <button
-                                id="transcriptionTogglePinBtn"
-                                class="fas fa-map-pin"
-                                aria-label="Pin transcription"
-                                aria-pressed="false"
-                            ></button>
-                            <button id="transcriptionMaxBtn" aria-label="Maximize transcription">
-                                <i class="fas fa-expand"></i>
-                            </button>
-                            <button id="transcriptionMinBtn" class="hidden" aria-label="Restore transcription">
-                                <i class="fas fa-compress"></i>
-                            </button>
-                        </div>
-                        <div
-                            class="transcription-tool-group transcription-menu-tools"
-                            aria-label="Transcription actions"
-                        >
-                            <div class="dropdown title">
-                                <button
-                                    class="dropdown-toggle"
-                                    type="button"
-                                    id="transcriptionDropDownMenu"
-                                    data-bs-toggle="dropdown"
-                                    aria-expanded="false"
-                                    aria-label="Transcription menu"
-                                >
-                                    <i class="fas fa-bars"></i>
-                                </button>
-                                <ul class="dropdown-menu text-start" aria-labelledby="transcriptionDropDownMenu">
-                                    <li>
-                                        <hr />
-                                        <div class="transcription-switch-row">
-                                            <i class="fa-solid fa-eye"></i>
-                                            <label class="transcription-switch-label" for="transcriptShowOnMsg"
-                                                >Show on msg</label
-                                            >
-                                            <div class="form-check form-switch form-switch-md">
-                                                <input
-                                                    class="form-check-input"
-                                                    type="checkbox"
-                                                    id="transcriptShowOnMsg"
-                                                    checked
-                                                />
-                                            </div>
-                                        </div>
-                                    </li>
-                                    <li>
-                                        <div class="transcription-switch-row">
-                                            <i class="fa-solid fa-share-nodes"></i>
-                                            <label class="transcription-switch-label" for="transcriptSendToAll"
-                                                >Send to all</label
-                                            >
-                                            <div class="form-check form-switch form-switch-md">
-                                                <input
-                                                    class="form-check-input"
-                                                    type="checkbox"
-                                                    id="transcriptSendToAll"
-                                                    checked
-                                                />
-                                            </div>
-                                        </div>
-                                        <hr />
-                                    </li>
-                                    <li id="transcriptWhisperLi" class="hidden">
-                                        <div class="transcription-switch-row">
-                                            <i class="fa-solid fa-wand-magic-sparkles"></i>
-                                            <label class="transcription-switch-label" for="transcriptWhisperMode"
-                                                >Whisper mode</label
-                                            >
-                                            <div class="form-check form-switch form-switch-md">
-                                                <input
-                                                    class="form-check-input"
-                                                    type="checkbox"
-                                                    id="transcriptWhisperMode"
-                                                />
-                                            </div>
-                                        </div>
-                                        <hr />
-                                    </li>
-                                    <li>
-                                        <button id="transcriptionGhostBtn">
-                                            <i class="fas fa-circle-half-stroke"></i>&nbsp;Toggle bg
-                                        </button>
-                                    </li>
-                                    <li id="transcriptionAllLi" class="hidden">
-                                        <button id="transcriptionAllBtn">
-                                            <i class="fas fa-play"></i>&nbsp;Start for all
-                                        </button>
-                                    </li>
-                                    <li>
-                                        <button id="transcriptionSaveBtn"><i class="fas fa-save"></i>&nbsp;Save</button>
-                                    </li>
-                                    <li>
-                                        <button id="transcriptionCleanBtn">
-                                            <i class="fas fa-trash"></i>&nbsp;Clean
-                                        </button>
-                                    </li>
-                                </ul>
-                            </div>
-                        </div>
-                        <button
-                            id="transcriptionCloseBtn"
-                            class="fas fa-times"
-                            aria-label="Close transcription"
-                        ></button>
-                    </div>
-                </header>
-                <main id="transcriptionChat" class="transcription-chat">
-                    <!-- EMPTY TRANSCRIPTION ILLUSTRATION -->
-                    <div id="transcriptionEmptyNotice" class="empty-chat-notice">
-                        <img alt="Empty chat illustration" class="empty-chat-img" src="../svg/emptyTranscription.svg" />
-                        <h5 class="empty-chat-title">Start Transcription</h5>
-                        <p class="empty-chat-desc">
-                            There are no transcriptions here yet. Start transcription by clicking the "Start" button.
-                        </p>
-                    </div>
-                </main>
-                <div id="transcriptionFooter" class="transcription-inputarea">
-                    <div class="transcription-language-controls">
-                        <label class="transcription-select-field">
-                            <i class="fas fa-language" aria-hidden="true"></i>
-                            <select
-                                id="transcriptionLanguage"
-                                class="form-select text-light bg-dark"
-                                aria-label="Transcription language"
-                            ></select>
-                        </label>
-                        <label class="transcription-select-field">
-                            <i class="fas fa-globe" aria-hidden="true"></i>
-                            <select
-                                id="transcriptionDialect"
-                                class="form-select text-light bg-dark"
-                                aria-label="Transcription dialect"
-                            ></select>
-                        </label>
-                    </div>
-                    <div class="transcription-speech-actions" aria-label="Transcription controls">
-                        <button
-                            id="transcriptionSpeechStart"
-                            class="transcription-speech-btn transcription-speech-start"
-                            type="button"
-                            aria-label="Start transcription"
-                        >
-                            <i class="fas fa-play"></i>
-                        </button>
-                        <button
-                            id="transcriptionSpeechStop"
-                            class="transcription-speech-btn transcription-speech-stop hidden"
-                            type="button"
-                            aria-label="Stop transcription"
-                        >
-                            <i class="fas fa-stop"></i>
-                        </button>
-                    </div>
-                </div>
-            </section>
-        </section>
-
-        <div id="transcriptionPopup" class="transcriptio-popup"></div>
 
         <!-- Breakout Rooms Panel -->
         <section id="breakoutPanel" class="breakout-panel fadein center hidden">
