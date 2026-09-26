@@ -1495,7 +1495,6 @@ module.exports = {
 
             // Participants list controls
             participantsList: {
-                saveInfoButton: process.env.SHOW_SAVE_INFO !== 'false',
                 sendFileAllButton: process.env.SHOW_SEND_FILE_ALL !== 'false',
                 ejectAllButton: process.env.SHOW_EJECT_ALL !== 'false',
                 sendFileButton: process.env.SHOW_SEND_FILE !== 'false',

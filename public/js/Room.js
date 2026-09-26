@@ -544,7 +544,6 @@ async function initClient() {
         setTippy('editorCleanBtn', 'Clean', 'bottom');
         setTippy('pollAddOptionBtn', 'Add option', 'top');
         setTippy('pollDelOptionBtn', 'Delete option', 'top');
-        setTippy('participantsSaveBtn', 'Save participants info', 'bottom');
         setTippy('participantsRaiseHandBtn', 'Toggle raise hands', 'bottom');
         setTippy('participantsUnreadMessagesBtn', 'Toggle unread messages', 'bottom');
         setTippy('participantsHiddenBtn', 'Hidden participants', 'bottom');
@@ -2992,9 +2991,6 @@ function handleButtons() {
             document.getElementById(button.dataset.panelActionTarget)?.click();
         };
     });
-    participantsSaveBtn.onclick = () => {
-        saveRoomPeers();
-    };
     participantsUnreadMessagesBtn.onclick = () => {
         rc.toggleUnreadMsg();
     };
@@ -7268,15 +7264,6 @@ async function getRemotePeerInfo(peer_id) {
 async function getRoomPeers() {
     let room_info = await rc.getRoomInfo();
     return new Map(JSON.parse(room_info.peers));
-}
-
-async function saveRoomPeers() {
-    const peers = await getRoomPeers();
-    let peersToSave = [];
-    for (let peer of Array.from(peers.keys())) {
-        peersToSave.push(peers.get(peer).peer_info);
-    }
-    saveObjToJsonFile(peersToSave, 'PARTICIPANTS');
 }
 
 async function getRoomParticipants() {

@@ -8,6 +8,9 @@ const test = require('node:test');
 const page = readFileSync(join(__dirname, '../views/Room.html'), 'utf8');
 const css = readFileSync(join(__dirname, '../css/ChatListActions.css'), 'utf8');
 const client = readFileSync(join(__dirname, 'RoomClient.js'), 'utf8');
+const room = readFileSync(join(__dirname, 'Room.js'), 'utf8');
+const rules = readFileSync(join(__dirname, 'Rules.js'), 'utf8');
+const config = readFileSync(join(__dirname, '../../app/src/config.template.js'), 'utf8');
 
 test('narrow conversation header gives Invite, actions, and Close separate grid cells', () => {
     const header = page.split('<!-- CHAT LIST OPTIONS -->')[1].split('<!-- CHAT SEARCH -->')[0];
@@ -18,6 +21,15 @@ test('narrow conversation header gives Invite, actions, and Close separate grid 
     assert.match(css, /@media screen and \(max-width: 600px\) \{\s*@container chat-panel \(min-width: 420px\)/);
     assert.match(page, /ChatListActions\.css\?v=bodrik-2/);
     assert.match(page, /RoomClient\.js\?v=bodrik-21/);
+});
+
+test('participants export control and its obsolete settings are absent', () => {
+    assert.doesNotMatch(page, /participantsSaveBtn/);
+    assert.doesNotMatch(room, /participantsSaveBtn|saveRoomPeers/);
+    assert.doesNotMatch(rules, /participantsSaveBtn|saveInfoButton/);
+    assert.doesNotMatch(config, /saveInfoButton|SHOW_SAVE_INFO/);
+    assert.match(page, /Rules\.js\?v=bodrik-4/);
+    assert.match(page, /Room\.js\?v=bodrik-28/);
 });
 
 test('conversation list covers the chat header on narrow screens, but not on desktop', () => {

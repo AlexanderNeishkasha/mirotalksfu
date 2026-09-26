@@ -125,7 +125,6 @@ let BUTTONS = {
         pollSaveButton: true,
     },
     participantsList: {
-        saveInfoButton: true, // presenter
         sendFileAllButton: true, // presenter
         ejectAllButton: true, // presenter
         sendFileButton: true, // presenter & guests
@@ -161,7 +160,6 @@ function handleRules(isPresenter, roomSetup = true) {
         // GUEST
         // ##################################
         BUTTONS.main.breakoutRoomButton = false;
-        BUTTONS.participantsList.saveInfoButton = false;
         BUTTONS.settings.lockRoomButton = false;
         BUTTONS.settings.unlockRoomButton = false;
         BUTTONS.settings.broadcastingButton = false;
@@ -284,7 +282,6 @@ function handleRules(isPresenter, roomSetup = true) {
         show(roomRecordingOptions);
         hide(roomHostOnlyRecording);
     }
-    BUTTONS.participantsList.saveInfoButton ? show(participantsSaveBtn) : hide(participantsSaveBtn);
     BUTTONS.whiteboard.whiteboardLockButton ? show(whiteboardUnlockBtn) : hide(whiteboardUnlockBtn);
     isPresenter ? show(whiteboardParticipantNamesControl, 'flex') : hide(whiteboardParticipantNamesControl);
     refreshExitButtonTooltip();
@@ -385,7 +382,6 @@ function handleRulesBroadcasting() {
     //BUTTONS.main.pollButton = false;
     BUTTONS.main.breakoutRoomButton = false;
     BUTTONS.main.settingsButton = false;
-    BUTTONS.participantsList.saveInfoButton = false;
     BUTTONS.settings.lockRoomButton = false;
     BUTTONS.settings.unlockRoomButton = false;
     BUTTONS.settings.lobbyButton = false;
