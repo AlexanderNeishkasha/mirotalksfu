@@ -1,0 +1,101 @@
+/* The conversation list is only 300px wide even on desktop: keep controls on two rows. */
+.chat-list-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 32px;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.chat-list-actions #chatShareRoomBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 12px;
+    border: none;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: 'Montserrat', sans-serif;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    white-space: nowrap;
+    min-height: 34px;
+    flex-shrink: 0;
+    justify-self: start;
+}
+
+.chat-list-actions #chatShareRoomBtn:hover {
+    background: rgba(255, 255, 255, 0.14);
+    transform: none;
+}
+
+.chat-action-icon-btns {
+    display: flex;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    gap: 3px;
+    justify-content: flex-end;
+    min-width: 0;
+}
+
+.chat-action-icon-btns button,
+.chat-list-actions > #chatHideParticipantsList {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    padding: 0;
+    flex-shrink: 0;
+}
+
+.chat-action-icon-btns button:hover,
+.chat-list-actions > #chatHideParticipantsList:hover {
+    background: rgba(255, 255, 255, 0.16);
+}
+
+.chat-action-icon-btns #participantsHiddenBtn {
+    color: #fff !important;
+}
+
+.chat-action-icon-btns #participantsHiddenBtn.is-filtering {
+    background: #ffd700;
+    color: #1a1a1a !important;
+}
+
+.chat-action-icon-btns #participantsHiddenBtn.is-filtering:hover {
+    background: #ffcd00;
+}
+
+.chat-action-icon-btns .participant-list-dropdown-menu button {
+    width: 95%;
+    height: auto;
+    justify-content: flex-start;
+    padding: 9px 12px;
+    background: transparent;
+    font-size: 0.8rem;
+}
+
+.chat-action-icon-btns .participant-list-dropdown-menu button:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.chat-list-actions > #chatHideParticipantsList {
+    grid-column: 2;
+    grid-row: 1;
+    background: #1e3a8a;
+}
+
+.chat-list-actions > #chatHideParticipantsList:hover {
+    background: #1d4ed8;
+}
