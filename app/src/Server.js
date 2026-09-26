@@ -102,6 +102,7 @@ const Validator = require('./Validator');
 const { bindRejoinSecret, findDisconnectedRejoinPeers } = require('./BodrikRejoin');
 const { isNamedPresenter } = require('./BodrikPresenterIdentity');
 const { startRecoveryHeartbeat } = require('./BodrikRecoveryHeartbeat');
+const { createRecoveryGrace } = require('./BodrikRecoveryGrace');
 const HtmlInjector = require('./HtmlInjector');
 const { browserConsoleScript } = require('./BodrikBrowserConsole');
 const log = new Logger('Server');
@@ -539,6 +540,7 @@ const htmlInjector = new HtmlInjector(filesPath, config.ui.brand);
 const authHost = new Host(); // Authenticated IP by Login
 
 const roomList = new Map(); // All Rooms
+const recoveryGrace = createRecoveryGrace(io, roomList, log);
 
 const presenters = {}; // Collect presenters grp by roomId
 
@@ -2427,6 +2429,7 @@ function startServer() {
     // ####################################################
 
     io.on('connection', (socket) => {
+        recoveryGrace.cancel(socket.id);
         log.info('[Recovery] socket connected', {
             socket_id: socket.id,
             recovered: socket.recovered,
@@ -5109,7 +5112,7 @@ function startServer() {
 
         socket.on('disconnect', (reason) => {
             const recoverable = ['transport close', 'transport error', 'ping timeout'].includes(reason);
-            const disconnectedAt = Date.now();
+            const disconnectedPeer = socket.room_id && roomList.get(socket.room_id)?.getPeer(socket.id);
             log.info('[Recovery] socket disconnected', {
                 socket_id: socket.id,
                 room_id: socket.room_id || null,
@@ -5125,7 +5128,7 @@ function startServer() {
                 }
 
                 const { room, peer } = getRoomAndPeer(socket);
-                if (!peer) {
+                if (!peer || peer !== disconnectedPeer) {
                     // A newer admission already replaced this disconnected tab peer.
                     socket.room_id = null;
                     socket.removeAllListeners();
@@ -5209,23 +5212,10 @@ function startServer() {
             };
 
             if (recoverable) {
-                setTimeout(() => {
-                    const active = io.sockets.sockets.get(socket.id);
-                    log.info('[Recovery] grace expired', {
-                        socket_id: socket.id,
-                        room_id: socket.room_id || null,
-                        elapsed_ms: Date.now() - disconnectedAt,
-                        recovered: Boolean(active?.connected && active.recovered),
-                        peer_present: Boolean(socket.room_id && roomList.get(socket.room_id)?.getPeer(socket.id)),
-                    });
-                    if (active?.connected && active.recovered) {
-                        log.info('[Reconnect] - kept recovered peer', { socket_id: socket.id });
-                        return;
-                    }
-                    cleanup();
-                }, 120000);
+                recoveryGrace.defer(socket, cleanup);
                 return;
             }
+            recoveryGrace.cancel(socket.id);
             cleanup();
         });
 
