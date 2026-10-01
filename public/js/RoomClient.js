@@ -7643,8 +7643,8 @@ class RoomClient {
             null,
             image.recording,
             null,
-            `${icons.user} ${peer_name} 
-            <br /><br /> 
+            `${icons.user} ${peer_name}
+            <br /><br />
             <span>🔴 ${action}</span>
             <br />`
         );

@@ -6026,7 +6026,7 @@ function adaptAspectRatio(participantsCount) {
             : elemDisplay('participantsCountBadge', false);
     }
 
-    /* 
+    /*
         ['0:0', '4:3', '16:9', '1:1', '1:2'];
     */
     let desktop,
