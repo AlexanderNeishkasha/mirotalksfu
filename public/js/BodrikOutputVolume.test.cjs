@@ -4,7 +4,10 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 
 const source = fs.readFileSync(require('node:path').join(__dirname, 'RoomClient.js'), 'utf8');
-const methods = source.slice(source.indexOf('    applyOutputVolume(audioPlayer) {'), source.indexOf('    addVolumeEventListeners(inputElement, updateVolumeCallback) {'));
+const methods = source.slice(
+    source.indexOf('    applyOutputVolume(audioPlayer) {'),
+    source.indexOf('    addVolumeEventListeners(inputElement, updateVolumeCallback) {')
+);
 const gainSource = fs.readFileSync(require('node:path').join(__dirname, 'BodrikAudioGain.js'), 'utf8');
 const Volume = vm.runInNewContext(`${gainSource}; (class { ${methods} })`, { window: {} });
 
@@ -46,7 +49,9 @@ test('mobile peers route remote tracks through gain without double playback', ()
             sourceCreated++;
             return { connect() {} };
         },
-        createMediaElementSource: () => { throw new Error('should use stream'); },
+        createMediaElementSource: () => {
+            throw new Error('should use stream');
+        },
         createGain: () => ({ gain: { value: 1 }, connect() {} }),
         destination: {},
     });
