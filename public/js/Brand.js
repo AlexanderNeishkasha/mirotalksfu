@@ -100,24 +100,8 @@ let BRAND = {
         buttonLabel: 'Login',
     },
     about: {
-        title: '<strong>WebRTC SFU v2.4.71</strong>',
-        html: `
-            <div class="about-content">
-                <p class="about-description">
-                    Self-hosted group video meetings with scalable WebRTC conferencing.
-                </p>
-                <a
-                    class="about-primary-action"
-                    data-umami-event="About button"
-                    href="https://docs.mirotalk.com/sites/sfu.html"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                >
-                    <i class="fas fa-info-circle" aria-hidden="true"></i>
-                    <span>About</span>
-                </a>
-            </div>
-        `,
+        version: '2.4.71',
+        sourceRevision: '',
     },
     widget: {
         enabled: false,

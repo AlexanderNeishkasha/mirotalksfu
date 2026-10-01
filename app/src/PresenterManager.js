@@ -1,7 +1,8 @@
 'use strict';
 
+/** Promote an eligible remaining peer when automatic presenter assignment is enabled. */
 function assignFallbackPresenter(roomId, room, presenters, joinFirst) {
-    if (!joinFirst || !room || roomId.includes('_breakout_') || room.getPeersCount() === 0) return null;
+    if (!joinFirst || !room || room.getPeersCount() === 0) return null;
 
     if (!(roomId in presenters)) presenters[roomId] = {};
     if (Object.keys(presenters[roomId]).length > 0) return null;

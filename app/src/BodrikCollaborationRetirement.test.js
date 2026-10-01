@@ -105,7 +105,7 @@ test('remaining pinned panels retain their original widths', () => {
     for (const [state, expected] of [
         [{}, 0],
         [{ isChatPinned: true }, 25],
-        [{ isBreakoutPinned: true }, 30],
+        [{ isBreakoutPinned: true }, 0],
     ]) {
         assert.equal(width.call(state), expected);
     }

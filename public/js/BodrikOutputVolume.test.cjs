@@ -5,7 +5,8 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync(require('node:path').join(__dirname, 'RoomClient.js'), 'utf8');
 const methods = source.slice(source.indexOf('    applyOutputVolume(audioPlayer) {'), source.indexOf('    addVolumeEventListeners(inputElement, updateVolumeCallback) {'));
-const Volume = vm.runInNewContext(`(class { ${methods} })`, { window: {} });
+const gainSource = fs.readFileSync(require('node:path').join(__dirname, 'BodrikAudioGain.js'), 'utf8');
+const Volume = vm.runInNewContext(`${gainSource}; (class { ${methods} })`, { window: {} });
 
 /** Create a remote audio player with an inspectable gain node. */
 function player() {

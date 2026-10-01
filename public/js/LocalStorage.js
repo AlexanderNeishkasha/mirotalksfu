@@ -29,7 +29,7 @@ class LocalStorage {
             moderator_chat_cant_publicly: false, // Everyone can't chat publicly, only Private chat allowed
             moderator_chat_cant_chatgpt: false, // Everyone can't chat with ChatGPT
             moderator_chat_cant_deep_seek: false, // Everyone can't chat with DeepSeek
-            moderator_media_cant_sharing: false, // Everyone can't share media
+            // Everyone can't share media
 
             moderator_disconnect_all_on_leave: false, // Disconnect all participants on leave room
             dominant_speaker_focus: false, // Focus on dominant speaker
@@ -41,7 +41,7 @@ class LocalStorage {
             aspect_ratio: 0, // default (adaptive)
             screen_optimization: 1, // default detail (1): For high fidelity (screen sharing with text/graphics) || motion (2): For high frame rate (video playback, game streaming)
             screen_fps: 3, // default 1920x1080 15fps
-            broadcasting: false, // default false (one to many a/v streaming)
+            // default false (one to many a/v streaming)
             lobby: false, // default false
             pitch_bar: true, // volume indicator
             sounds: true, // room notify sounds

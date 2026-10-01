@@ -18,6 +18,17 @@ polls, or room-wide emoji reactions. Their controls, initialization, room state,
 and signaling handlers are removed; stale room-reaction commands are not relayed.
 Quill and PDF.js are no longer loaded. Chat emoji and chat-message reactions remain.
 Video drawing is also retired, so Fabric.js is no longer loaded.
+Peer-to-peer/shared URL media playback is retired; screen sharing, file transfer,
+and chat URL rendering remain available. Snapshot capture is retired; recording
+remains available in the Tools menu. The localized About dialog explains the
+upstream platform and links to the deployed public source. Broadcasting mode,
+breakout rooms, and RTMP streaming (including its standalone servers) are also
+retired. The meeting uses ordinary participant media permissions; screen sharing,
+recording, and the native music participant remain. Video AI avatars and the
+LiveKit client are retired; ordinary camera capture, profiles, and virtual
+backgrounds remain available. Document-level picture-in-picture is retired;
+ordinary per-video PiP remains. Empty camera selectors offer a localized
+permission retry that releases its temporary stream without publishing video.
 The service-specific backend, TURN server, deployment configuration, environment
 variables, credentials, and user-uploaded data are not stored in this repository.
 

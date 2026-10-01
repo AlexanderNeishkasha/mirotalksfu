@@ -1,0 +1,84 @@
+.meeting-about-popup {
+    width: min(560px, calc(100vw - 32px)) !important;
+}
+
+.meeting-about-popup .swal2-title {
+    padding-inline: 24px;
+    font-size: 1.65rem;
+}
+
+.meeting-about-popup .swal2-html-container {
+    margin: 20px 24px 0;
+    text-align: left;
+}
+
+.meeting-about {
+    display: grid;
+    gap: 14px;
+    color: var(--dd-color);
+}
+
+.meeting-about-version {
+    justify-self: start;
+    padding: 5px 10px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--room-switch-accent) 12%, transparent);
+    color: var(--room-switch-accent);
+    font-size: 0.8rem;
+}
+
+.meeting-about-card {
+    padding: 18px;
+    border: 1px solid color-mix(in srgb, var(--room-switch-accent) 22%, transparent);
+    border-radius: 14px;
+    background: var(--btns-bg-color);
+}
+
+.meeting-about-card h3 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 0 10px;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.meeting-about-card h3 i {
+    color: var(--room-switch-accent);
+}
+
+.meeting-about-card p {
+    margin: 0 0 16px;
+    font-size: 0.92rem;
+    line-height: 1.55;
+}
+
+.meeting-about-card a {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--room-switch-accent);
+    font-size: 0.9rem;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+}
+
+.meeting-about-card a:focus-visible {
+    outline: 2px solid var(--room-switch-accent);
+    outline-offset: 4px;
+    border-radius: 3px;
+}
+
+.meeting-about-popup .swal2-actions {
+    margin: 22px 0;
+}
+
+@media (max-width: 420px) {
+    .meeting-about-popup .swal2-html-container {
+        margin-inline: 16px;
+    }
+
+    .meeting-about-card {
+        padding: 14px;
+    }
+}

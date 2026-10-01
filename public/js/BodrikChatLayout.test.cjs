@@ -20,7 +20,7 @@ test('narrow conversation header gives Invite, actions, and Close separate grid 
     assert.match(css, /\.chat-list-actions > #chatHideParticipantsList\s*\{[^}]*grid-row: 1;/);
     assert.match(css, /@media screen and \(max-width: 600px\) \{\s*@container chat-panel \(min-width: 420px\)/);
     assert.match(page, /ChatListActions\.css\?v=bodrik-2/);
-    assert.match(page, /RoomClient\.js\?v=bodrik-23/);
+    assert.match(page, /RoomClient\.js\?v=bodrik-34/);
 });
 
 test('participants export control and its obsolete settings are absent', () => {
@@ -28,8 +28,8 @@ test('participants export control and its obsolete settings are absent', () => {
     assert.doesNotMatch(room, /participantsSaveBtn|saveRoomPeers/);
     assert.doesNotMatch(rules, /participantsSaveBtn|saveInfoButton/);
     assert.doesNotMatch(config, /saveInfoButton|SHOW_SAVE_INFO/);
-    assert.match(page, /Rules\.js\?v=bodrik-6/);
-    assert.match(page, /Room\.js\?v=bodrik-29/);
+    assert.match(page, /Rules\.js\?v=bodrik-12/);
+    assert.match(page, /Room\.js\?v=bodrik-37/);
 });
 
 test('conversation list covers the chat header on narrow screens, but not on desktop', () => {

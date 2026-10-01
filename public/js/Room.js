@@ -33,9 +33,6 @@ const isDesktopDevice = deviceType === 'desktop';
 const isFirefox = parserResult.browser.name?.toLowerCase() === 'firefox';
 const thisInfo = getInfo();
 
-const isEmbedded = window.self !== window.top;
-const showDocumentPipBtn = !isEmbedded && 'documentPictureInPicture' in window;
-
 /**
  * Initializes a Socket.IO client instance with custom connection and reconnection options.
  *
@@ -92,7 +89,7 @@ const _PEER = {
     geoLocation: '<i class="fas fa-location-dot"></i>',
     sendFile: '<i class="fas fa-upload"></i>',
     sendMsg: '<i class="fas fa-paper-plane"></i>',
-    sendVideo: '<i class="fab fa-youtube"></i>',
+
     pinPeer: '<i class="fas fa-map-pin"></i>',
     gridShow: '<i class="fas fa-eye"></i>',
     gridHide: '<i class="fas fa-eye-slash"></i>',
@@ -279,7 +276,7 @@ let hasTemporaryAvatar = !!(
 let peer_uuid = getPeerUUID();
 let peer_token = getPeerToken();
 let isScreenAllowed = getScreen();
-let isHideMeActive = getHideMeActive();
+
 let notify = getNotify();
 let chat = getChat();
 isPresenter = isPeerPresenter();
@@ -295,7 +292,7 @@ let isSoundEnabled = true;
 let isKeepButtonsVisible = false;
 let isChatPinEnabled = true;
 let isShortcutsEnabled = false;
-let isBroadcastingEnabled = false;
+
 let isLobbyEnabled = false;
 let hostOnlyRecording = false;
 let isEnumerateAudioDevices = false;
@@ -306,8 +303,7 @@ let isVideoPrivacyActive = false;
 let isRecording = false;
 let isAudioVideoAllowed = false;
 let isParticipantsListOpen = false;
-let isBreakoutPanelOpen = false;
-let breakoutRooms = [];
+
 let isVideoControlsOn = false;
 let isChatPasteTxt = false;
 let isChatMarkdownOn = false;
@@ -424,11 +420,7 @@ async function initClient() {
         );
         setTippy('lobbyAcceptAllBtn', 'Accept', 'top');
         setTippy('lobbyRejectAllBtn', 'Reject', 'top');
-        setTippy(
-            'switchBroadcasting',
-            'Broadcasting is the dissemination of audio or video content to a large audience (one to many)',
-            'right'
-        );
+
         setTippy(
             'switchLobby',
             'Lobby mode lets you protect your meeting by only allowing people to enter after a formal approval by a moderator',
@@ -456,7 +448,6 @@ async function initClient() {
             'Only the host (presenter) has the capability to record the meeting',
             'right'
         );
-        setTippy('refreshVideoFiles', 'Refresh', 'left');
         setTippy('switchServerRecording', 'The recording will be stored on the server rather than locally', 'right');
 
         setTippy('chatCleanTextButton', 'Clean', 'top');
@@ -474,13 +465,6 @@ async function initClient() {
         setTippy('chatHideParticipantsList', 'Hide', 'bottom');
         setTippy('chatMaxButton', 'Maximize', 'bottom');
         setTippy('chatMinButton', 'Minimize', 'bottom');
-
-        setTippy('breakoutTogglePin', 'Toggle pin', 'bottom');
-        setTippy('breakoutMaxButton', 'Maximize', 'bottom');
-        setTippy('breakoutMinButton', 'Minimize', 'bottom');
-        setTippy('breakoutRefreshBtn', 'Refresh rooms', 'bottom');
-        setTippy('breakoutDeleteAllBtn', 'Delete all rooms', 'bottom');
-        setTippy('breakoutPanelCloseBtn', 'Close', 'bottom');
 
         setTippy('participantsRaiseHandBtn', 'Toggle raise hands', 'bottom');
         setTippy('participantsUnreadMessagesBtn', 'Toggle unread messages', 'bottom');
@@ -637,46 +621,6 @@ async function refreshMyAudioDevices() {
     if (initSpeakerSelect) initSpeakerSelect.selectedIndex = initSpeakerSelectIndex;
     if (microphoneSelect) microphoneSelect.selectedIndex = microphoneSelectIndex;
     if (speakerSelect) speakerSelect.selectedIndex = speakerSelectIndex;
-}
-
-async function initEnumerateVideoDevices() {
-    // allow the video
-    await navigator.mediaDevices
-        .getUserMedia({ video: true })
-        .then(async (stream) => {
-            await enumerateVideoDevices(stream);
-            isVideoAllowed = true;
-        })
-        .catch(() => {
-            isVideoAllowed = false;
-        });
-}
-
-async function enumerateVideoDevices(stream) {
-    console.log('02 ----> Get Video Devices');
-
-    if (videoSelect) videoSelect.innerHTML = '';
-    if (initVideoSelect) initVideoSelect.innerHTML = '';
-
-    await navigator.mediaDevices
-        .enumerateDevices()
-        .then((devices) =>
-            devices.forEach(async (device) => {
-                let el,
-                    eli = null;
-                if ('videoinput' === device.kind) {
-                    if (videoSelect) el = videoSelect;
-                    if (initVideoSelect) eli = initVideoSelect;
-                    lS.DEVICES_COUNT.video++;
-                }
-                if (!el) return;
-                await addChild(device, [el, eli]);
-            })
-        )
-        .then(async () => {
-            await stopTracks(stream);
-            isEnumerateVideoDevices = true;
-        });
 }
 
 async function initEnumerateAudioDevices() {
@@ -932,17 +876,6 @@ function getChat() {
     }
     console.log('Direct join', { chat: chat });
     return chat;
-}
-
-function getHideMeActive() {
-    let hide = getQueryParam('hide');
-    let queryHideMe = false;
-    if (hide) {
-        hide = hide.toLowerCase();
-        queryHideMe = hide === '1' || hide === 'true';
-    }
-    console.log('Direct join', { hide: queryHideMe });
-    return queryHideMe;
 }
 
 function isPeerPresenter() {
@@ -1749,7 +1682,7 @@ function roomIsReady() {
 
     BUTTONS.main.exitButton && show(exitButton);
     BUTTONS.main.shareButton && show(shareButton);
-    BUTTONS.main.hideMeButton && show(hideMeButton);
+
     if (BUTTONS.settings.tabRecording) {
         show(startRecButton);
     } else {
@@ -1778,8 +1711,6 @@ function roomIsReady() {
         hide(chatTogglePin);
         hide(chatMaxButton);
         hide(chatMinButton);
-
-        hide(breakoutTogglePin);
     } else {
         rc.makeDraggable(chatRoom, chatHeader);
 
@@ -1788,30 +1719,21 @@ function roomIsReady() {
         rc.makeDraggable(sendFileDiv, sendFileDragHandle);
         rc.makeDraggable(receiveFileDiv, receiveFileDragHandle);
         rc.makeDraggable(lobby, lobbyHeader);
-        rc.makeDraggable(breakoutToolbar, breakoutToolbarHandle);
-        rc.makeDraggable(breakoutPanel, breakoutPanelHeader);
+
         if (navigator.getDisplayMedia || navigator.mediaDevices.getDisplayMedia) {
             if (BUTTONS.main.startScreenButton) {
                 show(startScreenButton);
                 show(ScreenQualityDiv);
                 show(ScreenFpsDiv);
             }
-            BUTTONS.main.snapshotRoomButton && show(snapshotRoomButton);
         }
         BUTTONS.chat.chatPinButton && !isMobileDevice && show(chatTogglePin);
         BUTTONS.chat.chatMaxButton && show(chatMaxButton);
-
-        show(breakoutTogglePin);
 
         if (BUTTONS.settings.pushToTalk) {
             show(audioFocusControlsDiv);
             show(pushToTalkDiv);
         }
-        BUTTONS.settings.tabRTMPStreamingBtn &&
-            show(tabRTMPStreamingBtn) &&
-            show(startRtmpButton) &&
-            show(startRtmpURLButton) &&
-            show(streamerRtmpButton);
     }
     if (BUTTONS.main.fullScreenButton && !parserResult.browser.name.toLowerCase().includes('safari')) {
         document.onfullscreenchange = () => {
@@ -1822,7 +1744,6 @@ function roomIsReady() {
         hide(fullScreenButton);
     }
 
-    if (BUTTONS.main.documentPiPButton && showDocumentPipBtn) show(documentPiPButton);
     BUTTONS.main.settingsButton && show(settingsButton);
     updateParticipantViewButtonVisibility();
     isAudioAllowed ? show(stopAudioButton) : BUTTONS.main.startAudioButton && show(startAudioButton);
@@ -1839,7 +1760,7 @@ function roomIsReady() {
     }
     BUTTONS.settings.fileSharing && show(fileShareButton);
     BUTTONS.settings.lockRoomButton && show(lockRoomButton);
-    BUTTONS.settings.broadcastingButton && show(broadcastingButton);
+
     BUTTONS.settings.lobbyButton && show(lobbyButton);
     updateJoinLockButtons();
     !BUTTONS.settings.customNoiseSuppression && hide(noiseSuppressionButton);
@@ -1866,7 +1787,7 @@ function roomIsReady() {
     setupSettingsExtraDropdown();
     setupQuickDeviceSwitchDropdowns();
     checkButtonsBar();
-    checkBreakoutRoom();
+
     if (room_password) {
         lockRoomButton.click();
     }
@@ -2359,14 +2280,7 @@ function handleButtons() {
     shareButton.onclick = () => {
         shareRoom(true);
     };
-    hideMeButton.onclick = (e) => {
-        if (isHideALLVideosActive) {
-            return userLog('warning', 'To use this feature, please toggle video focus mode', 'top-end', 6000);
-        }
-        isHideMeActive = !isHideMeActive;
-        rc.handleHideMe();
-        hideClassElements('videoMenuBar');
-    };
+
     settingsButton.onclick = () => {
         rc.toggleMySettings();
     };
@@ -2403,18 +2317,7 @@ function handleButtons() {
     tabRoomBtn.onclick = (e) => {
         rc.openTab(e, 'tabRoom');
     };
-    tabVideoShareBtn.onclick = (e) => {
-        rc.openTab(e, 'tabVideoShare');
-        rc.prefillShareMediaUrlFromClipboard();
-    };
-    tabRTMPStreamingBtn.onclick = (e) => {
-        rc.getRTMP();
-        rc.openTab(e, 'tabRTMPStreaming');
-    };
-    refreshVideoFiles.onclick = () => {
-        rc.getRTMP();
-        userLog('info', 'Refreshed video files', 'top-end');
-    };
+
     tabAspectBtn.onclick = (e) => {
         rc.openTab(e, 'tabAspect');
     };
@@ -2433,20 +2336,7 @@ function handleButtons() {
     tabLanguagesBtn.onclick = (e) => {
         rc.openTab(e, 'tabLanguages');
     };
-    tabVideoAIBtn.onclick = (e) => {
-        rc.openTab(e, 'tabVideoAI');
-        rc.getAvatarList();
-        rc.getVoiceList();
-    };
-    avatarVideoAIStart.onclick = (e) => {
-        rc.stopSession();
-        rc.handleVideoAI();
-        rc.toggleMySettings();
-    };
-    avatarQuality.selectedIndex = 1;
-    avatarQuality.onchange = (e) => {
-        VideoAI.quality = e.target.value;
-    };
+
     speakerTestBtn.onclick = () => {
         playSpeaker(speakerSelect?.value, 'speaker');
     };
@@ -2459,56 +2349,6 @@ function handleButtons() {
     participantsButton.onclick = async () => {
         rc.toggleParticipants();
     };
-
-    // Breakout Rooms
-    breakoutRoomButton.onclick = () => {
-        toggleBreakoutPanel();
-    };
-    breakoutReturnBtn.onclick = () => {
-        returnToMainRoom();
-    };
-    breakoutHelpBtn.onclick = () => {
-        askBreakoutHelp();
-    };
-    breakoutPanelCloseBtn.onclick = () => {
-        toggleBreakoutPanel();
-    };
-    breakoutAddRoomBtn.onclick = () => {
-        addBreakoutRoom();
-    };
-    breakoutRefreshBtn.onclick = () => {
-        refreshBreakoutPanel();
-    };
-    breakoutTogglePin.onclick = () => {
-        rc.toggleBreakoutPin();
-    };
-    breakoutMaxButton.onclick = () => {
-        rc.breakoutMaximize();
-    };
-    breakoutMinButton.onclick = () => {
-        rc.breakoutMinimize();
-    };
-    breakoutLaunchBtn.onclick = () => {
-        launchBreakoutRooms();
-    };
-    breakoutDeleteAllBtn.onclick = () => {
-        deleteAllBreakoutRooms();
-    };
-    breakoutBroadcastAllBtn.onclick = () => {
-        broadcastToBreakoutRooms();
-    };
-    breakoutBroadcastInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') broadcastToBreakoutRooms();
-    });
-    breakoutEndAllBtn.onclick = () => {
-        endAllBreakoutSessions();
-    };
-    breakoutAutoAssignBtn.onclick = () => {
-        autoAssignBreakoutRooms();
-    };
-    breakoutParticipantSearch.addEventListener('input', () => {
-        filterBreakoutParticipants();
-    });
 
     chatHideParticipantsList.onclick = (e) => {
         rc.toggleShowParticipants(true);
@@ -2608,7 +2448,6 @@ function handleButtons() {
         rc.resumeRecording();
     };
     swapCameraButton.onclick = () => {
-        if (isHideMeActive) rc.handleHideMe();
         rc.closeThenProduce(RoomClient.mediaType.video, null, true);
     };
     raiseHandButton.onclick = () => {
@@ -2665,10 +2504,7 @@ function handleButtons() {
         if (moderator.video_cant_unhide) {
             return userLog('warning', 'The moderator does not allow you to unhide', 'top-end', 6000);
         }
-        setVideoButtonsDisabled(true);
-        if (!isEnumerateVideoDevices) await initEnumerateVideoDevices();
-        await rc.produce(RoomClient.mediaType.video, videoSelect.value);
-        // await rc.resumeProducer(RoomClient.mediaType.video);
+        await window.BodrikCameraAccess.startCamera(rc);
     };
     stopVideoButton.onclick = () => {
         setVideoButtonsDisabled(true);
@@ -2685,28 +2521,7 @@ function handleButtons() {
     stopScreenButton.onclick = () => {
         rc.closeProducer(RoomClient.mediaType.screen);
     };
-    copyRtmpUrlButton.onclick = () => {
-        rc.copyRTMPUrl(rtmpLiveUrl.value);
-    };
-    startRtmpButton.onclick = () => {
-        if (rc.selectedRtmpFilename == '') {
-            userLog('warning', 'Please select the Video file to stream', 'top-end', 6000);
-            return;
-        }
-        rc.startRTMP();
-    };
-    stopRtmpButton.onclick = () => {
-        rc.stopRTMP();
-    };
-    streamerRtmpButton.onclick = () => {
-        rc.openRTMPStreamer();
-    };
-    startRtmpURLButton.onclick = () => {
-        rc.startRTMPfromURL(rtmpStreamURL.value);
-    };
-    stopRtmpURLButton.onclick = () => {
-        rc.stopRTMPfromURL();
-    };
+
     fileShareButton.onclick = () => {
         rc.selectFileToShare(socket.id, true);
     };
@@ -2716,21 +2531,7 @@ function handleButtons() {
     fileShareChatButton.onclick = () => {
         rc.chatPeerId === 'all' ? fileShareButton.click() : rc.selectFileToShare(rc.chatPeerId, false, rc.chatPeerName);
     };
-    videoShareButton.onclick = () => {
-        rc.shareVideoFromSettings();
-    };
-    shareMediaUrlInput.onkeyup = (event) => {
-        if (event.key === 'Enter') {
-            event.preventDefault();
-            rc.shareVideoFromSettings();
-        }
-    };
-    videoCloseBtn.onclick = () => {
-        if (rc._moderator.media_cant_sharing) {
-            return userLog('warning', 'The moderator does not allow you close this media', 'top-end', 6000);
-        }
-        rc.closeVideo(true);
-    };
+
     sendAbortBtn.onclick = () => {
         rc.abortFileTransfer();
     };
@@ -2739,13 +2540,6 @@ function handleButtons() {
     };
     receiveHideBtn.onclick = () => {
         rc.hideFileTransfer();
-    };
-
-    documentPiPButton.onclick = () => {
-        rc.toggleDocumentPIP();
-    };
-    snapshotRoomButton.onclick = () => {
-        rc.snapshotRoom();
     };
 
     document.querySelectorAll('[data-panel-action-target]').forEach((button) => {
@@ -2959,7 +2753,12 @@ function detectCameraFacingMode(stream) {
 // HANDLE MEDIA ERROR
 // ####################################################
 
+/** Report media failures; camera errors use an actionable localized dialog instead of a technical dump. */
 function handleMediaError(mediaType, err, redirectURL = false) {
+    if (mediaType === 'videoType') {
+        window.BodrikCameraAccess.showError(err);
+        return;
+    }
     sound('alert');
 
     let errMessage = err;
@@ -3107,7 +2906,7 @@ function handleCameraMirror(video) {
 }
 
 function updateParticipantViewButtonVisibility() {
-    !isMobileDevice && !isBroadcastingEnabled ? show(participantViewDropdown) : hide(participantViewDropdown);
+    !isMobileDevice ? show(participantViewDropdown) : hide(participantViewDropdown);
 }
 
 function setParticipantViewMode(requestedMode, persist = true, notify = true) {
@@ -3118,15 +2917,9 @@ function setParticipantViewMode(requestedMode, persist = true, notify = true) {
         'speaker-left',
         'speaker-right',
         'speaker-1:1',
-        'livestream',
     ]);
     const migratedMode = requestedMode === 'default' ? 'grid' : requestedMode;
     let mode = supportedModes.has(migratedMode) ? migratedMode : 'grid';
-
-    if (mode === 'livestream' && !isBroadcastingEnabled) {
-        if (notify) rc.userLog('info', 'Enable broadcasting before using Livestream view', 'top-end');
-        mode = 'grid';
-    }
 
     participantViewMode.value = mode;
     document.querySelectorAll('#participantViewMenu [data-participant-view]').forEach((button) => {
@@ -3135,7 +2928,7 @@ function setParticipantViewMode(requestedMode, persist = true, notify = true) {
         button.setAttribute('aria-pressed', active);
     });
 
-    const pinPosition = mode === 'livestream' ? 'speaker-1:1' : mode;
+    const pinPosition = mode;
     const isSpeakerView = pinPosition.startsWith('speaker-');
 
     if (isSpeakerView) {
@@ -3337,14 +3130,7 @@ function handleSelects() {
         if (document.hidden) setPushToTalkPressed(false);
     });
     // room
-    switchBroadcasting.onchange = (e) => {
-        isBroadcastingEnabled = e.currentTarget.checked;
-        updateParticipantViewButtonVisibility();
-        rc.roomAction('broadcasting');
-        localStorageSettings.broadcasting = isBroadcastingEnabled;
-        lS.setSettings(localStorageSettings);
-        e.target.blur();
-    };
+
     switchLobby.onchange = (e) => {
         isLobbyEnabled = e.currentTarget.checked;
         rc.roomAction(isLobbyEnabled ? 'lobbyOn' : 'lobbyOff');
@@ -3569,14 +3355,6 @@ function handleSelects() {
         lS.setSettings(localStorageSettings);
         e.target.blur();
     };
-    switchEveryoneCantMediaSharing.onchange = (e) => {
-        const mediaCantSharing = e.currentTarget.checked;
-        rc.updateRoomModerator({ type: 'media_cant_sharing', status: mediaCantSharing });
-        rc.roomMessage('media_cant_sharing', mediaCantSharing);
-        localStorageSettings.moderator_media_cant_sharing = mediaCantSharing;
-        lS.setSettings(localStorageSettings);
-        e.target.blur();
-    };
 
     switchDisconnectAllOnLeave.onchange = (e) => {
         const disconnectAll = e.currentTarget.checked;
@@ -3661,41 +3439,12 @@ function handleKeyboardShortcuts() {
                     }
                     settingsButton.click();
                     break;
-                case 'x':
-                    if (notPresenter && !BUTTONS.main.hideMeButton) {
-                        userLog('warning', 'The presenter has disabled your ability to hide yourself', 'top-end');
-                        break;
-                    }
-                    hideMeButton.click();
-                    break;
                 case 'r':
                     if (notPresenter && (hostOnlyRecording || !BUTTONS.settings.tabRecording)) {
                         userLog('warning', 'The presenter has disabled your ability to start recording', 'top-end');
                         break;
                     }
                     isRecording ? stopRecButton.click() : startRecButton.click();
-                    break;
-                case 'd':
-                    if (!showDocumentPipBtn) {
-                        userLog('warning', 'The document PIP is not supported in this browser', 'top-end');
-                        break;
-                    }
-                    if (notPresenter && !BUTTONS.main.documentPiPButton) {
-                        userLog(
-                            'warning',
-                            'The presenter has disabled your ability to open the document PIP',
-                            'top-end'
-                        );
-                        break;
-                    }
-                    documentPiPButton.click();
-                    break;
-                case 't':
-                    if (notPresenter && !BUTTONS.main.snapshotRoomButton) {
-                        userLog('warning', 'The presenter has disabled your ability to take a snapshot', 'top-end');
-                        break;
-                    }
-                    snapshotRoomButton.click();
                     break;
                 case 'f':
                     if (notPresenter && !BUTTONS.settings.fileSharing) {
@@ -3889,7 +3638,7 @@ function loadSettingsFromLocalStorage() {
     isKeepButtonsVisible = localStorageSettings.keep_buttons_visible;
     isChatPinEnabled = localStorageSettings.chat_pin !== undefined ? localStorageSettings.chat_pin : true;
     isShortcutsEnabled = localStorageSettings.keyboard_shortcuts;
-    isBroadcastingEnabled = localStorageSettings.broadcasting;
+
     showChatOnMsg.checked = rc.showChatOnMessage;
     speechIncomingMsg.checked = rc.speechInMessages;
     switchPitchBar.checked = isPitchBarEnabled;
@@ -3899,7 +3648,6 @@ function loadSettingsFromLocalStorage() {
     switchKeepButtonsVisible.checked = isKeepButtonsVisible;
     switchChatPin.checked = isChatPinEnabled;
     switchShortcuts.checked = isShortcutsEnabled;
-    switchBroadcasting.checked = isBroadcastingEnabled;
 
     switchServerRecording.checked = localStorageSettings.rec_server;
 
@@ -4158,36 +3906,7 @@ function handleRoomClientEvents() {
             hostOnlyRecording = false;
         }
     });
-    rc.on(RoomClient.EVENTS.startRTMP, () => {
-        console.log('Room event: RTMP started');
-        hide(startRtmpButton);
-        show(stopRtmpButton);
-    });
-    rc.on(RoomClient.EVENTS.stopRTMP, () => {
-        console.log('Room event: RTMP stopped');
-        hide(stopRtmpButton);
-        show(startRtmpButton);
-    });
-    rc.on(RoomClient.EVENTS.endRTMP, () => {
-        console.log('Room event: RTMP ended');
-        hide(stopRtmpButton);
-        show(startRtmpButton);
-    });
-    rc.on(RoomClient.EVENTS.startRTMPfromURL, () => {
-        console.log('Room event: RTMP from URL started');
-        hide(startRtmpURLButton);
-        show(stopRtmpURLButton);
-    });
-    rc.on(RoomClient.EVENTS.stopRTMPfromURL, () => {
-        console.log('Room event: RTMP from URL stopped');
-        hide(stopRtmpURLButton);
-        show(startRtmpURLButton);
-    });
-    rc.on(RoomClient.EVENTS.endRTMPfromURL, () => {
-        console.log('Room event: RTMP from URL ended');
-        hide(stopRtmpURLButton);
-        show(startRtmpURLButton);
-    });
+
     rc.on(RoomClient.EVENTS.exitRoom, () => {
         if (isExiting) return;
         isExiting = true;
@@ -4263,23 +3982,6 @@ function redirectOnLeave(disconnectAll = false) {
     endRoomSession();
     rc.exitRoom(disconnectAll);
     redirect && redirect.enabled ? openURL(redirect.url) : openURL('/newroom');
-}
-
-function userLog(icon, message, position = 'top-end', timer = 3000) {
-    const Toast = Swal.mixin({
-        background: swalBackground,
-        toast: true,
-        position: position,
-        showConfirmButton: false,
-        timer: timer,
-        timerProgressBar: true,
-    });
-    Toast.fire({
-        icon: icon,
-        title: message,
-        showClass: { popup: 'animate__animated animate__fadeInDown' },
-        hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-    });
 }
 
 function saveDataToFile(dataURL, fileName) {
@@ -5044,32 +4746,6 @@ function setupQuickDeviceSwitchDropdowns() {
             });
             videoMenu.appendChild(virtualBgBtn);
         }
-
-        // Video AI button (mirror the Video AI settings tab: show only when that tab is visible)
-        const videoAITabBtn = getId('tabVideoAIBtn');
-        const videoAITabVisible =
-            VideoAI.enabled &&
-            videoAITabBtn &&
-            !videoAITabBtn.classList.contains('hidden') &&
-            videoAITabBtn.style.display !== 'none';
-        if (videoAITabVisible) {
-            appendMenuDivider(videoMenu);
-            const videoAIBtn = document.createElement('button');
-            videoAIBtn.type = 'button';
-            videoAIBtn.className = 'device-menu-action-btn';
-            const videoAIIcon = document.createElement('i');
-            videoAIIcon.className = 'fas fa-robot';
-            videoAIBtn.appendChild(videoAIIcon);
-            videoAIBtn.appendChild(document.createTextNode(' Open Video AI'));
-            videoAIBtn.addEventListener('click', () => {
-                rc.toggleMySettings();
-                // Simulate tab click to open video AI tab
-                setTimeout(() => {
-                    tabVideoAIBtn.click();
-                }, 100);
-            });
-            videoMenu.appendChild(videoAIBtn);
-        }
     }
 
     function buildAudioMenu() {
@@ -5302,7 +4978,7 @@ async function getRoomParticipants() {
     updateChatConversationsCount();
     refreshHiddenParticipantsButton();
     if (isHiddenParticipantsFilterActive) applyHiddenParticipantsFilter();
-    if (isBreakoutPanelOpen) refreshBreakoutPanel();
+
     console.log('*** Refresh Chat participant lists ***');
 }
 
@@ -5507,16 +5183,6 @@ function getParticipantsList(peers) {
             );
         }
 
-        publicMenuItems += renderParticipantMenuItem(
-            renderParticipantActionButton({
-                buttonClass: 'btn-sm ml5',
-                buttonId: 'sendVideoToAll',
-                onClick: `rc.shareVideo('all');`,
-                iconHtml: _PEER.sendVideo,
-                label: 'Share audio/video to all',
-            })
-        );
-
         if (BUTTONS.participantsList.ejectAllButton) {
             publicMenuItems += renderParticipantMenuGroup('Danger zone');
             publicMenuItems += renderParticipantMenuItem(
@@ -5704,16 +5370,6 @@ function getParticipantsList(peers) {
                     );
                 }
 
-                menuItems += renderParticipantMenuItem(
-                    renderParticipantActionButton({
-                        buttonClass: 'btn-sm ml5',
-                        buttonId: `${peer_id}___sendVideoTo`,
-                        onClick: `rc.shareVideo('${peer_id}', ${JSON.stringify(peer_name)});`,
-                        iconHtml: _PEER.sendVideo,
-                        label: 'Share audio/video',
-                    })
-                );
-
                 if (BUTTONS.participantsList.geoLocationButton) {
                     menuItems += renderParticipantMenuItem(
                         renderParticipantActionButton({
@@ -5801,8 +5457,7 @@ function getParticipantsList(peers) {
                 menuItems += pinMenuItem;
                 menuItems += hideFromGridMenuItem;
 
-                // NO ROOM BROADCASTING
-                if (!isBroadcastingEnabled) {
+                {
                     menuItems += renderParticipantMenuGroup('Share');
 
                     if (BUTTONS.participantsList.sendFileButton) {
@@ -5816,16 +5471,6 @@ function getParticipantsList(peers) {
                             })
                         );
                     }
-
-                    menuItems += renderParticipantMenuItem(
-                        renderParticipantActionButton({
-                            buttonClass: 'btn-sm ml5',
-                            buttonId: `${peer_id}___sendVideoTo`,
-                            onClick: `rc.shareVideo('${peer_id}', ${JSON.stringify(peer_name)});`,
-                            iconHtml: _PEER.sendVideo,
-                            label: 'Share Audio/Video',
-                        })
-                    );
                 }
 
                 const dropdownHtml = renderParticipantDropdown(
@@ -6020,10 +5665,9 @@ function applyParticipantGridVisibility() {
     videoMediaContainer.querySelectorAll('.Camera').forEach((camera) => {
         const peerId = camera.dataset.peerId;
         const isCameraOff = camera.dataset.cameraOff === 'true';
-        const hiddenBySelfView = isHideMeActive && peerId === rc.peer_id;
         const hiddenByPreference = locallyHiddenPeerIds.has(peerId) || (!showCameraOffParticipants && isCameraOff);
         const hiddenByFocusMode = focusModeTile && camera !== focusModeTile;
-        camera.style.display = hiddenBySelfView || hiddenByPreference || hiddenByFocusMode ? 'none' : 'block';
+        camera.style.display = hiddenByPreference || hiddenByFocusMode ? 'none' : 'block';
     });
 
     handleAspectRatio();
@@ -6851,841 +6495,9 @@ window.addEventListener('beforeunload', (e) => {
 // ABOUT
 // ####################################################
 
-/** Show meeting details and the corresponding public source for this deployment. */
-function showAbout() {
-    sound('open');
-
-    const revision = BRAND.about?.sourceRevision;
-    const sourceRef = /^[a-f0-9]{40}$/.test(revision) ? revision : 'main';
-    const sourceUrl = `https://github.com/AlexanderNeishkasha/mirotalksfu/tree/${sourceRef}`;
-    const sourceLabel = window.i18n?.t('Source code', 'labels') || 'Source code';
-    const sourceLink = `<p><a href="${sourceUrl}" target="_blank" rel="noopener noreferrer">${sourceLabel}</a></p>`;
-
-    Swal.fire({
-        background: swalBackground,
-        position: 'center',
-        title: BRAND.about?.title && BRAND.about.title.trim() !== '' ? BRAND.about.title : 'WebRTC SFU v2.4.71',
-        html: renderRoomTemplate('popupAboutTemplate', {
-            html: {
-                aboutContent: `${BRAND.about.html}${sourceLink}`,
-            },
-        }),
-        showClass: { popup: 'animate__animated animate__fadeInDown' },
-        hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-    });
-}
-
-// ####################################################
-// BREAKOUT ROOMS
 // ####################################################
 
-async function getBreakoutRoomsInfo() {
-    try {
-        return await rc.socket.request('getBreakoutRoomsInfo', { mainRoom: room_id });
-    } catch (e) {
-        console.warn('Failed to get breakout rooms info', e);
-        return [];
-    }
-}
-
-function parseDurationToSeconds(duration) {
-    if (!duration || duration === 'unlimited') return 0;
-    const match = duration.match(/^(\d{1,2}):(\d{2}):(\d{2})$/);
-    if (!match) return 0;
-    return parseInt(match[1], 10) * 3600 + parseInt(match[2], 10) * 60 + parseInt(match[3], 10);
-}
-
-function navigateToRoom(room, extraParams = {}) {
-    const baseUrl = `${window.location.origin}/join`;
-    const queryParams = new URLSearchParams({
-        room: room,
-        name: peer_name,
-        audio: rc.peer_info.peer_audio ? '1' : '0',
-        video: rc.peer_info.peer_video ? '1' : '0',
-        notify: '0',
-        ...extraParams,
-    });
-    if (peer_token) queryParams.set('token', peer_token);
-
-    if (typeof preventExit !== 'undefined') preventExit = false;
-    rc.exit(true);
-    openURL(`${baseUrl}?${queryParams.toString()}`);
-}
-
-function checkBreakoutRoom() {
-    const breakoutMain = getQueryParam('breakoutMain');
-    if (breakoutMain) {
-        const toolbar = getId('breakoutToolbar');
-        const roomLabel = getId('breakoutToolbarRoomName');
-        if (toolbar && roomLabel) {
-            roomLabel.textContent = getQueryParam('breakoutName') || room_id;
-            toolbar.classList.remove('hidden');
-            toolbar.dataset.mainRoom = breakoutMain;
-        }
-        checkBreakoutTimer();
-    }
-}
-
-function returnToMainRoom() {
-    const toolbar = getId('breakoutToolbar');
-    const mainRoom = toolbar ? toolbar.dataset.mainRoom : null;
-    if (!mainRoom || !rc) return;
-    navigateToRoom(mainRoom);
-}
-
-function askBreakoutHelp() {
-    const toolbar = getId('breakoutToolbar');
-    const mainRoom = toolbar ? toolbar.dataset.mainRoom : null;
-    if (!mainRoom || !rc) return;
-
-    rc.socket.emit('breakoutRoomHelp', {
-        peer_name: peer_name,
-        mainRoom: mainRoom,
-        breakoutRoom: room_id,
-    });
-
-    rc.userLog('info', 'Help request sent to presenter', 'top-end', 3000);
-    sound('notification');
-}
-
-function toggleBreakoutPanel() {
-    if (!rc || !isPresenter) return;
-    const panel = getId('breakoutPanel');
-    if (!panel) return;
-
-    isBreakoutPanelOpen = !isBreakoutPanelOpen;
-
-    if (isBreakoutPanelOpen) {
-        rc.isMobileDevice ? rc.breakoutMaximize() : rc.breakoutMinimize();
-        show(panel);
-        refreshBreakoutPanel();
-        sound('open');
-
-        if (rc.isBreakoutPinned) rc.breakoutUnpin();
-
-        if (!rc.isMobileDevice && rc.canBePinned()) {
-            rc.toggleBreakoutPin();
-        }
-    } else {
-        if (rc.isBreakoutPinned) rc.breakoutUnpin();
-        if (rc.isBreakoutMaximized) rc.breakoutMinimize();
-        hide(panel);
-    }
-}
-
-function addBreakoutRoom() {
-    const index = breakoutRooms.length + 1;
-    breakoutRooms.push({ id: `${room_id}_breakout_${index}`, duration: 'unlimited', name: `Room ${index}` });
-    refreshBreakoutPanel();
-}
-
-async function deleteAllBreakoutRooms() {
-    if (breakoutRooms.length === 0) return;
-
-    const breakoutInfo = await getBreakoutRoomsInfo();
-    const activeRoomIds = new Set(breakoutInfo.filter((room) => room.peers > 0).map((room) => room.room));
-    const inactiveRooms = breakoutRooms.filter((room) => !activeRoomIds.has(room.id));
-    const activeRooms = breakoutRooms.filter((room) => activeRoomIds.has(room.id));
-
-    if (inactiveRooms.length === 0) {
-        return rc.userLog(
-            'warning',
-            'No inactive breakout rooms available to delete. Active breakout rooms must be ended first.',
-            'top-end',
-            5000
-        );
-    }
-
-    const deletingAllRooms = activeRooms.length === 0;
-    const confirmed = await Swal.fire({
-        background: swalBackground,
-        position: 'top',
-        title: deletingAllRooms ? 'Delete All Breakout Rooms?' : 'Delete Inactive Breakout Rooms?',
-        html: `
-            <div class="popup-template-copy popup-template-copy--left">
-                <b>${deletingAllRooms ? 'This will remove every breakout room.' : `This will remove ${inactiveRooms.length} inactive breakout room${inactiveRooms.length !== 1 ? 's' : ''}.`}</b><br /><br />
-                ${
-                    activeRooms.length > 0
-                        ? `${activeRooms.length} active breakout room${activeRooms.length !== 1 ? 's will remain open because participant' : ' will remain open because a participant is'} still inside.`
-                        : 'Participants will no longer be able to join these rooms until you create them again.'
-                }
-            </div>
-        `,
-        showDenyButton: true,
-        confirmButtonText: '<i class="fas fa-trash"></i> Delete',
-        denyButtonText: 'Cancel',
-        customClass: {
-            popup: 'breakout-swal breakout-swal--end',
-            htmlContainer: 'breakout-swal-html',
-            confirmButton: 'breakout-swal-confirm breakout-swal-confirm--end',
-            denyButton: 'breakout-swal-deny',
-        },
-        showClass: { popup: 'animate__animated animate__fadeInDown' },
-        hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-    });
-
-    if (!confirmed.isConfirmed) return;
-
-    breakoutRooms = activeRooms;
-    refreshBreakoutPanel();
-
-    return rc.userLog(
-        'info',
-        deletingAllRooms
-            ? 'All breakout rooms deleted'
-            : `Deleted ${inactiveRooms.length} inactive breakout room${inactiveRooms.length !== 1 ? 's' : ''}`,
-        'top-end',
-        3000
-    );
-}
-
-async function removeBreakoutRoom(index) {
-    const room = breakoutRooms[index];
-    if (!room) return;
-
-    const breakoutInfo = await getBreakoutRoomsInfo();
-    const info = breakoutInfo.find((r) => r.room === room.id);
-    if (info && info.peers > 0) {
-        return rc.userLog(
-            'warning',
-            `Cannot remove room with ${info.peers} active peer(s). Wait for them to return or broadcast a message first.`,
-            'top-end',
-            5000
-        );
-    }
-
-    breakoutRooms.splice(index, 1);
-    refreshBreakoutPanel();
-}
-
-async function refreshBreakoutPanel() {
-    if (!isBreakoutPanelOpen || !rc) return;
-
-    // Get current room peers
-    const peers = await getRoomPeers();
-    const peerList = [];
-    for (const [id, data] of peers) {
-        if (id === rc.peer_id) continue;
-        const avatar = getParticipantAvatar(data.peer_info.peer_name, data.peer_info.peer_avatar);
-        peerList.push({ id, name: data.peer_info.peer_name, avatar });
-    }
-
-    // Save current select values before re-render
-    const savedAssignments = {};
-    document.querySelectorAll('.breakout-room-select').forEach((sel) => {
-        if (sel.value) savedAssignments[sel.dataset.peerId] = sel.value;
-    });
-
-    // Get breakout room info from server (which rooms actually exist and peer counts)
-    const breakoutInfo = await getBreakoutRoomsInfo();
-
-    // Ensure rooms discovered on server are in our local list
-    for (const info of breakoutInfo) {
-        if (!breakoutRooms.some((r) => r.id === info.room)) {
-            breakoutRooms.push({
-                id: info.room,
-                duration: 'unlimited',
-                name: info.room.split('_breakout_').pop() || 'Room',
-            });
-        }
-    }
-
-    // Update rooms section label
-    const roomsLabel = getId('breakoutRoomsLabel');
-    roomsLabel.textContent = breakoutRooms.length > 0 ? `Rooms (${breakoutRooms.length})` : 'Rooms';
-
-    // Build rooms list
-    const roomsList = getId('breakoutRoomsList');
-    const emptyState = getId('breakoutEmptyState');
-    let roomsHtml = '';
-    const roomTooltips = [];
-    breakoutRooms.forEach((room, idx) => {
-        const displayName = room.name || `Room ${idx + 1}`;
-        const info = breakoutInfo.find((r) => r.room === room.id);
-        const peerCount = info ? info.peers : 0;
-        const peerNames = info && info.peerNames ? info.peerNames : [];
-        const durationDisplay =
-            room.duration === 'unlimited'
-                ? '<i class="fas fa-infinity"></i>'
-                : `<i class="fas fa-clock"></i> ${room.duration}`;
-        const activeClass = peerCount > 0 ? ' breakout-room-active' : '';
-        const countId = `breakoutRoomCount-${idx}`;
-        const nameId = `breakoutRoomName-${idx}`;
-        const durationId = `breakoutRoomDuration-${idx}`;
-        roomsHtml += renderRoomTemplate('breakoutRoomCardTemplate', {
-            text: {
-                displayName,
-                peerCountLabel: `${peerCount} peer${peerCount !== 1 ? 's' : ''}`,
-            },
-            html: {
-                durationDisplay,
-            },
-            attrs: {
-                cardClass: `breakout-room-card${activeClass}`,
-                nameId,
-                nameOnClick: `renameBreakoutRoom(${idx})`,
-                nameTitle: 'Click to rename',
-                countId,
-                durationId,
-                durationOnClick: `editBreakoutDuration(${idx})`,
-                durationTitle: 'Click to change duration',
-                joinOnClick: `presenterJoinBreakoutRoom('${room.id}')`,
-                messageOnClick: `broadcastToBreakoutRooms('${room.id}')`,
-                removeOnClick: `removeBreakoutRoom(${idx})`,
-            },
-        });
-        if (peerNames.length > 0) {
-            const namesHtml = peerNames
-                .map((n) => `<i class="fas fa-user breakout-room-peer-icon"></i>${n}`)
-                .join('<br>');
-            roomTooltips.push({ id: countId, content: namesHtml });
-        }
-    });
-    roomsList.innerHTML = roomsHtml;
-
-    // Apply tooltips to peer count spans (appendTo body to avoid overflow clipping)
-    roomTooltips.forEach((t) => {
-        const el = getId(t.id);
-        if (!el) return;
-        if (el._tippy) el._tippy.destroy();
-        tippy(el, {
-            content: t.content,
-            placement: 'top',
-            allowHTML: true,
-            appendTo: document.body,
-        });
-    });
-
-    // Toggle empty state vs rooms list
-    const hasRooms = breakoutRooms.length > 0;
-    hasRooms ? hide(emptyState) : show(emptyState);
-    hasRooms ? show(roomsList) : hide(roomsList);
-
-    // Show/hide launch button and header actions
-    const launchBtn = getId('breakoutLaunchBtn');
-    const deleteAllBtn = getId('breakoutDeleteAllBtn');
-    hasRooms ? show(launchBtn) : hide(launchBtn);
-    hasRooms ? show(deleteAllBtn) : hide(deleteAllBtn);
-
-    // Show/hide actions bar when rooms exist
-    const actionsBar = getId('breakoutActionsBar');
-    const endAllBtn = getId('breakoutEndAllBtn');
-    const broadcastAllBtn = getId('breakoutBroadcastAllBtn');
-    const hasActivePeers = breakoutInfo.some((r) => r.peers > 0);
-
-    hasRooms ? show(actionsBar) : hide(actionsBar);
-    hasActivePeers ? show(endAllBtn) : hide(endAllBtn);
-
-    syncPinnedBreakoutPanelLayout(hasRooms);
-
-    broadcastAllBtn.disabled = !hasRooms;
-
-    // Show/hide auto-assign button when rooms and participants exist
-    const autoAssignBtn = getId('breakoutAutoAssignBtn');
-    hasRooms && peerList.length > 0 ? show(autoAssignBtn) : hide(autoAssignBtn);
-
-    // Update participants section label
-    const participantsLabel = getId('breakoutParticipantsLabel');
-    participantsLabel.textContent = peerList.length > 0 ? `Participants (${peerList.length})` : 'Participants';
-
-    // Build participants list with room assignment dropdowns
-    const bpList = getId('breakoutParticipantsList');
-    const roomOptions = breakoutRooms
-        .map((room, idx) =>
-            renderRoomTemplate('breakoutRoomOptionTemplate', {
-                text: { label: room.name || `Room ${idx + 1}` },
-                attrs: { value: room.id },
-            })
-        )
-        .join('');
-    const breakoutParticipantOptions =
-        renderRoomTemplate('breakoutRoomOptionTemplate', {
-            text: { label: 'Not assigned' },
-            attrs: { value: '' },
-        }) + roomOptions;
-
-    let participantsHtml = '';
-    for (const p of peerList) {
-        participantsHtml += renderRoomTemplate('breakoutParticipantRowTemplate', {
-            text: {
-                peerName: p.name,
-            },
-            html: {
-                roomOptions: breakoutParticipantOptions,
-            },
-            attrs: {
-                avatarSrc: p.avatar,
-                peerId: p.id,
-                peerNameAttr: p.name,
-            },
-        });
-    }
-
-    if (peerList.length === 0) {
-        participantsHtml = renderRoomTemplate('breakoutNoParticipantsTemplate');
-    }
-    bpList.innerHTML = participantsHtml;
-
-    // Restore saved select values
-    document.querySelectorAll('.breakout-room-select').forEach((sel) => {
-        const saved = savedAssignments[sel.dataset.peerId];
-        if (saved && Array.from(sel.options).some((o) => o.value === saved)) {
-            sel.value = saved;
-        }
-    });
-}
-
-function syncPinnedBreakoutPanelLayout(hasRooms) {
-    if (!rc || !rc.isBreakoutPinned) return;
-
-    const body = getId('breakoutPanel')?.querySelector('.breakout-panel-body');
-    const sections = document.querySelectorAll('#breakoutPanel .breakout-section');
-    const roomsSection = sections[0];
-
-    if (!body || !roomsSection) return;
-
-    if (hasRooms) {
-        roomsSection.style.display = 'flex';
-        roomsSection.style.flexDirection = 'column';
-        roomsSection.style.minHeight = '0';
-        roomsSection.style.overflow = 'hidden';
-        body.style.gridTemplateRows = 'auto minmax(0, 1fr) auto minmax(0, 1fr)';
-        return;
-    }
-
-    roomsSection.style.display = 'none';
-    roomsSection.style.flexDirection = '';
-    roomsSection.style.minHeight = '';
-    roomsSection.style.overflow = '';
-    body.style.gridTemplateRows = 'auto minmax(220px, 1fr)';
-}
-
-async function launchBreakoutRooms() {
-    const selects = document.querySelectorAll('.breakout-room-select');
-    const assignments = [];
-
-    selects.forEach((select) => {
-        if (select.value) {
-            assignments.push({
-                peerId: select.dataset.peerId,
-                peerName: select.dataset.peerName,
-                breakoutRoom: select.value,
-            });
-        }
-    });
-
-    if (assignments.length === 0) {
-        return rc.userLog('warning', 'Please assign at least one participant to a room', 'top-end', 4000);
-    }
-
-    // Group assignments by room for summary
-    const roomCounts = {};
-    assignments.forEach((a) => {
-        const idx = breakoutRooms.findIndex((r) => r.id === a.breakoutRoom);
-        const room = breakoutRooms[idx];
-        const name = room ? room.name || `Room ${idx + 1}` : `Room ${idx + 1}`;
-        roomCounts[name] = (roomCounts[name] || 0) + 1;
-    });
-    const summary = Object.entries(roomCounts)
-        .map(([name, count]) =>
-            renderRoomTemplate('popupBreakoutSummaryRowTemplate', {
-                text: {
-                    roomName: name,
-                    countValue: String(count),
-                },
-                attrs: {
-                    roomIconClass: 'fas fa-door-open',
-                    countIconClass: `fas fa-user${count > 1 ? 's' : ''}`,
-                },
-            })
-        )
-        .join('');
-
-    const confirmed = await Swal.fire({
-        background: swalBackground,
-        position: 'top',
-        title: 'Launch Breakout Rooms',
-        html: renderRoomTemplate('popupBreakoutLaunchTemplate', {
-            text: {
-                participantCount: String(assignments.length),
-                participantLabel: `participant${assignments.length !== 1 ? 's' : ''}`,
-            },
-            html: {
-                summary,
-            },
-        }),
-        showDenyButton: true,
-        confirmButtonText: '<i class="fas fa-rocket"></i> Launch',
-        denyButtonText: 'Cancel',
-        customClass: {
-            popup: 'breakout-swal breakout-swal--launch',
-            htmlContainer: 'breakout-swal-html',
-            confirmButton: 'breakout-swal-confirm breakout-swal-confirm--launch',
-            denyButton: 'breakout-swal-deny',
-        },
-        showClass: { popup: 'animate__animated animate__fadeInDown' },
-        hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-    });
-
-    if (!confirmed.isConfirmed) return;
-
-    // Use per-room durations and names from assignments
-    const assignmentsWithDuration = assignments.map((a) => {
-        const idx = breakoutRooms.findIndex((r) => r.id === a.breakoutRoom);
-        const room = idx !== -1 ? breakoutRooms[idx] : null;
-        return {
-            ...a,
-            duration: room ? room.duration : 'unlimited',
-            roomName: room ? room.name || `Room ${idx + 1}` : a.breakoutRoom,
-        };
-    });
-
-    rc.socket.emit('breakoutRoom', {
-        peer_name: peer_name,
-        peer_uuid: peer_uuid,
-        mainRoom: room_id,
-        assignments: assignmentsWithDuration,
-        duration: 'per-room',
-    });
-
-    rc.userLog('info', `Breakout rooms launched! ${assignments.length} participant(s) assigned`, 'top-end', 4000);
-
-    // Staggered refresh to show updated counts as participants join their rooms
-    setTimeout(() => refreshBreakoutPanel(), 2000);
-    setTimeout(() => refreshBreakoutPanel(), 5000);
-    setTimeout(() => refreshBreakoutPanel(), 10000);
-}
-
-async function presenterJoinBreakoutRoom(breakoutRoom) {
-    if (!rc) return;
-
-    const breakoutInfo = await getBreakoutRoomsInfo();
-    const info = breakoutInfo.find((r) => r.room === breakoutRoom);
-    if (!info || info.peers === 0) {
-        return rc.userLog('warning', 'No peers in this room yet', 'top-end', 3000);
-    }
-
-    const room = breakoutRooms.find((r) => r.id === breakoutRoom);
-    const duration = room ? room.duration : getBreakoutDuration();
-    const breakoutName = room ? room.name || breakoutRoom : breakoutRoom;
-
-    navigateToRoom(breakoutRoom, { breakoutMain: room_id, duration: duration, breakoutName: breakoutName });
-}
-
-function broadcastToBreakoutRooms(targetRoom = null) {
-    if (!rc || !isPresenter) return;
-
-    const input = getId('breakoutBroadcastInput');
-    const message = input.value.trim();
-    if (!message) {
-        return rc.userLog('warning', 'Please type a message to broadcast', 'top-end', 3000);
-    }
-
-    rc.socket.emit('breakoutRoomBroadcast', {
-        peer_name: peer_name,
-        peer_uuid: peer_uuid,
-        mainRoom: room_id,
-        targetRoom: targetRoom,
-        message: message,
-    });
-
-    const logMsg = targetRoom ? 'Message sent to room' : 'Message broadcast to all breakout rooms';
-    rc.userLog('info', logMsg, 'top-end', 3000);
-    input.value = '';
-}
-
-function filterBreakoutParticipants() {
-    const query = getId('breakoutParticipantSearch').value.toLowerCase().trim();
-    const rows = document.querySelectorAll('.breakout-participant-row');
-    rows.forEach((row) => {
-        const name = row.querySelector('.breakout-peer-name');
-        if (!name) return;
-        row.style.display = name.textContent.toLowerCase().includes(query) ? '' : 'none';
-    });
-}
-
-function renameBreakoutRoom(index) {
-    const room = breakoutRooms[index];
-    if (!room) return;
-
-    const nameEl = getId(`breakoutRoomName-${index}`);
-    if (!nameEl) return;
-
-    const currentName = room.name || `Room ${index + 1}`;
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.className = 'breakout-room-name-input';
-    input.value = currentName;
-    input.maxLength = 30;
-
-    nameEl.replaceWith(input);
-    input.focus();
-    input.select();
-
-    function saveName() {
-        const newName = input.value.trim() || `Room ${index + 1}`;
-        room.name = newName;
-        refreshBreakoutPanel();
-    }
-
-    input.addEventListener('blur', saveName);
-    input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') input.blur();
-        if (e.key === 'Escape') {
-            input.value = currentName;
-            input.blur();
-        }
-    });
-}
-
-function editBreakoutDuration(index) {
-    const room = breakoutRooms[index];
-    if (!room) return;
-
-    const currentValue = room.duration === 'unlimited' ? '' : room.duration;
-
-    Swal.fire({
-        background: swalBackground,
-        position: 'center',
-        title: 'Set Room Duration',
-        html: renderRoomTemplate('popupBreakoutDurationPickerTemplate'),
-        showCancelButton: true,
-        showDenyButton: true,
-        confirmButtonText: 'Set',
-        denyButtonText: 'Unlimited',
-        cancelButtonText: 'Cancel',
-        showClass: { popup: 'animate__animated animate__fadeInDown' },
-        hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-        didOpen: () => {
-            flatpickr('#breakoutDurationPicker', {
-                enableTime: true,
-                noCalendar: true,
-                dateFormat: 'H:i:S',
-                enableSeconds: true,
-                time_24hr: true,
-                defaultHour: 0,
-                defaultMinute: 30,
-                defaultSeconds: 0,
-                defaultDate: currentValue || '0:30:00',
-                inline: true,
-                disableMobile: true,
-            });
-        },
-        preConfirm: () => {
-            const val = document.getElementById('breakoutDurationPicker').value.trim();
-            if (!val) return null;
-            return val;
-        },
-    }).then((result) => {
-        if (result.isDenied) {
-            room.duration = 'unlimited';
-            refreshBreakoutPanel();
-        } else if (result.isConfirmed) {
-            const val = result.value;
-            if (!val) {
-                room.duration = 'unlimited';
-            } else {
-                const validated = validateBreakoutDuration(val);
-                room.duration = validated === null ? 'unlimited' : validated;
-            }
-            refreshBreakoutPanel();
-        }
-    });
-}
-
-function autoAssignBreakoutRooms() {
-    if (breakoutRooms.length === 0) {
-        return rc.userLog('warning', 'Add at least one room first', 'top-end', 3000);
-    }
-
-    const selects = Array.from(document.querySelectorAll('.breakout-room-select'));
-    if (selects.length === 0) {
-        return rc.userLog('warning', 'No participants to assign', 'top-end', 3000);
-    }
-
-    // Only assign unassigned participants
-    const unassigned = selects.filter((sel) => !sel.value);
-    if (unassigned.length === 0) {
-        return rc.userLog('info', 'All participants are already assigned', 'top-end', 3000);
-    }
-
-    // Shuffle unassigned participants randomly
-    for (let i = unassigned.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [unassigned[i], unassigned[j]] = [unassigned[j], unassigned[i]];
-    }
-
-    // Round-robin assignment across rooms
-    unassigned.forEach((sel, i) => {
-        const roomIndex = i % breakoutRooms.length;
-        sel.value = breakoutRooms[roomIndex].id;
-    });
-
-    rc.userLog(
-        'info',
-        `${unassigned.length} participant(s) auto-assigned to ${breakoutRooms.length} room(s)`,
-        'top-end',
-        3000
-    );
-}
-
-async function endAllBreakoutSessions() {
-    if (!rc || !isPresenter) return;
-
-    const breakoutInfo = await getBreakoutRoomsInfo();
-    const totalPeers = breakoutInfo.reduce((sum, r) => sum + r.peers, 0);
-
-    if (totalPeers === 0) {
-        breakoutRooms = [];
-        refreshBreakoutPanel();
-        return rc.userLog('info', 'All breakout rooms cleared', 'top-end', 3000);
-    }
-
-    const confirmed = await Swal.fire({
-        background: swalBackground,
-        position: 'top',
-        title: 'End All Breakout Sessions?',
-        html: renderRoomTemplate('popupBreakoutEndTemplate', {
-            text: {
-                participantCount: String(totalPeers),
-                participantLabel: `participant${totalPeers !== 1 ? 's' : ''}`,
-            },
-        }),
-        showDenyButton: true,
-        confirmButtonText: '<i class="fas fa-door-open"></i> End All',
-        denyButtonText: 'Cancel',
-        customClass: {
-            popup: 'breakout-swal breakout-swal--end',
-            htmlContainer: 'breakout-swal-html',
-            confirmButton: 'breakout-swal-confirm breakout-swal-confirm--end',
-            denyButton: 'breakout-swal-deny',
-        },
-        showClass: { popup: 'animate__animated animate__fadeInDown' },
-        hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-    });
-
-    if (!confirmed.isConfirmed) return;
-
-    const countdownEl = document.getElementById('breakoutEndCountdown');
-    const countdown = countdownEl ? parseInt(countdownEl.value) : 0;
-
-    if (countdown > 0) {
-        rc.socket.emit('breakoutRoomCountdown', {
-            peer_name: peer_name,
-            peer_uuid: peer_uuid,
-            mainRoom: room_id,
-            countdown: countdown,
-        });
-        rc.userLog('info', `Breakout sessions ending in ${countdown} seconds...`, 'top-end', 3000);
-    } else {
-        rc.socket.emit('breakoutRoomEnd', {
-            peer_name: peer_name,
-            peer_uuid: peer_uuid,
-            mainRoom: room_id,
-        });
-        rc.userLog('info', 'Ending all breakout sessions...', 'top-end', 3000);
-    }
-
-    setTimeout(
-        () => {
-            breakoutRooms = [];
-            refreshBreakoutPanel();
-        },
-        (countdown + 3) * 1000
-    );
-}
-
-function validateBreakoutDuration(input) {
-    if (!input || input.toLowerCase() === 'unlimited') return 'unlimited';
-    const total = parseDurationToSeconds(input);
-    if (total === 0) {
-        const match = input.match(/^(\d{1,2}):(\d{2}):(\d{2})$/);
-        if (!match) {
-            rc.userLog('warning', 'Invalid duration format. Use the time picker or set unlimited', 'top-end', 4000);
-            return null;
-        }
-        const minutes = parseInt(match[2], 10);
-        const seconds = parseInt(match[3], 10);
-        if (minutes > 59 || seconds > 59) {
-            rc.userLog('warning', 'Invalid duration. Minutes and seconds must be 0-59', 'top-end', 4000);
-            return null;
-        }
-        rc.userLog('warning', 'Duration must be greater than 0', 'top-end', 4000);
-        return null;
-    }
-    return input;
-}
-
-let breakoutTimerInterval = null;
-
-function checkBreakoutTimer() {
-    const duration = getQueryParam('duration');
-    if (!duration || duration === 'unlimited') return;
-
-    const seconds = parseDurationToSeconds(duration);
-    if (seconds <= 0) return;
-
-    startBreakoutCountdown(seconds, { warn: false });
-}
-
-function startBreakoutEndCountdown(seconds) {
-    if (!rc || seconds <= 0) return;
-    startBreakoutCountdown(seconds, { warn: true });
-}
-
-function startBreakoutCountdown(seconds, { warn = false } = {}) {
-    if (breakoutTimerInterval) {
-        clearInterval(breakoutTimerInterval);
-        breakoutTimerInterval = null;
-    }
-
-    let remaining = seconds;
-
-    const timerEl = getId('breakoutTimer');
-    const displayEl = getId('breakoutTimerDisplay');
-    if (!timerEl || !displayEl) return;
-
-    timerEl.classList.remove('hidden');
-    if (warn) timerEl.parentElement.classList.add('breakout-timer-warning');
-    updateTimerDisplay(displayEl, remaining);
-
-    if (warn && rc) {
-        rc.userLog('warning', `Breakout session closing in ${remaining} seconds`, 'top-end', 5000);
-    }
-
-    breakoutTimerInterval = setInterval(() => {
-        remaining--;
-        updateTimerDisplay(displayEl, remaining);
-
-        if (warn) {
-            if ((remaining === 30 || remaining === 10 || remaining === 5) && rc) {
-                rc.userLog('warning', `Returning to main room in ${remaining} seconds`, 'top-end', 3000);
-                sound('notification');
-            }
-        } else {
-            if (remaining <= 30 && remaining > 0 && remaining % 10 === 0 && rc) {
-                rc.userLog('warning', `Breakout session ends in ${remaining} seconds`, 'top-end', 3000);
-            }
-        }
-
-        if (remaining <= 0) {
-            clearInterval(breakoutTimerInterval);
-            breakoutTimerInterval = null;
-            if (rc) rc.userLog('info', 'Breakout session ended. Returning to main room...', 'top-end', 4000);
-            setTimeout(() => returnToMainRoom(), 2000);
-        }
-    }, 1000);
-}
-
-function updateTimerDisplay(el, seconds) {
-    const h = String(Math.floor(seconds / 3600)).padStart(2, '0');
-    const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
-    const s = String(seconds % 60).padStart(2, '0');
-    el.textContent = `${h}:${m}:${s}`;
-    if (seconds <= 30) {
-        el.parentElement.classList.add('breakout-timer-warning');
-    }
-}
+// ####################################################
 
 // ####################################################
 // EXIT MENU

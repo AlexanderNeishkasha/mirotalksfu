@@ -11,7 +11,7 @@
  *   - buttons  : text/attributes on <button> elements in the static HTML
  *   - labels   : all other static HTML text and title/placeholder/aria-label attributes
  *   - dialogs  : SweetAlert (Swal.fire) titles, buttons, placeholders and body text
- *   - toasts   : snackbar/toast notifications (RoomClient.userLog)
+ *   - toasts   : shared notifications (userLog and RoomClient.userLog)
  *
  * Keys within each namespace are the original English source strings. Missing keys
  * fall back to the original English text.
@@ -146,26 +146,11 @@
         return true;
     }
 
-    function wrapUserLog() {
-        if (typeof window.RoomClient !== 'function' || !window.RoomClient.prototype) return false;
-        const proto = window.RoomClient.prototype;
-        if (typeof proto.userLog !== 'function' || proto.userLog.__i18nWrapped) return true;
-        const original = proto.userLog;
-        const wrapped = function (type, message, position, ...rest) {
-            const translated = typeof message === 'string' ? translate(message, 'toasts') : message;
-            return original.call(this, type, translated, position, ...rest);
-        };
-        wrapped.__i18nWrapped = true;
-        proto.userLog = wrapped;
-        return true;
-    }
-
     function installHooks() {
         // Evaluate all so an early-ready hook installs even if another lib is still loading.
         const tippyOk = wrapTippy();
         const swalOk = wrapSwal();
-        const userLogOk = wrapUserLog();
-        if (!(tippyOk && swalOk && userLogOk) && hookRetries < 50) {
+        if (!(tippyOk && swalOk) && hookRetries < 50) {
             hookRetries++;
             setTimeout(installHooks, 100);
         }

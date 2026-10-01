@@ -2,7 +2,7 @@
 
 const { v4: uuidv4 } = require('uuid');
 const config = require('./config');
-const RtmpStreaming = require('./RtmpStreaming');
+
 const { BodrikMusic } = require('./BodrikMusic');
 const Logger = require('./Logger');
 const { createTurnTransportOptions } = require('./TurnCredentials');
@@ -29,7 +29,7 @@ module.exports = class Room {
             activeSpeakerObserverEnabled !== undefined ? activeSpeakerObserverEnabled : false;
         this.activeSpeakerObserver = null;
         // ##########################
-        this._isBroadcasting = false;
+
         // ##########################
         this._isLocked = false;
         this._isLobbyEnabled = false;
@@ -65,13 +65,11 @@ module.exports = class Room {
             chat_cant_publicly: false,
             chat_cant_chatgpt: false,
             chat_cant_deep_seek: false,
-            media_cant_sharing: false,
         };
         this._followMe = null;
         this.survey = config?.features?.survey;
         this.redirect = config?.features?.redirect;
-        this.videoAIEnabled = config?.integrations?.videoAI?.enabled || false;
-        this.videoAISessionTimeLimit = config?.integrations?.videoAI?.sessionTimeLimit || 0;
+
         this.peers = new Map();
         this.bannedPeers = new Map(); // uuid -> timestamp, with TTL-based expiration
         this.webRtcTransport = config.mediasoup.webRtcTransport;
@@ -80,13 +78,7 @@ module.exports = class Room {
         this.routerSettings = config.mediasoup.router;
         this.routerReady = this.createTheRouter();
 
-        // RTMP configuration
-        this.rtmpStreaming = new RtmpStreaming(this);
-
         this.isHostProtected = config?.security?.host?.protected || false;
-
-        // Share Media
-        this.shareMediaData = {};
 
         this.maxParticipants = config?.moderation?.room?.maxParticipants || 1000;
         this.globalLobby = config?.moderation?.room?.lobby || false;
@@ -100,7 +92,7 @@ module.exports = class Room {
         return {
             id: this.id,
             sessionId: this.sessionId,
-            broadcasting: this._isBroadcasting,
+
             recording: this.recording,
             config: {
                 isLocked: this._isLocked,
@@ -108,23 +100,15 @@ module.exports = class Room {
                 isJoinLocked: this._isJoinLocked,
                 hostOnlyRecording: this._hostOnlyRecording,
             },
-            rtmp: {
-                enabled: this.rtmpStreaming.rtmp && this.rtmpStreaming.rtmp.enabled,
-                fromFile: this.rtmpStreaming.rtmp && this.rtmpStreaming.rtmp.fromFile,
-                fromUrl: this.rtmpStreaming.rtmp && this.rtmpStreaming.rtmp.fromUrl,
-                fromStream: this.rtmpStreaming.rtmp && this.rtmpStreaming.rtmp.fromStream,
-                allowCustomUrl: this.rtmpStreaming.rtmp && this.rtmpStreaming.rtmp.allowCustomUrl,
-            },
+
             hostProtected: this.isHostProtected,
             moderator: this._moderator,
             followMe: this._followMe,
             survey: this.survey,
             redirect: this.redirect,
-            videoAIEnabled: this.videoAIEnabled,
-            videoAISessionTimeLimit: this.videoAISessionTimeLimit,
+
             chatGPTEnabled: config?.integrations?.chatGPT?.enabled || false,
 
-            shareMediaData: this.shareMediaData,
             dominantSpeaker: this.activeSpeakerObserverEnabled,
             peers: JSON.stringify([...this.peers]),
             peersCount: this.getPeersCount(),
@@ -139,56 +123,12 @@ module.exports = class Room {
     }
 
     // ##############################################
-    // SHARE MEDIA
-    // ##############################################
-
-    updateShareMedia(data) {
-        this.shareMediaData = data;
-    }
 
     // ##############################################
 
     // ##############################################
 
     // ##############################################
-    // RTMP (delegated to RtmpStreaming)
-    // ##############################################
-
-    isRtmpFileStreamerActive() {
-        return this.rtmpStreaming.isRtmpFileStreamerActive();
-    }
-
-    async getRTMP(dir) {
-        return this.rtmpStreaming.getRTMP(dir);
-    }
-
-    async startRTMP(socket_id, room, host, port, file, customRtmpUrl) {
-        return this.rtmpStreaming.startRTMP(socket_id, room, host, port, file, customRtmpUrl);
-    }
-
-    stopRTMP() {
-        return this.rtmpStreaming.stopRTMP();
-    }
-
-    isRtmpUrlStreamerActive() {
-        return this.rtmpStreaming.isRtmpUrlStreamerActive();
-    }
-
-    async startRTMPfromURL(socket_id, room, host, port, inputVideoURL, customRtmpUrl) {
-        return this.rtmpStreaming.startRTMPfromURL(socket_id, room, host, port, inputVideoURL, customRtmpUrl);
-    }
-
-    stopRTMPfromURL() {
-        return this.rtmpStreaming.stopRTMPfromURL();
-    }
-
-    getRTMPUrl(host, port) {
-        return this.rtmpStreaming.getRTMPUrl(host, port);
-    }
-
-    generateRTMPUrl(baseURL, streamPath, secretKey, expirationHours) {
-        return this.rtmpStreaming.generateRTMPUrl(baseURL, streamPath, secretKey, expirationHours);
-    }
 
     // ####################################################
     // ROUTER
@@ -253,7 +193,7 @@ module.exports = class Room {
         this.closeAudioLevelObserver();
         this.bodrikMusic?.stop();
         this.closeActiveSpeakerObserver();
-        this.rtmpStreaming.closeAll();
+
         this.closeRouter();
         log.debug('Room closed', { room_id: this.id });
     }
@@ -451,9 +391,6 @@ module.exports = class Room {
                 break;
             case 'chat_cant_deep_seek':
                 this._moderator.chat_cant_deep_seek = data.status;
-                break;
-            case 'media_cant_sharing':
-                this._moderator.media_cant_sharing = data.status;
                 break;
 
             default:
@@ -1140,9 +1077,7 @@ module.exports = class Room {
     // ####################################################
 
     // GET
-    isBroadcasting() {
-        return this._isBroadcasting;
-    }
+
     getPassword() {
         return this._roomPassword;
     }
@@ -1165,9 +1100,7 @@ module.exports = class Room {
     }
 
     // SET
-    setIsBroadcasting(status) {
-        this._isBroadcasting = status;
-    }
+
     setLocked(status, password) {
         this._isLocked = status;
         this._roomPassword = password;

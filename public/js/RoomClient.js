@@ -19,8 +19,7 @@ const cfg = {
 
 const html = {
     newline: '\n', //'<br />',
-    hideMeOn: 'fas fa-user-slash',
-    hideMeOff: 'fas fa-user',
+
     audioOn: 'fas fa-microphone',
     audioOff: 'fas fa-microphone-slash',
     videoOn: 'fas fa-video',
@@ -31,10 +30,10 @@ const html = {
     fullScreen: 'fas fa-expand',
     fullScreenOn: 'fas fa-compress-alt',
     fullScreenOff: 'fas fa-expand-alt',
-    snapshot: 'fas fa-camera-retro',
+
     sendFile: 'fas fa-upload',
     sendMsg: 'fas fa-paper-plane',
-    sendVideo: 'fab fa-youtube',
+
     geolocation: 'fas fa-location-dot',
     ban: 'fas fa-ban',
     kickOut: 'fas fa-times',
@@ -118,7 +117,7 @@ const image = {
     users: '../images/participants.png',
     user: '../images/participant.png',
     username: '../images/user.png',
-    videoShare: '../images/video-share.png',
+
     message: '../images/message.png',
     share: '../images/share.png',
     exit: '../images/exit.png',
@@ -129,10 +128,10 @@ const image = {
     deepSeek: '../images/deepSeek.png',
     all: '../images/all.png',
     forbidden: '../images/forbidden.png',
-    broadcasting: '../images/broadcasting.png',
+
     geolocation: '../images/geolocation.png',
     network: '../images/network.gif',
-    rtmp: '../images/rtmp.png',
+
     save: '../images/save.png',
     back: '../images/back.png',
     blur: '../images/blur.png',
@@ -194,12 +193,6 @@ const _EVENTS = {
     roomUnlock: 'roomUnlock',
     hostOnlyRecordingOn: 'hostOnlyRecordingOn',
     hostOnlyRecordingOff: 'hostOnlyRecordingOff',
-    startRTMP: 'startRTMP',
-    stopRTMP: 'stopRTMP',
-    endRTMP: 'endRTMP',
-    startRTMPfromURL: 'startRTMPfromURL',
-    stopRTMPfromURL: 'stopRTMPfromURL',
-    endRTMPfromURL: 'endRTMPfromURL',
 };
 
 // Enums
@@ -210,26 +203,6 @@ const enums = {
         stop: 'Stop conference recording',
     },
     //...
-};
-
-// LiveAvatar config
-const VideoAI = {
-    enabled: true,
-    active: false,
-    info: {},
-    avatarId: null,
-    avatarName: '',
-    avatarVoice: null,
-    quality: 'medium',
-    sessionToken: null,
-    livekitRoom: null,
-    sessionTimeLimit: 0,
-    sessionCountdown: null,
-    avatarProducers: [],
-    shareToRoom: false,
-    useChatGPT: true,
-    mediaParticipantIdentity: null,
-    muteAvatarAudio: false,
 };
 
 // Recording
@@ -292,9 +265,6 @@ class RoomClient {
         this.iceProducerRestarting = false;
         this.iceConsumerRestarting = false;
 
-        // RTMP selected file name
-        this.selectedRtmpFilename = '';
-
         // Moderator
         this._moderator = {
             video_start_privacy: false,
@@ -307,7 +277,6 @@ class RoomClient {
             chat_cant_publicly: false,
             chat_cant_chatgpt: false,
             chat_cant_deep_seek: false,
-            media_cant_sharing: false,
         };
 
         // Chat messages
@@ -322,10 +291,6 @@ class RoomClient {
         this.chatPeerName = 'all';
         this.chatPeerAvatar = '';
         this.unreadMessageCounts = {};
-
-        // LiveAvatar Video AI
-        this.videoAIContainer = null;
-        this.videoAIElement = null;
 
         this.dominantSpeaker = false;
         this.isAudioAllowed = isAudioAllowed;
@@ -356,8 +321,6 @@ class RoomClient {
         this.isChatOpen = false;
         this.isChatEmojiOpen = false;
 
-        this.isBreakoutPinned = false;
-        this.isBreakoutMaximized = false;
         this.isSpeechSynthesisSupported = isSpeechSynthesisSupported;
         this.isParticipantsOpen = false;
         this.isChatOpenedByParticipantsBtn = false;
@@ -399,10 +362,6 @@ class RoomClient {
         this.RoomLobbyAccepted = false;
         this.lobbyPears = {};
 
-        // RTMP Streamer
-        this.rtmpFileStreamer = false;
-        this.rtmpUrltSreamer = false;
-
         // File transfer settings
         this.fileToSend = null;
         this.fileReader = null;
@@ -419,6 +378,8 @@ class RoomClient {
         this._isRecording = false;
         this._recStartTs = null;
         this.mediaRecorder = null;
+        this._recordingStarted = false;
+        this._recordingStopping = false;
         this.audioRecorder = null;
         this.screenAudioRecorder = null; // mixes participant audio with system/tab audio
         this.recScreenStream = null;
@@ -431,7 +392,7 @@ class RoomClient {
         this.recSyncTime = 4000; // 4 sec
         this.recSyncChunkSize = 1000000; // 1MB
         this.recUploadToken = ''; // Per-session token authorizing /recSync* uploads (issued on join)
-        this.rtmpStreamToken = ''; // Per-session token authorizing the /rtmp streamer page (issued on join)
+
         this.sessionId = ''; // Server-side unique conference-instance ID (issued on join)
 
         // Encodings
@@ -601,6 +562,7 @@ class RoomClient {
             });
     }
 
+    /** Admit the peer, retain recording/session credentials, and initialize the room or report rejection. */
     async join(data) {
         this.socket
             .request('join', data)
@@ -620,68 +582,29 @@ class RoomClient {
                         false
                     );
                 }
-
-                if (room === 'invalid') {
-                    console.warn('00-WARNING ----> Invalid Room name! Path traversal pattern detected!');
-                    return this.roomInvalid();
-                }
-
-                if (room === 'notAllowed') {
-                    console.warn(
-                        '00-WARNING ----> Room is Unauthorized for current user, please provide a valid room name for this user'
-                    );
-                    return this.userRoomNotAllowed();
-                }
-
-                if (room === 'unauthorized') {
-                    console.warn(
-                        '00-WARNING ----> Room is Unauthorized for current user, please provide a valid username and password'
-                    );
-                    return this.userUnauthorized();
-                }
-
-                if (room === 'isJoinLocked') {
-                    console.warn('00-WARNING ----> Room is Locked for new participants');
-                    return this.roomJoinLocked();
-                }
-
+                if (room === 'invalid') return this.roomInvalid();
+                if (room === 'notAllowed') return this.userRoomNotAllowed();
+                if (room === 'unauthorized') return this.userUnauthorized();
+                if (room === 'isJoinLocked') return this.roomJoinLocked();
                 if (room === 'isLocked') {
                     this.RoomIsLocked = true;
                     this.event(_EVENTS.roomLock);
-                    console.warn('00-WARNING ----> Room is Locked, Try to unlock by the password');
                     return this.unlockTheRoom();
                 }
-
                 if (room === 'isLobby') {
                     this.RoomIsLobby = true;
                     this.event(_EVENTS.lobbyOn);
-                    console.warn('00-WARNING ----> Room Lobby Enabled, Wait to confirm my join');
                     return this.waitJoinConfirm();
                 }
+                if (room === 'isBanned') return this.isBanned();
 
-                if (room === 'isBanned') {
-                    console.warn('00-WARNING ----> You are Banned from the Room!');
-                    return this.isBanned();
-                }
-
-                // ##########################################
                 this.peers = new Map(JSON.parse(room.peers));
-                // ##########################################
-
-                // Store the per-session token used to authorize server recording uploads
                 if (room.recUploadToken) this.recUploadToken = room.recUploadToken;
-
-                // Store the per-session token used to authorize the RTMP streamer page
-                if (room.rtmpStreamToken) this.rtmpStreamToken = room.rtmpStreamToken;
-
-                // Store the server-side unique conference-instance ID for this room instance
                 if (room.sessionId) this.sessionId = room.sessionId;
-
                 await this.joinAllowed(room);
             })
             .catch((error) => {
                 console.error('Join error:', error);
-                //
                 popupHtmlMessage(null, image.network, 'Join Room', error, 'center', false, true);
             });
     }
@@ -707,9 +630,7 @@ class RoomClient {
         // Request existing data producers from other peers
         this.socket.emit('getDataProducers');
 
-        if (isBroadcastingEnabled) {
-            isPresenter ? await this.startLocalMedia() : this.handleRoomBroadcasting();
-        } else {
+        {
             await this.startLocalMedia();
         }
 
@@ -766,15 +687,12 @@ class RoomClient {
                 console.warn('7.1-WARNING ----> GLOBAL Room Lobby detected');
             }
 
-            // Room-level VideoAI availability, kept so handleRules can gate the tab correctly
             // both at join and when a peer is promoted/demoted mid-session.
-            this.videoAIEnabled = room.videoAIEnabled || false;
 
             handleRules(isPresenter);
 
             // ###################################################################################################
-            isBroadcastingEnabled = isPresenter && !room.broadcasting ? isBroadcastingEnabled : room.broadcasting;
-            console.log('07.1 ----> ROOM BROADCASTING', isBroadcastingEnabled);
+
             // ###################################################################################################
 
             if (BUTTONS.settings.tabRecording) {
@@ -835,38 +753,10 @@ class RoomClient {
             if (room.followMe && room.followMe.enabled && !isPresenter) {
                 this._pendingFollowMe = room.followMe;
             }
-            // Store ChatGPT enabled state for VideoAI fallback
-            this.chatGPTEnabled = room.chatGPTEnabled || false;
-            // Check if VideoAI is enabled and hide to guests by default
-            if (!isPresenter || !this.videoAIEnabled) {
-                VideoAI.enabled = false;
-                elemDisplay('tabVideoAIBtn', false);
-            }
-            if (room.videoAISessionTimeLimit > 0) {
-                VideoAI.sessionTimeLimit = room.videoAISessionTimeLimit;
-            }
-            // Check che RTMP config
-            if (room.rtmp) {
-                console.log('RTMP config', room.rtmp);
-                const { enabled, fromFile, fromUrl, fromStream, allowCustomUrl } = room.rtmp;
-                elemDisplay('tabRTMPStreamingBtn', enabled, 'flex');
-                elemDisplay('rtmpFromFile', fromFile);
-                elemDisplay('rtmpFromUrl', fromUrl);
-                elemDisplay('rtmpFromStream', fromStream);
-                elemDisplay('rtmpCustomDestination', allowCustomUrl);
-                if (allowCustomUrl) this.initRtmpCustomDestination();
-                if (!fromFile && !fromUrl && !fromStream) {
-                    elemDisplay('tabRTMPStreamingBtn', false);
-                }
-            }
 
-            // Share Media Data on Join
-            if (
-                room.shareMediaData &&
-                Object.keys(room.shareMediaData).length !== 0 &&
-                room.shareMediaData.action === 'open'
-            ) {
-                this.shareVideoAction(room.shareMediaData);
+            this.chatGPTEnabled = room.chatGPTEnabled || false;
+
+            {
             }
 
             // Dominant Speaker
@@ -897,7 +787,7 @@ class RoomClient {
                 continue;
             }
 
-            const canSetVideoOff = !isBroadcastingEnabled || (isBroadcastingEnabled && peer_presenter);
+            const canSetVideoOff = true;
 
             if (!peer_video && canSetVideoOff) {
                 console.log('Detected peer video off ' + peer_name);
@@ -1297,7 +1187,7 @@ class RoomClient {
         this.socket.on('setPresenterRole', this.handleSetPresenterRole);
         this.socket.on('fileInfo', this.handleFileInfoData);
         this.socket.on('file', this.handleFileData);
-        this.socket.on('shareVideoAction', this.handleShareVideoAction);
+
         this.socket.on('fileAbort', this.handleFileAbortData);
         this.socket.on('receiveFileAbort', this.handleReceiveFileAbortData);
 
@@ -1306,17 +1196,7 @@ class RoomClient {
         this.socket.on('updateRoomModerator', this.handleUpdateRoomModeratorData);
         this.socket.on('updateRoomModeratorALL', this.handleUpdateRoomModeratorALLData);
         this.socket.on('recordingAction', this.handleRecordingActionData);
-        this.socket.on('endRTMP', this.handleEndRTMP);
-        this.socket.on('errorRTMP', this.handleErrorRTMP);
-        this.socket.on('endRTMPfromURL', this.handleEndRTMPfromURL);
-        this.socket.on('errorRTMPfromURL', this.handleErrorRTMPfromURL);
 
-        this.socket.on('breakoutRoom', this.handleBreakoutRoom);
-        this.socket.on('breakoutRoomCountsChanged', this.handleBreakoutRoomCountsChanged);
-        this.socket.on('breakoutRoomMessage', this.handleBreakoutRoomMessage);
-        this.socket.on('breakoutRoomEnd', this.handleBreakoutRoomEnd);
-        this.socket.on('breakoutRoomCountdown', this.handleBreakoutRoomCountdown);
-        this.socket.on('breakoutRoomHelp', this.handleBreakoutRoomHelp);
         this.socket.on('followMe', this.handleFollowMeData);
         this.socket.on('chatReaction', this.handleChatReaction);
     }
@@ -1397,7 +1277,7 @@ class RoomClient {
     }
 
     handleSetVideoOff = (data) => {
-        if (!isBroadcastingEnabled || (isBroadcastingEnabled && data.peer_presenter)) {
+        {
             console.log('SocketOn setVideoOff', {
                 peer_name: data.peer_name,
                 peer_presenter: data.peer_presenter,
@@ -1411,23 +1291,16 @@ class RoomClient {
         this.removeVideoOff(data.peer_id);
         this.lobbyRemoveMe(data.peer_id);
         participantsCount = data.peer_counts;
-        if (!isBroadcastingEnabled) adaptAspectRatio(participantsCount);
+        adaptAspectRatio(participantsCount);
         if (isParticipantsListOpen) getRoomParticipants();
-        if (isBreakoutPanelOpen) refreshBreakoutPanel();
-        if (isBroadcastingEnabled && data.isPresenter) {
-            this.userLog('info', `${icons.broadcaster} ${data.peer_name} disconnected`, 'top-end', 6000);
-        }
     };
 
     handleRefreshParticipantsCount = (data) => {
         console.log('SocketOn Participants Count:', data);
         participantsCount = data.peer_counts;
-        if (isBroadcastingEnabled) {
-            if (isParticipantsListOpen) getRoomParticipants();
-        } else {
+        {
             adaptAspectRatio(participantsCount);
         }
-        if (isBreakoutPanelOpen) refreshBreakoutPanel();
     };
 
     handleNewProducers = async (data, reconcile = false) => {
@@ -1512,10 +1385,7 @@ class RoomClient {
     handleRoomAction = (data) => {
         console.log('SocketOn Room action:', data);
         const action = typeof data === 'string' ? data : data.action;
-        if (action === 'broadcasting' && typeof data.room_broadcasting === 'boolean') {
-            isBroadcastingEnabled = data.room_broadcasting;
-            updateParticipantViewButtonVisibility();
-        }
+
         this.roomAction(action, false);
     };
 
@@ -1558,10 +1428,6 @@ class RoomClient {
         this.handleFile(data);
     };
 
-    handleShareVideoAction = (data) => {
-        this.shareVideoAction(data);
-    };
-
     handleFileAbortData = (data) => {
         this.handleFileAbort(data);
     };
@@ -1592,139 +1458,6 @@ class RoomClient {
         console.log('SocketOn Recording action:', data);
         this.handleRecordingAction(data);
     };
-
-    handleEndRTMP = (data) => {
-        this.endRTMP(data);
-    };
-
-    handleErrorRTMP = (data) => {
-        this.errorRTMP(data);
-    };
-
-    handleEndRTMPfromURL = (data) => {
-        this.endRTMPfromURL(data);
-    };
-
-    handleErrorRTMPfromURL = (data) => {
-        this.errorRTMPfromURL(data);
-    };
-
-    handleBreakoutRoom = (data) => {
-        if (data.action === 'assign') {
-            this.joinBreakoutRoom(data.breakoutRoom, data.mainRoom, data.duration, data.roomName);
-        }
-    };
-
-    handleBreakoutRoomCountsChanged = () => {
-        if (isBreakoutPanelOpen) refreshBreakoutPanel();
-    };
-
-    handleBreakoutRoomMessage = (data) => {
-        console.log('SocketOn breakoutRoomMessage', data);
-        this.userLog('info', `<b>${data.peer_name}</b>: ${data.message}`, 'top-end', 8000);
-        sound('notification');
-    };
-
-    handleBreakoutRoomEnd = (data) => {
-        console.log('SocketOn breakoutRoomEnd', data);
-        this.userLog('info', 'Breakout session ended by presenter. Returning to main room...', 'top-end', 4000);
-        sound('notification');
-        setTimeout(() => returnToMainRoom(), 2000);
-    };
-
-    handleBreakoutRoomCountdown = (data) => {
-        console.log('SocketOn breakoutRoomCountdown', data);
-        sound('notification');
-        startBreakoutEndCountdown(data.countdown);
-    };
-
-    handleBreakoutRoomHelp = (data) => {
-        console.log('SocketOn breakoutRoomHelp', data);
-        if (!isPresenter) return;
-        sound('notification');
-        const roomIdx = breakoutRooms.findIndex((r) => r.id === data.breakoutRoom);
-        const room = roomIdx !== -1 ? breakoutRooms[roomIdx] : null;
-        const roomLabel = room ? room.name || `Room ${roomIdx + 1}` : data.breakoutRoom;
-        Swal.fire({
-            background: swalBackground,
-            position: 'top',
-            title: 'Help Requested',
-            html: renderRoomTemplate('popupBreakoutHelpTemplate', {
-                text: {
-                    peerName: data.peer_name,
-                    roomLabel,
-                },
-            }),
-            showDenyButton: true,
-            confirmButtonText: `${icons.signIn} Join Room`,
-            denyButtonText: 'Dismiss',
-            customClass: {
-                popup: 'breakout-swal breakout-swal--help',
-                htmlContainer: 'breakout-swal-html',
-                confirmButton: 'breakout-swal-confirm breakout-swal-confirm--help',
-                denyButton: 'breakout-swal-deny',
-            },
-            showClass: { popup: 'animate__animated animate__fadeInDown' },
-            hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-        }).then((result) => {
-            if (result.isConfirmed) {
-                presenterJoinBreakoutRoom(data.breakoutRoom);
-            }
-        });
-    };
-
-    async joinBreakoutRoom(breakoutRoom, mainRoom, duration = 'unlimited', roomName = '') {
-        const displayName = roomName || breakoutRoom;
-        const durationChip =
-            duration && duration !== 'unlimited'
-                ? `<div class="breakout-popup-chip">${icons.clock}<span>${duration}</span></div>`
-                : `<div class="breakout-popup-chip breakout-popup-chip--open">${icons.infinity}<span>No time limit</span></div>`;
-        const confirmResult = await Swal.fire({
-            allowOutsideClick: false,
-            allowEscapeKey: false,
-            background: swalBackground,
-            position: 'center',
-            title: 'Breakout Room Ready',
-            html: renderRoomTemplate('popupBreakoutJoinTemplate', {
-                text: {
-                    displayName,
-                },
-                html: {
-                    durationChip,
-                },
-            }),
-            showDenyButton: true,
-            confirmButtonText: `${icons.arrowRight} Join`,
-            denyButtonText: 'Stay',
-            customClass: {
-                popup: 'breakout-swal breakout-swal--join',
-                htmlContainer: 'breakout-swal-html',
-                confirmButton: 'breakout-swal-confirm breakout-swal-confirm--join',
-                denyButton: 'breakout-swal-deny breakout-swal-deny--quiet',
-            },
-            showClass: { popup: 'animate__animated animate__fadeInDown' },
-            hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-        });
-
-        if (!confirmResult.isConfirmed) return;
-
-        const baseUrl = `${window.location.origin}/join`;
-        const queryParams = new URLSearchParams({
-            room: breakoutRoom,
-            name: this.peer_name,
-            audio: this.peer_info.peer_audio ? '1' : '0',
-            video: this.peer_info.peer_video ? '1' : '0',
-            notify: '0',
-            breakoutMain: mainRoom,
-            breakoutName: displayName,
-            duration: duration || 'unlimited',
-        });
-        if (this.peer_info.peer_token) queryParams.set('token', this.peer_info.peer_token);
-
-        if (typeof preventExit !== 'undefined') preventExit = false;
-        this.exit(true);
-        openURL(`${baseUrl}?${queryParams.toString()}`);
-    }
 
     // ####################################################
     // SOCKET RECONNECT/DISCONNECT
@@ -2100,53 +1833,8 @@ class RoomClient {
     // ####################################################
 
     // ####################################################
-    // HANDLE ROOM BROADCASTING
+
     // ####################################################
-
-    handleRoomBroadcasting() {
-        console.log('07.4 ----> Room Broadcasting is currently active, and you are not the designated presenter');
-
-        this.peer_info.peer_audio = false;
-        this.peer_info.peer_video = false;
-        this.peer_info.peer_screen = false;
-
-        const mediaTypes = ['audio', 'video', 'screen'];
-
-        mediaTypes.forEach((type) => {
-            const data = {
-                room_id: this.room_id,
-                peer_name: this.peer_name,
-                peer_id: this.peer_id,
-                peer_presenter: isPresenter,
-                type: type,
-                status: false,
-                broadcast: true,
-            };
-            this.socket.emit('updatePeerInfo', data);
-        });
-
-        handleRulesBroadcasting();
-    }
-
-    toggleRoomBroadcasting() {
-        Swal.fire({
-            background: swalBackground,
-            position: 'center',
-            imageUrl: image.broadcasting,
-            title: 'Room broadcasting Enabled',
-            text: 'Would you like to continue the room broadcast?',
-            showDenyButton: true,
-            confirmButtonColor: '#18392B',
-            confirmButtonText: `Yes`,
-            denyButtonText: `No`,
-            showClass: { popup: 'animate__animated animate__fadeInDown' },
-            hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-        }).then((result) => {
-            if (result.isDenied) {
-                switchBroadcasting.click();
-            }
-        });
-    }
 
     // ####################################################
     // START LOCAL AUDIO VIDEO MEDIA
@@ -2193,12 +1881,6 @@ class RoomClient {
             hide(startAudioDeviceDropdown);
         }
 
-        if (!isEnumerateVideoDevices) {
-            hide(startVideoButton);
-            hide(stopVideoButton);
-            hide(startVideoDeviceDropdown);
-        }
-
         if (this.joinRoomWithScreen && !this._moderator.screen_cant_share) {
             await this.produce(mediaType.screen, null, false, true);
             console.log('11 ----> START SCREEN MEDIA');
@@ -2220,6 +1902,7 @@ class RoomClient {
     // PRODUCER
     // ####################################################
 
+    /** Capture and publish local media, releasing failed camera captures and restoring video-off state. */
     async produce(type, deviceId = null, swapCamera = false, init = false) {
         let mediaConstraints = {};
         let elem;
@@ -2429,7 +2112,6 @@ class RoomClient {
             }
 
             if (video) {
-                this.handleHideMe();
             }
 
             producer.on('trackended', () => {
@@ -2465,6 +2147,12 @@ class RoomClient {
             return producer;
         } catch (err) {
             console.error('Produce error:', err);
+            if (type === mediaType.video) {
+                stream?.getTracks().forEach((track) => track.stop());
+                this.isVideoAllowed = false;
+                this.peer_info.peer_video = false;
+                this.event(_EVENTS.stopVideo);
+            }
             handleMediaError(type, err);
         }
     }
@@ -3166,31 +2854,6 @@ class RoomClient {
     // PRODUCER
     // ####################################################
 
-    handleHideMe() {
-        const myScreenWrap = this.getId(this.screenProducerId + '__video');
-        const myVideoWrap = this.getId(this.videoProducerId + '__video');
-        const myVideoWrapOff = this.getId(this.peer_id + '__videoOff');
-        const myVideoPinBtn = this.getId(this.videoProducerId + '__pin');
-        const myScreenPinBtn = this.getId(this.screenProducerId + '__pin');
-        console.log('handleHideMe', {
-            isHideMeActive: isHideMeActive,
-            myScreenWrap: myScreenWrap ? myScreenWrap.id : null,
-            myVideoWrap: myVideoWrap ? myVideoWrap.id : null,
-            myVideoWrapOff: myVideoWrapOff ? myVideoWrapOff.id : null,
-            myVideoPinBtn: myVideoPinBtn ? myVideoPinBtn.id : null,
-            myScreenPinBtn: myScreenPinBtn ? myScreenPinBtn.id : null,
-        });
-        if (myScreenWrap) myScreenWrap.style.display = isHideMeActive ? 'none' : 'block';
-        if (isHideMeActive && this.isVideoPinned && myVideoPinBtn) myVideoPinBtn.click();
-        if (isHideMeActive && this.isVideoPinned && myScreenPinBtn) myScreenPinBtn.click();
-        if (myVideoWrap) myVideoWrap.style.display = isHideMeActive ? 'none' : 'block';
-        if (myVideoWrapOff) myVideoWrapOff.style.display = isHideMeActive ? 'none' : 'block';
-        hideMeIcon.className = isHideMeActive ? html.hideMeOn : html.hideMeOff;
-        hideMeIcon.style.color = isHideMeActive ? 'red' : 'white';
-        isHideMeActive ? this.sound('left') : this.sound('joined');
-        typeof applyParticipantGridVisibility === 'function' ? applyParticipantGridVisibility() : resizeVideoMedia();
-    }
-
     producerExist(type) {
         return this.producerLabel.has(type);
     }
@@ -3216,7 +2879,7 @@ class RoomClient {
     }
 
     async handleProducer(id, type, stream) {
-        let elem, vb, vp, ts, d, p, i, au, pip, ha, fs, pm, pb, pn, mv, st, ri;
+        let elem, vb, vp, d, p, i, au, pip, ha, fs, pm, pb, pn, mv, st, ri;
         switch (type) {
             case mediaType.video:
             case mediaType.screen:
@@ -3238,7 +2901,7 @@ class RoomClient {
                 elem.autoplay = true;
                 elem.muted = true;
                 elem.volume = 0;
-                elem.style.objectFit = isScreen || isBroadcastingEnabled ? 'contain' : 'var(--videoObjFit)';
+                elem.style.objectFit = isScreen ? 'contain' : 'var(--videoObjFit)';
 
                 const localVideoLoader = this.createVideoLoader(id + '__loader');
 
@@ -3249,7 +2912,7 @@ class RoomClient {
                 pip = this.createButton(id + '__pictureInPicture', html.pip);
                 ha = this.createButton(id + '__hideALL', html.hideALL + ' focusMode');
                 fs = this.createButton(id + '__fullScreen', html.fullScreen);
-                ts = this.createButton(id + '__snapshot', html.snapshot);
+
                 mv = this.createButton(id + '__mirror', html.mirror);
 
                 pn = this.createButton(id + '__pin', html.pin);
@@ -3291,7 +2954,7 @@ class RoomClient {
 
                 BUTTONS.producerVideo.muteAudioButton && vb.appendChild(au);
                 BUTTONS.producerVideo.videoPrivacyButton && !isScreen && vb.appendChild(vp);
-                BUTTONS.producerVideo.snapShotButton && vb.appendChild(ts);
+
                 BUTTONS.producerVideo.videoPictureInPicture &&
                     this.isVideoPictureInPictureSupported &&
                     vb.appendChild(pip);
@@ -3311,8 +2974,7 @@ class RoomClient {
                 BUTTONS.producerVideo.videoPictureInPicture &&
                     this.isVideoPictureInPictureSupported &&
                     myDropdownContent.appendChild(this.createResponsiveDropdownItem(pip, 'Picture in Picture'));
-                BUTTONS.producerVideo.snapShotButton &&
-                    myDropdownContent.appendChild(this.createResponsiveDropdownItem(ts, 'Take Snapshot'));
+
                 BUTTONS.producerVideo.videoPrivacyButton &&
                     !isScreen &&
                     myDropdownContent.appendChild(this.createResponsiveDropdownItem(vp, 'Video Privacy'));
@@ -3331,7 +2993,7 @@ class RoomClient {
                 vb.appendChild(myDropdownDiv);
                 BUTTONS.producerVideo.muteAudioButton && vb.appendChild(au);
                 BUTTONS.producerVideo.videoPrivacyButton && !isScreen && vb.appendChild(vp);
-                BUTTONS.producerVideo.snapShotButton && vb.appendChild(ts);
+
                 BUTTONS.producerVideo.videoPictureInPicture &&
                     this.isVideoPictureInPictureSupported &&
                     vb.appendChild(pip);
@@ -3374,7 +3036,7 @@ class RoomClient {
                 this.isVideoFullScreenSupported && this.handleFS(elem.id, fs.id);
                 this.handleVB(d.id, vb.id);
                 this.handleDD(elem.id, this.peer_id, true);
-                this.handleTS(elem.id, ts.id);
+
                 this.handleMV(elem.id, mv.id);
                 this.handleHA(ha.id, d.id);
 
@@ -3391,7 +3053,6 @@ class RoomClient {
                     this.setTippy(pn.id, 'Toggle Pin', 'bottom');
                     this.setTippy(ha.id, 'Toggle Focus mode', 'bottom');
                     this.setTippy(pip.id, 'Toggle picture in picture', 'bottom');
-                    this.setTippy(ts.id, 'Snapshot', 'bottom');
 
                     this.setTippy(vp.id, 'Toggle video privacy', 'bottom');
                     this.setTippy(au.id, 'Audio status', 'bottom');
@@ -3961,7 +3622,7 @@ class RoomClient {
     }
 
     async handleConsumer(id, type, stream, peer_name, peer_info) {
-        let elem, vb, d, p, i, cm, au, pip, fs, ts, sf, sm, sv, gl, ban, ko, pb, pm, pv, pn, ha, hg, mv, role;
+        let elem, vb, d, p, i, cm, au, pip, fs, sf, sm, gl, ban, ko, pb, pm, pv, pn, ha, hg, mv, role;
 
         let eDiv, eBtn, eVc; // expand buttons
 
@@ -3997,7 +3658,7 @@ class RoomClient {
                 elem.autoplay = true;
                 elem.muted = true;
                 elem.className = '';
-                elem.style.objectFit = remoteIsScreen || isBroadcastingEnabled ? 'contain' : 'var(--videoObjFit)';
+                elem.style.objectFit = remoteIsScreen ? 'contain' : 'var(--videoObjFit)';
 
                 const remoteVideoLoader = this.createVideoLoader(id + '__loader');
 
@@ -4020,14 +3681,13 @@ class RoomClient {
                 pip = this.createButton(id + '__pictureInPicture', html.pip);
                 mv = this.createButton(id + '__videoMirror', html.mirror);
                 fs = this.createButton(id + '__fullScreen', html.fullScreen);
-                ts = this.createButton(id + '__snapshot', html.snapshot);
 
                 pn = this.createButton(id + '__pin', html.pin);
                 ha = this.createButton(id + '__hideALL', html.hideALL + ' focusMode');
                 hg = this.createButton(id + '___' + remotePeerId + '___hideFromGrid', html.hideFromGrid);
                 sf = this.createButton(id + '___' + remotePeerId + '___sendFile', html.sendFile);
                 sm = this.createButton(id + '___' + remotePeerId + '___sendMsg', html.sendMsg);
-                sv = this.createButton(id + '___' + remotePeerId + '___sendVideo', html.sendVideo);
+
                 cm = this.createButton(id + '___' + remotePeerId + '___video', html.videoOn);
                 au = this.createButton(remotePeerId + '__audio', remotePeerAudio ? html.audioOn : html.audioOff);
                 gl = this.createButton(id + '___' + remotePeerId + '___geoLocation', html.geolocation);
@@ -4075,8 +3735,6 @@ class RoomClient {
                 BUTTONS.consumerVideo.videoPictureInPicture &&
                     this.isVideoPictureInPictureSupported &&
                     eVc.appendChild(this.createResponsiveDropdownItem(pip, 'Picture in Picture'));
-                BUTTONS.consumerVideo.snapShotButton &&
-                    eVc.appendChild(this.createResponsiveDropdownItem(ts, 'Take Snapshot'));
 
                 BUTTONS.consumerVideo.audioVolumeInput &&
                     eVc.appendChild(this.createResponsiveDropdownRangeItem(pv, 'Volume', 'fa-volume-high'));
@@ -4099,8 +3757,7 @@ class RoomClient {
                 BUTTONS.consumerVideo.geolocationButton &&
                     eVc.appendChild(this.createDropdownItem(gl, 'Geo Location', eVc));
                 BUTTONS.consumerVideo.sendFileButton && eVc.appendChild(this.createDropdownItem(sf, 'Send File', eVc));
-                BUTTONS.consumerVideo.sendVideoButton &&
-                    eVc.appendChild(this.createDropdownItem(sv, 'Send Video/Audio', eVc));
+
                 BUTTONS.consumerVideo.banButton && eVc.appendChild(this.createDropdownItem(ban, 'Ban', eVc, 'red'));
                 BUTTONS.consumerVideo.ejectButton &&
                     eVc.appendChild(this.createDropdownItem(ko, 'Kick Out', eVc, 'red'));
@@ -4114,7 +3771,7 @@ class RoomClient {
                 BUTTONS.consumerVideo.audioVolumeInput && vb.appendChild(pv);
                 BUTTONS.consumerVideo.muteAudioButton && vb.appendChild(au);
                 BUTTONS.consumerVideo.muteVideoButton && vb.appendChild(cm);
-                BUTTONS.consumerVideo.snapShotButton && vb.appendChild(ts);
+
                 BUTTONS.consumerVideo.videoPictureInPicture &&
                     this.isVideoPictureInPictureSupported &&
                     vb.appendChild(pip);
@@ -4146,14 +3803,14 @@ class RoomClient {
                 this.isVideoFullScreenSupported && this.handleFS(elem.id, fs.id);
                 this.handleVB(d.id, vb.id);
                 this.handleDD(elem.id, remotePeerId);
-                this.handleTS(elem.id, ts.id);
+
                 this.handleMV(elem.id, mv.id);
 
                 this.handleSF(sf.id, peer_name, remotePeerId);
                 this.handleHA(ha.id, d.id);
                 this.handleHFG(hg.id, remotePeerId);
                 this.handleSM(sm.id, peer_name, remotePeerId);
-                this.handleSV(sv.id, peer_name, remotePeerId);
+
                 BUTTONS.consumerVideo.muteVideoButton && this.handleCM(cm.id, remotePeerId);
                 BUTTONS.consumerVideo.muteAudioButton && this.handleAU(au.id, remotePeerId);
                 this.handleCV(pv.id);
@@ -4188,7 +3845,6 @@ class RoomClient {
                     this.setTippy(pn.id, 'Toggle Pin', 'bottom');
                     this.setTippy(ha.id, 'Toggle Focus mode', 'bottom');
                     this.setTippy(pip.id, 'Toggle picture in picture', 'bottom');
-                    this.setTippy(ts.id, 'Snapshot', 'bottom');
 
                     this.setTippy(cm.id, 'Hide', 'bottom');
                     this.setTippy(au.id, 'Mute', 'bottom');
@@ -4330,7 +3986,7 @@ class RoomClient {
 
     setVideoOff(peer_info, remotePeer = false) {
         //console.log('setVideoOff', peer_info);
-        let d, vb, i, h, au, sf, sm, sv, gl, ban, ko, hg, p, pm, pb, pv, pn, st, ri, role;
+        let d, vb, i, h, au, sf, sm, gl, ban, ko, hg, p, pm, pb, pv, pn, st, ri, role;
         let eDiv, eBtn, eVc;
 
         const { peer_id, peer_name, peer_avatar, peer_audio, peer_presenter } = peer_info;
@@ -4368,7 +4024,7 @@ class RoomClient {
         if (remotePeer) {
             sf = this.createButton('remotePeer___' + peer_id + '___sendFile', html.sendFile);
             sm = this.createButton('remotePeer___' + peer_id + '___sendMsg', html.sendMsg);
-            sv = this.createButton('remotePeer___' + peer_id + '___sendVideo', html.sendVideo);
+
             gl = this.createButton('remotePeer___' + peer_id + '___geoLocation', html.geolocation);
             ban = this.createButton('remotePeer___' + peer_id + '___ban', html.ban);
             ko = this.createButton('remotePeer___' + peer_id + '___kickOut', html.kickOut);
@@ -4431,7 +4087,7 @@ class RoomClient {
             BUTTONS.videoOff.sendMessageButton && eVc.appendChild(this.createDropdownItem(sm, 'Private Message', eVc));
             BUTTONS.videoOff.geolocationButton && eVc.appendChild(this.createDropdownItem(gl, 'Geo Location', eVc));
             BUTTONS.videoOff.sendFileButton && eVc.appendChild(this.createDropdownItem(sf, 'Send File', eVc));
-            BUTTONS.videoOff.sendVideoButton && eVc.appendChild(this.createDropdownItem(sv, 'Send Video/Audio', eVc));
+
             BUTTONS.videoOff.banButton && eVc.appendChild(this.createDropdownItem(ban, 'Ban', eVc, 'red'));
             BUTTONS.videoOff.ejectButton && eVc.appendChild(this.createDropdownItem(ko, 'Kick Out', eVc, 'red'));
         }
@@ -4477,7 +4133,7 @@ class RoomClient {
             this.handleCV(pv.id);
             this.handleSM(sm.id, peer_name, peer_id);
             this.handleSF(sf.id, peer_name, peer_id);
-            this.handleSV(sv.id, peer_name, peer_id);
+
             this.handleGL(gl.id, peer_id);
             this.handleBAN(ban.id, peer_id);
             this.handleKO(ko.id, peer_id);
@@ -4498,7 +4154,7 @@ class RoomClient {
         if (!this.isMobileDevice && remotePeer) {
             this.setTippy(sm.id, 'Send message', 'bottom');
             this.setTippy(sf.id, 'Send file', 'bottom');
-            this.setTippy(sv.id, 'Send video', 'bottom');
+
             this.setTippy(au.id, 'Mute', 'bottom');
             this.setTippy(pv.id, '🔊 Volume', 'bottom');
             this.setTippy(pn.id, 'Pin', 'bottom');
@@ -4514,8 +4170,6 @@ class RoomClient {
         handleAspectRatio();
 
         console.log('[setVideoOff] Video-element-count', this.videoMediaContainer.childElementCount);
-
-        this.handleHideMe();
     }
 
     removeVideoOff(peer_id) {
@@ -4583,9 +4237,7 @@ class RoomClient {
         this.isLeaving = true;
         this._isConnected = false;
         this.closeReconnectAlert();
-        if (VideoAI.active) this.stopSession();
-        if (this.rtmpFilestreamer) this.stopRTMP();
-        if (this.rtmpUrlstreamer) this.stopRTMPfromURL();
+
         if (this.RNNoiseProcessor) this.disableRNNoiseSuppression();
 
         const clean = () => {
@@ -4616,7 +4268,7 @@ class RoomClient {
                 this.socket.off('setPresenterRole');
                 this.socket.off('fileInfo');
                 this.socket.off('file');
-                this.socket.off('shareVideoAction');
+
                 this.socket.off('fileAbort');
                 this.socket.off('receiveFileAbort');
 
@@ -4625,12 +4277,7 @@ class RoomClient {
                 this.socket.off('updateRoomModerator');
                 this.socket.off('updateRoomModeratorALL');
                 this.socket.off('recordingAction');
-                this.socket.off('endRTMP');
-                this.socket.off('errorRTMP');
-                this.socket.off('endRTMPfromURL');
-                this.socket.off('errorRTMPfromURL');
 
-                this.socket.off('breakoutRoom');
                 this.socket.io.off('reconnect_attempt');
                 this.socket.io.off('reconnect_failed');
             }
@@ -4745,8 +4392,6 @@ class RoomClient {
         const remoteAudioElements = Array.from(this.remoteAudioEl?.querySelectorAll('audio') || []);
 
         audioElement ? outputElements.push(audioElement) : outputElements.push(...remoteAudioElements);
-
-        if (this.videoAIElement) outputElements.push(this.videoAIElement);
 
         const els = [...new Set(outputElements.filter(Boolean))];
         if (!els.length) return;
@@ -4933,9 +4578,10 @@ class RoomClient {
     }
 
     setIsAudio(peer_id, status) {
-        if (!isBroadcastingEnabled || (isBroadcastingEnabled && isPresenter)) {
+        {
             console.log('Set local audio enabled: ' + status);
             this.peer_info.peer_audio = status;
+            this.audioRecorder?.updateMicrophoneVolume(status);
             const audioStatus = this.getPeerAudioBtn(peer_id); // producer, consumers
             const audioVolume = this.getPeerAudioVolumeBar(peer_id); // consumers
             if (audioStatus) audioStatus.className = status ? html.audioOn : html.audioOff;
@@ -4944,7 +4590,7 @@ class RoomClient {
     }
 
     setIsVideo(status) {
-        if (!isBroadcastingEnabled || (isBroadcastingEnabled && isPresenter)) {
+        {
             this.peer_info.peer_video = status;
             if (!this.peer_info.peer_video) {
                 console.log('Set local video enabled: ' + status);
@@ -4955,7 +4601,7 @@ class RoomClient {
     }
 
     setIsScreen(status) {
-        if (!isBroadcastingEnabled || (isBroadcastingEnabled && isPresenter)) {
+        {
             this.peer_info.peer_screen = status;
             if (!this.peer_info.peer_screen && !this.peer_info.peer_video) {
                 console.log('Set local screen enabled: ' + status);
@@ -5082,32 +4728,9 @@ class RoomClient {
         }
     }
 
+    /** Display localized notifications through the shared renderer, including HTML notifications. */
     userLog(icon, message, position, timer = 5000) {
-        const Toast = Swal.mixin({
-            background: swalBackground,
-            toast: true,
-            position: position,
-            showConfirmButton: false,
-            timer: timer,
-            timerProgressBar: true,
-        });
-        switch (icon) {
-            case 'html':
-                Toast.fire({
-                    icon: icon,
-                    html: message,
-                    showClass: { popup: 'animate__animated animate__fadeInDown' },
-                    hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-                });
-                break;
-            default:
-                Toast.fire({
-                    icon: icon,
-                    title: message,
-                    showClass: { popup: 'animate__animated animate__fadeInDown' },
-                    hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-                });
-        }
+        return window.BodrikToast.show(icon, message, position, timer);
     }
 
     toast(icon, title, text, position = 'top-end', timer = 5000, sound = false) {
@@ -5356,137 +4979,6 @@ class RoomClient {
     // HANDLE DOCUMENT PIP
     // ####################################################
 
-    async toggleDocumentPIP() {
-        if (documentPictureInPicture.window) {
-            documentPictureInPicture.window.close();
-            console.log('DOCUMENT PIP close');
-            return;
-        }
-        await this.documentPictureInPictureOpen();
-    }
-
-    documentPictureInPictureClose() {
-        if (!showDocumentPipBtn) return;
-        if (documentPictureInPicture.window) {
-            documentPictureInPicture.window.close();
-            console.log('DOCUMENT PIP close');
-        }
-    }
-
-    async documentPictureInPictureOpen() {
-        if (!showDocumentPipBtn) return;
-        try {
-            const pipWindow = await documentPictureInPicture.requestWindow({
-                width: 300,
-                height: 720,
-            });
-
-            function updateCustomProperties() {
-                const documentStyle = getComputedStyle(document.documentElement);
-
-                pipWindow.document.documentElement.style = `
-                    --body-bg: ${documentStyle.getPropertyValue('--body-bg')};
-                `;
-            }
-
-            updateCustomProperties();
-
-            const pipStylesheet = document.createElement('link');
-            const pipVideoContainer = document.createElement('div');
-
-            pipStylesheet.type = 'text/css';
-            pipStylesheet.rel = 'stylesheet';
-            pipStylesheet.href = '../css/DocumentPiP.css';
-
-            pipVideoContainer.className = 'pipVideoContainer';
-
-            pipWindow.document.head.append(pipStylesheet);
-            pipWindow.document.body.append(pipVideoContainer);
-
-            function cloneVideoElements() {
-                let foundVideo = false;
-
-                pipVideoContainer.innerHTML = '';
-
-                [...document.querySelectorAll('video')].forEach((video) => {
-                    console.log('DOCUMENT PIP found video id -----> ' + video.id);
-
-                    // No video stream detected or is video share from URL...
-                    if (!video.srcObject || video.id === '__videoShare') return;
-
-                    const videoElement = rc.getId(video.id);
-
-                    const isPIPAllowed = !videoElement.classList.contains('videoCircle'); // Check if not in privacy mode
-
-                    const logMessage = [rc.videoProducerId, rc.screenProducerId].includes(video.id)
-                        ? `DOCUMENT PIP PRODUCER: PiP allowed? -----> ${isPIPAllowed}`
-                        : `DOCUMENT PIP CONSUMER: PiP allowed? -----> ${isPIPAllowed}`;
-
-                    console.log(logMessage);
-
-                    if (!isPIPAllowed) return;
-
-                    // Video is ON and not in privacy mode continue....
-
-                    foundVideo = true;
-
-                    const pipVideo = document.createElement('video');
-
-                    pipVideo.classList.add('pipVideo');
-                    pipVideo.classList.toggle('mirror', video.classList.contains('mirror'));
-                    pipVideo.srcObject = video.srcObject;
-                    pipVideo.autoplay = true;
-                    pipVideo.muted = true;
-
-                    pipVideoContainer.append(pipVideo);
-
-                    const videoElementObserver = new MutationObserver((mutations) => {
-                        mutations.forEach((mutation) => {
-                            if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-                                // Handle class changes in video elements
-                                console.log(`Video ${mutation.target.id} class changed:`, mutation.target.className);
-                                cloneVideoElements();
-                            }
-                        });
-                    });
-
-                    // Start observing for new videos and class changes
-                    videoElementObserver.observe(video, { attributes: true, attributeFilter: ['class'] });
-                });
-
-                return foundVideo;
-            }
-
-            if (!cloneVideoElements()) {
-                rc.documentPictureInPictureClose();
-                return userLog('warning', 'No video allowed for Document PIP', 'top-end', 6000);
-            }
-
-            const videoObserver = new MutationObserver(() => {
-                cloneVideoElements();
-            });
-
-            videoObserver.observe(rc.videoMediaContainer, {
-                childList: true,
-            });
-
-            const documentObserver = new MutationObserver(() => {
-                updateCustomProperties();
-            });
-
-            documentObserver.observe(document.documentElement, {
-                attributeFilter: ['style'],
-            });
-
-            pipWindow.addEventListener('unload', () => {
-                videoObserver.disconnect();
-                documentObserver.disconnect();
-            });
-        } catch (err) {
-            userLog('warning', err.message, 'top-end', 6000);
-        }
-    }
-
     // ####################################################
     // FULL SCREEN
     // ####################################################
@@ -5657,7 +5149,7 @@ class RoomClient {
                         if (this.isScreenAllowed) return;
                         return this.msgPopup('toast', 'Another video seems pinned, unpin it before to pin this one');
                     }
-                    if (!isScreen && !isBroadcastingEnabled) videoPlayer.style.objectFit = 'var(--videoObjFit)';
+                    if (!isScreen) videoPlayer.style.objectFit = 'var(--videoObjFit)';
                     this.videoPinMediaContainer.removeChild(cam);
                     cam.className = 'Camera';
                     this.videoMediaContainer.appendChild(cam);
@@ -5689,7 +5181,7 @@ class RoomClient {
     scheduleParticipantViewRestore() {
         if (this.isMobileDevice || this.isVideoPinned) return;
         const mode = localStorageSettings?.participant_view;
-        if (!mode?.startsWith('speaker-') && mode !== 'livestream') return;
+        if (!mode?.startsWith('speaker-')) return;
 
         clearTimeout(this.participantViewRestoreTimer);
         this.participantViewRestoreTimer = setTimeout(() => {
@@ -5742,17 +5234,14 @@ class RoomClient {
                 this.videoMediaContainer.style.width = thumbnailWidth + '%';
                 break;
             case 'speaker-1:1':
-            case 'livestream':
-                this.videoMediaContainer.style.display = 'none';
-                break;
+
             default:
                 break;
         }
-        if (position !== 'speaker-1:1' && position !== 'livestream') resizeVideoMedia();
+        if (position !== 'speaker-1:1') resizeVideoMedia();
     }
 
     getPinnedSidePanelWidth() {
-        if (this.isBreakoutPinned) return 30;
         if (this.isChatPinned) return 25;
         return 0;
     }
@@ -5988,7 +5477,7 @@ class RoomClient {
     }
 
     resizeVideoMenuBar() {
-        const somethingPinned = this.isVideoPinned || this.isChatPinned || this.isBreakoutPinned;
+        const somethingPinned = this.isVideoPinned || this.isChatPinned;
         const menuBarWidth = somethingPinned ? '75%' : '70%';
         const videoMenuBar = rc.getEcN('videoMenuBar');
         for (let i = 0; i < videoMenuBar.length; i++) {
@@ -6008,10 +5497,6 @@ class RoomClient {
         this.isVideoPinned = false;
         if (this.isChatPinned) {
             this.chatPin();
-        }
-
-        if (this.isBreakoutPinned) {
-            this.breakoutPin();
         }
     }
 
@@ -6041,30 +5526,6 @@ class RoomClient {
     // ####################################################
     // TAKE SNAPSHOT
     // ####################################################
-
-    handleTS(elemId, tsId) {
-        let videoPlayer = this.getId(elemId);
-        let btnTs = this.getId(tsId);
-        if (btnTs && videoPlayer) {
-            btnTs.addEventListener('click', () => {
-                if (videoPlayer.classList.contains('videoCircle')) {
-                    return this.userLog('info', 'SnapShoot not allowed if video on privacy mode', 'top-end');
-                }
-                this.sound('snapshot');
-                let context, canvas, width, height, dataURL;
-                width = videoPlayer.videoWidth;
-                height = videoPlayer.videoHeight;
-                canvas = canvas || document.createElement('canvas');
-                canvas.width = width;
-                canvas.height = height;
-                context = canvas.getContext('2d');
-                context.drawImage(videoPlayer, 0, 0, width, height);
-                dataURL = canvas.toDataURL('image/png');
-                // console.log(dataURL);
-                saveDataToFile(dataURL, getDataTimeString() + '-SNAPSHOT.png');
-            });
-        }
-    }
 
     // ####################################################
     // HANDLE VIDEO DRAWING OVERLAY
@@ -6336,9 +5797,6 @@ class RoomClient {
     }
 
     toggleChatPin() {
-        if (this.isBreakoutPinned) {
-            return userLog('info', 'Please unpin the breakout rooms that appears to be currently pinned', 'top-end');
-        }
         this.isChatPinned ? this.chatUnpin() : this.chatPin();
         this.sound('click');
     }
@@ -6484,7 +5942,7 @@ class RoomClient {
     }
 
     sendMessage() {
-        if (!this.thereAreParticipants() && !isChatGPTOn && !isDeepSeekOn && !(VideoAI.enabled && VideoAI.active)) {
+        if (!this.thereAreParticipants() && !isChatGPTOn && !isDeepSeekOn) {
             this.cleanMessage();
             isChatPasteTxt = false;
             return this.userLog('info', 'No participants in the room', 'top-end');
@@ -6555,22 +6013,6 @@ class RoomClient {
                     6000
                 );
             }
-            // If VideoAI is active and ChatGPT interaction is off (toggled or disabled), speak via avatar instead
-            if (VideoAI.enabled && VideoAI.active && !VideoAI.useChatGPT) {
-                this.setMsgAvatar('left', this.peer_name, this.peer_avatar);
-                this.appendMessage(
-                    'left',
-                    this.leftMsgAvatar,
-                    this.peer_name,
-                    this.peer_id,
-                    peer_msg,
-                    'ChatGPT',
-                    'ChatGPT'
-                );
-                this.cleanMessage();
-                this.streamingTask(peer_msg);
-                return;
-            }
 
             data.to_peer_id = 'ChatGPT';
             data.to_peer_name = 'ChatGPT';
@@ -6607,10 +6049,8 @@ class RoomClient {
                     this.setMsgAvatar('right', 'ChatGPT');
                     this.appendMessage('right', image.chatgpt, 'ChatGPT', this.peer_id, message, 'ChatGPT', 'ChatGPT');
                     this.cleanMessage();
-                    this.streamingTask(message); // Video AI avatar speak
-                    this.speechInMessages && !VideoAI.active
-                        ? this.speechMessage(true, 'ChatGPT', message)
-                        : this.sound('message');
+
+                    this.speechInMessages ? this.speechMessage(true, 'ChatGPT', message) : this.sound('message');
                 })
                 .catch((err) => {
                     this.hideAITypingIndicator('ChatGPT');
@@ -6671,32 +6111,13 @@ class RoomClient {
                         'DeepSeek'
                     );
                     this.cleanMessage();
-                    this.streamingTask(message);
-                    this.speechInMessages && !VideoAI.active
-                        ? this.speechMessage(true, 'DeepSeek', message)
-                        : this.sound('message');
+
+                    this.speechInMessages ? this.speechMessage(true, 'DeepSeek', message) : this.sound('message');
                 })
                 .catch((err) => {
                     this.hideAITypingIndicator('DeepSeek');
                     console.log('DeepSeek error:', err);
                 });
-        }
-
-        if (!isChatGPTOn && !isDeepSeekOn && VideoAI.enabled && VideoAI.active && this.chatPeerId === 'ChatGPT') {
-            // ChatGPT is off but LiveAvatar is active — speak the message directly via the avatar
-            this.setMsgAvatar('left', this.peer_name, this.peer_avatar);
-            this.appendMessage(
-                'left',
-                this.leftMsgAvatar,
-                this.peer_name,
-                this.peer_id,
-                peer_msg,
-                'ChatGPT',
-                'ChatGPT'
-            );
-            this.cleanMessage();
-            this.streamingTask(peer_msg);
-            return;
         }
 
         if (!isChatGPTOn && !isDeepSeekOn) {
@@ -6823,9 +6244,7 @@ class RoomClient {
         }
 
         if (this.speechInMessages) {
-            VideoAI.active
-                ? this.streamingTask(`New message from: ${data.peer_name}, the message is: ${data.peer_msg}`)
-                : this.speechMessage(true, data.peer_name, data.peer_msg);
+            this.speechMessage(true, data.peer_name, data.peer_msg);
         } else {
             this.sound('message');
         }
@@ -6939,6 +6358,7 @@ class RoomClient {
 
         // getImg is a user-controlled URL; use a temporary id and setAttribute
         // after insertion to avoid double-decode XSS via insertAdjacentHTML.
+
         const msgAvatarTmpId = `msg-av-${chatMessagesId}`;
         const positionFirst = myMessage
             ? `${timeAndName}<img id="${msgAvatarTmpId}" alt="avatar" />`
@@ -7292,7 +6712,6 @@ class RoomClient {
         if (this.isHtml(message)) return this.sanitizeHtml(message);
         if (this.isValidHttpURL(message)) {
             if (this.isImageURL(message)) return this.getImage(message);
-            //if (this.isVideoTypeSupported(message)) return this.getIframe(message);
             return this.getLink(message);
         }
         if (isChatMarkdownOn) return marked.parse(message);
@@ -7458,9 +6877,7 @@ class RoomClient {
     }
 
     speechText(msg) {
-        if (VideoAI.active) {
-            this.streamingTask(msg);
-        } else {
+        {
             const speech = new SpeechSynthesisUtterance();
             speech.text = msg;
             speech.rate = 0.9;
@@ -7564,217 +6981,8 @@ class RoomClient {
     // ##############################################
 
     // ####################################################
-    // BREAKOUT ROOMS PIN
+
     // ####################################################
-
-    toggleBreakoutPin() {
-        if (this.isChatPinned) {
-            return userLog('info', 'Please unpin the chat that appears to be currently pinned', 'top-end');
-        }
-
-        this.isBreakoutPinned ? this.breakoutUnpin() : this.breakoutPin();
-        this.sound('click');
-    }
-
-    setBreakoutControlState(button, isActive) {
-        button.classList.toggle('is-active', isActive);
-        button.setAttribute('aria-pressed', String(isActive));
-    }
-
-    breakoutPin() {
-        if (!this.isVideoPinned) {
-            this.videoMediaContainer.style.top = 0;
-            this.videoMediaContainer.style.width = '70%';
-            this.videoMediaContainer.style.height = '100%';
-        }
-        this.isBreakoutMaximized = false;
-        breakoutPanel.classList.remove('is-maximized');
-        hide(breakoutMinButton);
-        show(breakoutMaxButton);
-        if (!this.isMobileDevice) this.makeUnDraggable(breakoutPanel, breakoutPanelHeader);
-        this.breakoutPinned();
-        this.isBreakoutPinned = true;
-        this.refreshVideoPinLayout();
-        this.setBreakoutControlState(breakoutTogglePin, true);
-        this.resizeVideoMenuBar();
-        resizeVideoMedia();
-    }
-
-    breakoutUnpin() {
-        if (!this.isVideoPinned) {
-            this.videoMediaContainerUnpin();
-        }
-        breakoutPanel.classList.remove('panel-slide-in');
-        this.breakoutCenter();
-        this.isBreakoutPinned = false;
-        this.refreshVideoPinLayout();
-        this.setBreakoutControlState(breakoutTogglePin, false);
-        this.resizeVideoMenuBar();
-        resizeVideoMedia();
-        if (!this.isMobileDevice) this.makeDraggable(breakoutPanel, breakoutPanelHeader);
-    }
-
-    breakoutMaximize() {
-        if (this.isBreakoutPinned) this.breakoutUnpin();
-        this.isBreakoutMaximized = true;
-        breakoutPanel.classList.remove('panel-slide-in');
-        breakoutPanel.classList.add('is-maximized');
-        breakoutPanel.style.position = 'fixed';
-        breakoutPanel.style.inset = '';
-        breakoutPanel.style.top = '50%';
-        breakoutPanel.style.right = '';
-        breakoutPanel.style.left = '50%';
-        breakoutPanel.style.transform = 'translate(-50%, -50%)';
-        breakoutPanel.style.width = '100%';
-        breakoutPanel.style.height = '100%';
-        breakoutPanel.style.maxWidth = '100%';
-        breakoutPanel.style.maxHeight = '100%';
-        breakoutPanel.style.borderRadius = '0';
-        hide(breakoutMaxButton);
-        show(breakoutMinButton);
-        if (!this.isMobileDevice) this.makeUnDraggable(breakoutPanel, breakoutPanelHeader);
-    }
-
-    breakoutMinimize() {
-        this.isBreakoutMaximized = false;
-        breakoutPanel.classList.remove('is-maximized');
-        breakoutPanel.style.inset = '';
-        hide(breakoutMinButton);
-        show(breakoutMaxButton);
-        this.breakoutCenter();
-        if (!this.isMobileDevice) this.makeDraggable(breakoutPanel, breakoutPanelHeader);
-    }
-
-    getBreakoutPanelLayoutElements() {
-        const body = breakoutPanel.querySelector('.breakout-panel-body');
-        const sections = breakoutPanel.querySelectorAll('.breakout-section');
-
-        return {
-            body,
-            roomsSection: sections[0],
-            participantsSection: sections[1],
-            roomsList: breakoutPanel.querySelector('.breakout-rooms-list'),
-            participantsList: breakoutPanel.querySelector('.breakout-participants-list'),
-        };
-    }
-
-    breakoutPinned() {
-        const { body, roomsSection, participantsSection, roomsList, participantsList } =
-            this.getBreakoutPanelLayoutElements();
-
-        breakoutPanel.style.position = 'absolute';
-        breakoutPanel.style.top = '0';
-        breakoutPanel.style.right = '0';
-        breakoutPanel.style.left = 'auto';
-        breakoutPanel.style.transform = null;
-        breakoutPanel.style.width = '30%';
-        breakoutPanel.style.height = '100%';
-        breakoutPanel.style.maxWidth = '30%';
-        breakoutPanel.style.maxHeight = '100%';
-        breakoutPanel.style.borderRadius = '14px 0 0 14px';
-
-        if (body) {
-            body.style.maxHeight = 'calc(100vh - 55px)';
-            body.style.height = 'calc(100vh - 55px)';
-            body.style.display = 'grid';
-            body.style.flex = '1 1 auto';
-            body.style.gridTemplateRows = 'auto minmax(0, 1fr) auto minmax(0, 1fr)';
-            body.style.gap = '0';
-            body.style.minHeight = '0';
-            body.style.overflowY = 'hidden';
-            body.style.overscrollBehavior = 'contain';
-            body.style.scrollbarGutter = '';
-        }
-        if (roomsSection) {
-            roomsSection.style.display = 'flex';
-            roomsSection.style.flexDirection = 'column';
-            roomsSection.style.minHeight = '0';
-            roomsSection.style.overflow = 'hidden';
-        }
-        if (roomsList) {
-            roomsList.style.flex = '1 1 auto';
-            roomsList.style.minHeight = '0';
-            roomsList.style.maxHeight = 'none';
-            roomsList.style.overflowY = 'auto';
-            roomsList.style.scrollbarGutter = '';
-        }
-        if (participantsSection) {
-            participantsSection.style.display = 'flex';
-            participantsSection.style.flexDirection = 'column';
-            participantsSection.style.minHeight = '0';
-            participantsSection.style.overflow = 'hidden';
-            participantsSection.style.flex = '1 1 auto';
-            participantsSection.style.alignSelf = 'stretch';
-        }
-        if (participantsList) {
-            participantsList.style.maxHeight = 'none';
-            participantsList.style.flex = '1 1 auto';
-            participantsList.style.minHeight = '0';
-            participantsList.style.overflowY = 'auto';
-            participantsList.style.scrollbarGutter = '';
-        }
-        breakoutPanel.classList.remove('panel-slide-in');
-        void breakoutPanel.offsetWidth;
-        breakoutPanel.classList.add('panel-slide-in');
-    }
-
-    breakoutCenter() {
-        const { body, roomsSection, participantsSection, roomsList, participantsList } =
-            this.getBreakoutPanelLayoutElements();
-
-        breakoutPanel.style.position = 'fixed';
-        breakoutPanel.style.inset = '';
-        breakoutPanel.style.transform = 'translate(-50%, -50%)';
-        breakoutPanel.style.top = '50%';
-        breakoutPanel.style.left = '50%';
-        breakoutPanel.style.right = '';
-        breakoutPanel.style.width = '420px';
-        breakoutPanel.style.height = '';
-        breakoutPanel.style.maxWidth = '95vw';
-        breakoutPanel.style.maxHeight = '85vh';
-        breakoutPanel.style.borderRadius = '16px';
-
-        if (body) {
-            body.style.maxHeight = 'calc(85vh - 55px)';
-            body.style.height = '';
-            body.style.display = '';
-            body.style.flex = '';
-            body.style.gridTemplateRows = '';
-            body.style.gap = '';
-            body.style.minHeight = '';
-            body.style.overflowY = '';
-            body.style.overscrollBehavior = '';
-            body.style.scrollbarGutter = '';
-        }
-        if (roomsSection) {
-            roomsSection.style.display = '';
-            roomsSection.style.flexDirection = '';
-            roomsSection.style.minHeight = '';
-            roomsSection.style.overflow = '';
-        }
-        if (roomsList) {
-            roomsList.style.flex = '';
-            roomsList.style.minHeight = '';
-            roomsList.style.maxHeight = '';
-            roomsList.style.overflowY = '';
-            roomsList.style.scrollbarGutter = '';
-        }
-        if (participantsSection) {
-            participantsSection.style.display = '';
-            participantsSection.style.flexDirection = '';
-            participantsSection.style.minHeight = '';
-            participantsSection.style.overflow = '';
-            participantsSection.style.flex = '';
-            participantsSection.style.alignSelf = '';
-        }
-        if (participantsList) {
-            participantsList.style.maxHeight = '';
-            participantsList.style.flex = '';
-            participantsList.style.minHeight = '';
-            participantsList.style.overflowY = '';
-            participantsList.style.scrollbarGutter = '';
-        }
-    }
 
     // ####################################################
     // RECORDING
@@ -7821,7 +7029,15 @@ class RoomClient {
         tabVideoDevicesBtn.disabled = disabled;
     }
 
+    /** Report recording failures and dispose capture that never reached encoder startup. */
     handleRecordingError(error, popupLog = true) {
+        if (!this._recordingStarted) {
+            releaseRecordingCapture(this);
+            this.mediaRecorder = null;
+            this._isRecording = false;
+            this._recordingStopping = false;
+            this.disableRecordingOptions(false);
+        }
         this.toggleVideoAudioTabs(false);
         console.error('Recording error', error);
         if (popupLog) this.userLog('error', error, 'top-end', 6000);
@@ -7836,6 +7052,9 @@ class RoomClient {
     }
 
     startRecording() {
+        if (this.mediaRecorder) return;
+        this._recordingStarted = false;
+        this._recordingStopping = false;
         recordedBlobs = [];
 
         // Toggle Video/Audio tabs
@@ -7849,7 +7068,7 @@ class RoomClient {
         recCodecs = supportedMimeTypes[0];
 
         try {
-            this.audioRecorder = new MixedAudioRecorder();
+            this.audioRecorder = new BodrikRecordingAudio(this);
             const audioStreams = this.getAudioStreamFromAudioElements();
             console.log('Audio streams tracks --->', audioStreams.getTracks());
 
@@ -7893,6 +7112,8 @@ class RoomClient {
             const recCamStream = new MediaStream(combinedTracks);
             console.log('New Cam Media Stream tracks  --->', recCamStream.getTracks());
 
+            options = getRecordingOptions(recCamStream, options);
+            recCodecs = options.mimeType;
             this.mediaRecorder = new MediaRecorder(recCamStream, options);
             console.log('Created MediaRecorder', this.mediaRecorder, 'with options', options);
 
@@ -7954,12 +7175,28 @@ class RoomClient {
             });
     }
 
-    initRecording() {
-        this._isRecording = true;
-        this.handleMediaRecorder();
-        this.event(_EVENTS.startRec);
-        this.recordingAction(enums.recording.start);
-        this.sound('recStart');
+    /** Wait for a running recording graph before starting the encoder and exposing recording controls. */
+    async initRecording() {
+        const recorder = this.mediaRecorder;
+        try {
+            await this.audioRecorder.resume();
+            if (this.mediaRecorder !== recorder) return;
+            if (this.screenAudioRecorder?.audioContext?.state === 'suspended') {
+                await this.screenAudioRecorder.audioContext.resume();
+            }
+            if (this.mediaRecorder !== recorder) return;
+            this._isRecording = true;
+            this.handleMediaRecorder();
+            this._recordingStarted = true;
+            this.event(_EVENTS.startRec);
+            this.recordingAction(enums.recording.start);
+            this.sound('recStart');
+        } catch (error) {
+            if (this.mediaRecorder !== recorder) return;
+            releaseRecordingCapture(this);
+            this.mediaRecorder = null;
+            this.handleRecordingError('Unable to start recording: ' + error.message);
+        }
     }
 
     hasAudioTrack(mediaStream) {
@@ -8095,6 +7332,7 @@ class RoomClient {
         }
     }
 
+    /** Save final encoder output before releasing recording-only tracks and restoring controls. */
     async handleMediaRecorderStop(evt) {
         try {
             console.log('MediaRecorder stopped: ', evt);
@@ -8138,6 +7376,19 @@ class RoomClient {
             }
         } catch (err) {
             console.error('Recording save failed', err);
+            rc.handleRecordingError('Recording save failed: ' + err.message);
+        } finally {
+            if (rc.mediaRecorder === evt.target) {
+                releaseRecordingCapture(rc);
+                rc.mediaRecorder = null;
+                rc._isRecording = false;
+                rc._recordingStarted = false;
+                rc._recordingStopping = false;
+                rc.disableRecordingOptions(false);
+                rc.event(_EVENTS.stopRec);
+                rc.recordingAction(enums.recording.stop);
+                rc.sound('recStop');
+            }
         }
     }
 
@@ -8186,29 +7437,35 @@ class RoomClient {
         return typeof fn === 'function' ? fn : null;
     }
 
+    /** Package completed local recording data with its actual MIME type and start the download. */
     handleLocalRecordingStop() {
         console.log('MediaRecorder Blobs: ', recordedBlobs);
+        if (!recordedBlobs.length) {
+            this.handleRecordingError('No recording data was produced. Please try recording again.');
+            return;
+        }
 
         const dateTime = getDataTimeString();
         const type = recordedBlobs[0].type.includes('mp4') ? 'mp4' : 'webm';
-        const rawBlob = new Blob(recordedBlobs, { type: 'video/' + type });
+        const rawBlob = new Blob(recordedBlobs, { type: recordedBlobs[0].type.split(';')[0] });
         const recFileName = `Rec_${dateTime}.${type}`;
-        const currentDevice = this.isMobileDevice ? 'MOBILE' : 'PC';
+        const recordingStartedAt = this._recStartTs;
+        const durationMs = recordingStartedAt ? performance.now() - recordingStartedAt : undefined;
         const blobFileSize = bytesToSize(rawBlob.size);
         const recTimeText = this._lastRecTimeText || '0s';
         const recType = 'Locally';
         const recordingInfo = `
         <br/><br/>
         <ul>
-            <li>Stored: ${recType}</li>
-            <li>Time: ${recTimeText}</li>
-            <li>File: ${recFileName}</li>
-            <li>Codecs: ${recCodecs}</li>
-            <li>Size: ${blobFileSize}</li>
+            <li><span>Stored:</span> <span>${recType}</span></li>
+            <li><span>Time:</span> <span>${recTimeText}</span></li>
+            <li><span>File:</span> <span class="notranslate">${recFileName}</span></li>
+            <li><span>Codecs:</span> <span class="notranslate">${recCodecs}</span></li>
+            <li><span>Size:</span> <span>${blobFileSize}</span></li>
         </ul>
         <br/>
         `;
-        const recordingMsg = `Please wait to be processed, then will be downloaded to your ${currentDevice} device.`;
+        const recordingMsg = 'Processing the recording. It will download to your device when ready.';
 
         this.saveLastRecordingInfo(recordingInfo);
         this.showRecordingInfo(recType, recordingInfo, recordingMsg);
@@ -8218,14 +7475,13 @@ class RoomClient {
             if (type !== 'webm') return blob;
             try {
                 const fix = this.getWebmFixerFn();
-                const durationMs = this._recStartTs ? performance.now() - this._recStartTs : undefined;
                 const fixed = await fix(blob, durationMs);
                 return fixed || blob;
             } catch (e) {
                 console.warn('WEBM duration fix failed, saving original blob:', e);
                 return blob;
             } finally {
-                this._recStartTs = null;
+                if (this._recStartTs === recordingStartedAt) this._recStartTs = null;
             }
         };
 
@@ -8242,10 +7498,10 @@ class RoomClient {
         const recordingInfo = `
         <br/><br/>
         <ul>
-            <li>Stored: ${recType}</li>
-            <li>Time: ${recTimeText}</li>
-            <li>File: ${this.recServerFileName}</li>
-            <li>Codecs: ${recCodecs}</li>
+            <li><span>Stored:</span> <span>${recType}</span></li>
+            <li><span>Time:</span> <span>${recTimeText}</span></li>
+            <li><span>File:</span> <span class="notranslate">${this.recServerFileName}</span></li>
+            <li><span>Codecs:</span> <span class="notranslate">${recCodecs}</span></li>
         </ul>
         <br/>
         `;
@@ -8280,7 +7536,7 @@ class RoomClient {
                 html: renderRoomTemplate('popupRecordingInfoTemplate', {
                     text: {
                         indicator: '🔴',
-                        recType: recType,
+                        recordingLocation: recType === 'Locally' ? 'Local recording' : 'Server recording',
                         recordingMsg: recordingMsg,
                     },
                     html: {
@@ -8330,35 +7586,24 @@ class RoomClient {
         }
     }
 
+    /** Request encoder shutdown without disposing its audio inputs before final data and stop callbacks. */
     stopRecording() {
-        if (this.mediaRecorder) {
-            this.toggleVideoAudioTabs(false);
-            // Capture the elapsed time text BEFORE stopRec event resets it to '0s'
-            const recTimeEl = document.getElementById('recordingStatus');
-            this._lastRecTimeText = recTimeEl ? recTimeEl.innerText : '0s';
-            this._isRecording = false;
-            this.mediaRecorder.stop();
+        const recorder = this.mediaRecorder;
+        if (!recorder || this._recordingStopping) return;
+        this._recordingStopping = true;
+        this.toggleVideoAudioTabs(false);
+        const recTimeEl = document.getElementById('recordingStatus');
+        this._lastRecTimeText = recTimeEl ? recTimeEl.innerText : '0s';
+        this._isRecording = false;
+        if (!this._recordingStarted && recorder.state === 'inactive') {
+            releaseRecordingCapture(this);
             this.mediaRecorder = null;
-            if (this.recScreenStream) {
-                this.recScreenStream.getTracks().forEach((track) => {
-                    if (track.kind === 'video') track.stop();
-                });
-            }
-            // Stop system/tab audio capture and its mixer, if used
-            if (this.recScreenAudioTracks.length) {
-                this.recScreenAudioTracks.forEach((track) => track.stop());
-                this.recScreenAudioTracks = [];
-            }
-            if (this.screenAudioRecorder) {
-                this.screenAudioRecorder.stopMixedAudioStream();
-                this.screenAudioRecorder = null;
-            }
-            if (this.isMobileDevice) this.getId('swapCameraButton').className = '';
-            this.event(_EVENTS.stopRec);
-            this.audioRecorder.stopMixedAudioStream();
-            this.recordingAction(enums.recording.stop);
-            this.sound('recStop');
+            this._recordingStopping = false;
+            this.disableRecordingOptions(false);
+            return;
         }
+        if (recorder.state !== 'inactive') recorder.stop();
+        // The stop handler owns cleanup after the browser flushes the encoder.
     }
 
     recordingAction(action) {
@@ -8986,110 +8231,8 @@ class RoomClient {
     }
 
     // ####################################################
-    // SHARE VIDEO YOUTUBE - MP4 - WEBM - OGG or AUDIO mp3
+    // CHAT MEDIA URL HELPERS
     // ####################################################
-
-    handleSV(uid, peer_name, peer_id) {
-        let btnSv = this.getId(uid);
-        if (btnSv) {
-            btnSv.addEventListener('click', () => {
-                this.shareVideo(peer_id, peer_name);
-            });
-        }
-    }
-
-    shareVideo(peer_id = 'all', peer_name = 'all') {
-        if (this._moderator.media_cant_sharing) {
-            return userLog('warning', 'The moderator does not allow you to share any media', 'top-end', 6000);
-        }
-
-        this.sound('open');
-
-        Swal.fire({
-            background: swalBackground,
-            position: 'center',
-            imageUrl: image.videoShare,
-            title: 'Share a Video or Audio',
-            text: 'Paste a Video or Audio URL',
-            input: 'text',
-            showCancelButton: true,
-            confirmButtonText: `Share`,
-            showClass: { popup: 'animate__animated animate__fadeInDown' },
-            hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-        }).then((result) => {
-            if (result.value) {
-                this.shareVideoUrl(result.value, peer_id, peer_name);
-            }
-        });
-
-        // Take URL from clipboard ex:
-        // https://www.youtube.com/watch?v=1ZYbU82GVz4
-
-        navigator.clipboard
-            .readText()
-            .then((clipboardText) => {
-                if (!clipboardText) return false;
-                const sanitizedText = filterXSS(clipboardText);
-                const inputElement = Swal.getInput();
-                if (this.isVideoTypeSupported(sanitizedText) && inputElement) {
-                    inputElement.value = sanitizedText;
-                }
-                return false;
-            })
-            .catch(() => {
-                return false;
-            });
-    }
-
-    prefillShareMediaUrlFromClipboard() {
-        if (shareMediaUrlInput.value.trim() || !navigator.clipboard?.readText) return;
-        navigator.clipboard
-            .readText()
-            .then((clipboardText) => {
-                if (!clipboardText) return;
-                const sanitizedText = filterXSS(clipboardText.trim());
-                if (this.isVideoTypeSupported(sanitizedText)) shareMediaUrlInput.value = sanitizedText;
-            })
-            .catch(() => {});
-    }
-
-    shareVideoFromSettings() {
-        if (this._moderator.media_cant_sharing) {
-            return userLog('warning', 'The moderator does not allow you to share any media', 'top-end', 6000);
-        }
-        const mediaUrl = shareMediaUrlInput.value.trim();
-        if (!mediaUrl) return userLog('warning', 'Please paste a Video or audio URL to share');
-        if (this.shareVideoUrl(mediaUrl, 'all')) shareMediaUrlInput.value = '';
-    }
-
-    shareVideoUrl(url, peer_id = 'all', peer_name = 'all') {
-        const mediaUrl = filterXSS(url.trim());
-        if (!mediaUrl) return false;
-        // if (!this.thereAreParticipants()) {
-        //     return userLog('info', 'No participants detected', 'top-end');
-        // }
-        if (!this.isVideoTypeSupported(mediaUrl)) {
-            userLog('warning', 'Something wrong, try with another Video or audio URL');
-            return false;
-        }
-        const is_youtube = this.getVideoType(mediaUrl) == 'na';
-        const video_url = is_youtube ? this.getYoutubeEmbed(mediaUrl) : mediaUrl;
-        if (!video_url) {
-            this.userLog('error', 'Not valid video URL', 'top-end', 6000);
-            return false;
-        }
-        const data = {
-            peer_id: peer_id,
-            peer_name: this.peer_name,
-            video_url: video_url,
-            is_youtube: is_youtube,
-            action: 'open',
-        };
-        console.log('Video URL: ', video_url, peer_name);
-        this.socket.emit('shareVideoAction', data);
-        this.openVideo(data);
-        return true;
-    }
 
     getVideoType(url) {
         if (url.endsWith('.mp4')) return 'video/mp4';
@@ -9099,221 +8242,10 @@ class RoomClient {
         return 'na';
     }
 
-    isVideoTypeSupported(url) {
-        if (
-            url.endsWith('.mp4') ||
-            url.endsWith('.mp3') ||
-            url.endsWith('.webm') ||
-            url.endsWith('.ogg') ||
-            url.includes('youtube.com')
-        )
-            return true;
-        return false;
-    }
-
     getYoutubeEmbed(url) {
         let regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
         let match = url.match(regExp);
         return match && match[7].length == 11 ? 'https://www.youtube.com/embed/' + match[7] + '?autoplay=1' : false;
-    }
-
-    shareVideoAction(data) {
-        const { peer_name, action } = data;
-
-        switch (action) {
-            case 'open':
-                this.userLog('info', `${peer_name} ${icons.youtube} opened the video`, 'top-end');
-                this.openVideo(data);
-                break;
-            case 'close':
-                this.userLog('info', `${peer_name} ${icons.youtube} closed the video`, 'top-end');
-                this.closeVideo();
-                break;
-            default:
-                break;
-        }
-    }
-
-    openVideo(data) {
-        let d, vb, e, video, pn, fsBtn;
-        let peer_name = data.peer_name;
-        let video_url = data.video_url + (this.isMobileSafari ? '&enablejsapi=1&mute=1' : ''); // Safari need user interaction
-        let is_youtube = data.is_youtube;
-        let video_type = this.getVideoType(video_url);
-        this.closeVideo();
-        show(videoCloseBtn);
-        d = document.createElement('div');
-        d.className = 'Camera';
-        d.id = '__shareVideo';
-        vb = document.createElement('div');
-        vb.setAttribute('id', '__videoBar');
-        vb.className = 'videoMenuBarShare fadein';
-        e = this.createButton('__videoExit', 'fas fa-times');
-        pn = this.createButton('__pinUnpin', html.pin);
-        fsBtn = this.createButton('__videoFS', html.fullScreen);
-
-        if (is_youtube) {
-            video = document.createElement('iframe');
-            video.setAttribute('title', peer_name);
-            video.setAttribute(
-                'allow',
-                'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture'
-            );
-            video.setAttribute('frameborder', '0');
-            video.setAttribute('allowfullscreen', true);
-
-            // Safari on Mobile needs user interaction to unmute video
-            if (this.isMobileSafari) {
-                Swal.fire({
-                    allowOutsideClick: false,
-                    allowEscapeKey: false,
-                    background: swalBackground,
-                    position: 'top',
-                    imageUrl: image.videoShare,
-                    title: 'Unmute Video',
-                    text: 'Tap the button below to unmute and play the video with sound.',
-                    confirmButtonText: 'Unmute',
-                    didOpen: () => {
-                        const unmuteButton = Swal.getConfirmButton();
-                        if (unmuteButton) unmuteButton.focus();
-                    },
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        if (video && video.contentWindow) {
-                            video.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}', '*');
-                            video.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
-                        }
-                    }
-                });
-            }
-        } else {
-            video = document.createElement('video');
-            video.type = video_type;
-            video.autoplay = true;
-            video.controls = true;
-            if (video_type == 'video/mp3') {
-                video.poster = image.audio;
-            }
-        }
-        video.setAttribute('id', '__videoShare');
-        video.setAttribute('src', video_url);
-        video.setAttribute('width', '100%');
-        video.setAttribute('height', '100%');
-        vb.appendChild(e);
-        BUTTONS.videoShare.fullScreenButton && vb.appendChild(fsBtn);
-        if (BUTTONS.videoShare.pinVideoButton && !this.isMobileDevice) vb.appendChild(pn);
-        d.appendChild(video);
-        d.appendChild(vb);
-        this.videoMediaContainer.appendChild(d);
-
-        fsBtn.addEventListener('click', () => {
-            // Try to use the Fullscreen API
-            if (
-                video.requestFullscreen ||
-                video.webkitRequestFullscreen ||
-                video.mozRequestFullScreen ||
-                video.msRequestFullscreen
-            ) {
-                this.isFullScreen() ? this.goOutFullscreen(video) : this.goInFullscreen(video);
-            } else {
-                elemDisplay('__videoFS', false);
-
-                // Maximize video with CSS
-                video.style.position = 'fixed';
-                video.style.top = 0;
-                video.style.left = 0;
-                video.style.width = '100vw';
-                video.style.height = '100vh';
-                video.style.zIndex = 9999;
-
-                // Add a close/maximize button for fallback
-                let isMaximized = true;
-                const closeBtn = document.createElement('button');
-                closeBtn.innerText = isMaximized ? 'Minimize' : 'Maximize';
-                closeBtn.style.position = 'absolute';
-                closeBtn.style.top = '1px';
-                closeBtn.style.left = '1px';
-                closeBtn.style.zIndex = 10000;
-                closeBtn.style.background = 'rgba(0,0,0,0.5)';
-                closeBtn.style.color = '#fff';
-                closeBtn.style.border = 'none';
-                closeBtn.style.padding = '8px 12px';
-                closeBtn.style.borderRadius = '4px';
-                closeBtn.style.cursor = 'pointer';
-
-                closeBtn.onclick = () => {
-                    if (isMaximized) {
-                        video.style.position = '';
-                        video.style.top = '';
-                        video.style.left = '';
-                        video.style.width = '';
-                        video.style.height = '';
-                        video.style.zIndex = '';
-                        closeBtn.innerText = 'Maximize';
-                        isMaximized = false;
-                    } else {
-                        video.style.position = 'fixed';
-                        video.style.top = 0;
-                        video.style.left = 0;
-                        video.style.width = '100vw';
-                        video.style.height = '100vh';
-                        video.style.zIndex = 9999;
-                        closeBtn.innerText = 'Minimize';
-                        isMaximized = true;
-                    }
-                };
-
-                // Ensure only one button is added
-                if (!video.parentNode.querySelector('.mobile-video-close-btn')) {
-                    closeBtn.classList.add('mobile-video-close-btn');
-                    video.parentNode.appendChild(closeBtn);
-                }
-            }
-        });
-
-        const exitVideoBtn = this.getId(e.id);
-        exitVideoBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            if (this._moderator.media_cant_sharing) {
-                return userLog('warning', 'The moderator does not allow you close this media', 'top-end', 6000);
-            }
-            this.closeVideo(true);
-        });
-
-        this.handlePN(video.id, pn.id, d.id);
-        if (!this.isMobileDevice) {
-            this.setTippy(pn.id, 'Toggle Pin video player', 'bottom');
-            this.setTippy(e.id, 'Close video player', 'bottom');
-            this.setTippy(fsBtn.id, 'Full screen', 'bottom');
-        }
-
-        handleAspectRatio();
-        console.log('[openVideo] Video-element-count', this.videoMediaContainer.childElementCount);
-        this.sound('joined');
-    }
-
-    closeVideo(emit = false, peer_id = 'all') {
-        if (emit) {
-            let data = {
-                peer_id: peer_id,
-                peer_name: this.peer_name,
-                action: 'close',
-            };
-            this.socket.emit('shareVideoAction', data);
-        }
-        let shareVideoDiv = this.getId('__shareVideo');
-        if (shareVideoDiv) {
-            hide(videoCloseBtn);
-            shareVideoDiv.parentNode.removeChild(shareVideoDiv);
-            //alert(this.isVideoPinned + ' - ' + this.pinnedVideoPlayerId);
-            if (this.isVideoPinned && this.pinnedVideoPlayerId == '__videoShare') {
-                this.removeVideoPinMediaContainer();
-                console.log('Remove pin container due the Video player close');
-            }
-            handleAspectRatio();
-            console.log('[closeVideo] Video-element-count', this.videoMediaContainer.childElementCount);
-            this.sound('left');
-        }
     }
 
     // ####################################################
@@ -9322,7 +8254,6 @@ class RoomClient {
 
     roomAction(action, emit = true, popup = true) {
         const data = {
-            room_broadcasting: isBroadcastingEnabled,
             room_id: this.room_id,
             peer_id: this.peer_id,
             peer_name: this.peer_name,
@@ -9332,10 +8263,6 @@ class RoomClient {
         };
         if (emit) {
             switch (action) {
-                case 'broadcasting':
-                    this.socket.emit('roomAction', data);
-                    if (popup) this.roomStatus(action);
-                    break;
                 case 'lock':
                     if (room_password) {
                         this.socket
@@ -9422,9 +8349,6 @@ class RoomClient {
 
     roomStatus(action) {
         switch (action) {
-            case 'broadcasting':
-                this.userLog('info', `${icons.room} BROADCASTING ${isBroadcastingEnabled ? 'On' : 'Off'}`, 'top-end');
-                break;
             case 'lock':
                 if (!isPresenter) return;
                 this.sound('locked');
@@ -9556,9 +8480,6 @@ class RoomClient {
                     `${icons.moderator} Moderator: everyone can't chat with DeepSeek ${status}`,
                     'top-end'
                 );
-                break;
-            case 'media_cant_sharing':
-                this.userLog('info', `${icons.moderator} Moderator: everyone can't share media ${status}`, 'top-end');
                 break;
 
             case 'disconnect_all_on_leave':
@@ -10181,7 +9102,7 @@ class RoomClient {
 
     getOutputAudioElements() {
         const elements = Array.from(this.remoteAudioEl?.querySelectorAll('audio') || []);
-        if (this.videoAIElement) elements.push(this.videoAIElement);
+
         return elements;
     }
 
@@ -10194,12 +9115,8 @@ class RoomClient {
     applyOutputVolume(audioPlayer) {
         if (!audioPlayer) return;
 
-        const peerVolume = audioPlayer.dataset.peerVolume !== undefined ? Number(audioPlayer.dataset.peerVolume) : 1;
-        const musicVolume = audioPlayer.dataset.bodrikMusic === 'true' ? this.bodrikMusicVolume : 1;
-        const volume = Math.min(
-            1,
-            Math.max(0, (isNaN(peerVolume) ? 1 : peerVolume) * this.masterOutputVolume * musicVolume)
-        );
+        const volume = getEffectiveAudioOutputVolume(this, audioPlayer);
+        this.audioRecorder?.updateElementVolume(audioPlayer, volume);
 
         const gainNode = this.getOutputGainNode(audioPlayer, volume);
         if (gainNode) {
@@ -10381,7 +9298,7 @@ class RoomClient {
         this.handleDominantSpeakerHighlight(peer_id);
         if (this.dominantSpeaker && switchDominantSpeakerFocus.checked) {
             const viewMode = participantViewMode.value;
-            viewMode.startsWith('speaker-') || viewMode === 'livestream'
+            viewMode.startsWith('speaker-')
                 ? this.handleDominantSpeakerPin(peer_id)
                 : this.handleDominantSpeakerFocus(peer_id);
         }
@@ -10500,7 +9417,7 @@ class RoomClient {
             const presenterEl = this.getId('isUserPresenter');
             if (presenterEl) presenterEl.innerText = presenterLabel(is_presenter);
             // Apply presenter/guest permissions without re-running the room auto-setup, so the
-            // room state (broadcasting, lobby, recording, moderator) set by the original presenter
+            // room state (lobby, recording, moderator) set by the original presenter
             // is preserved instead of being reset to this peer's local defaults.
             handleRules(is_presenter, false);
             // Existing remote tiles were built with the previous role's flags; add/remove the
@@ -10698,10 +9615,6 @@ class RoomClient {
     // ###################################################
 
     toggleFocusMode(videoContainerId, btnHa = null) {
-        if (isHideMeActive) {
-            this.userLog('warning', 'To use this feature, please toggle Hide self view before', 'top-end', 6000);
-            return;
-        }
         const videoContainer = this.getId(videoContainerId);
         isHideALLVideosActive = !isHideALLVideosActive;
         if (btnHa) btnHa.style.color = isHideALLVideosActive ? 'lime' : 'white';
@@ -10881,19 +9794,7 @@ class RoomClient {
                     case 'mute':
                         const audioMessage =
                             'The participant has been muted, and only they have the ability to unmute themselves';
-                        if (isBroadcastingEnabled) {
-                            const peerAudioButton = this.getId(data.peer_id + '___pAudio');
-                            if (peerAudioButton) {
-                                const peerAudioIcon = peerAudioButton.querySelector('i');
-                                if (peerAudioIcon && peerAudioIcon.classList.contains('red')) {
-                                    if (isRulesActive && isPresenter) {
-                                        data.action = 'unmute';
-                                        return this.confirmPeerAction(data.action, data);
-                                    }
-                                    return this.userLog('info', audioMessage, 'top-end');
-                                }
-                            }
-                        } else {
+                        {
                             const peerAudioStatus = this.getId(data.peer_id + '__audio');
                             if (!peerAudioStatus || peerAudioStatus.className == html.audioOff) {
                                 if (isRulesActive && isPresenter) {
@@ -10907,19 +9808,7 @@ class RoomClient {
                     case 'hide':
                         const videoMessage =
                             'The participant is currently hidden, and only they have the option to unhide themselves';
-                        if (isBroadcastingEnabled) {
-                            const peerVideoButton = this.getId(data.peer_id + '___pVideo');
-                            if (peerVideoButton) {
-                                const peerVideoIcon = peerVideoButton.querySelector('i');
-                                if (peerVideoIcon && peerVideoIcon.classList.contains('red')) {
-                                    if (isRulesActive && isPresenter) {
-                                        data.action = 'unhide';
-                                        return this.confirmPeerAction(data.action, data);
-                                    }
-                                    return this.userLog('info', videoMessage, 'top-end');
-                                }
-                            }
-                        } else {
+                        {
                             const peerVideoOff = this.getId(data.peer_id + '__videoOff');
                             if (peerVideoOff) {
                                 if (isRulesActive && isPresenter) {
@@ -10967,7 +9856,9 @@ class RoomClient {
                 case 'ban':
                     if (peerActionAllowed) {
                         const message = `Will ban you from the room${
-                            msg ? `<br><br><span class="red">Reason: ${msg}</span>` : ''
+                            msg
+                                ? `<br><br><span class="red"><span>Reason:</span> <span class="notranslate">${msg}</span></span>`
+                                : ''
                         }`;
                         this.exit(true);
                         this.sound(action);
@@ -10977,7 +9868,9 @@ class RoomClient {
                 case 'eject':
                     if (peerActionAllowed) {
                         const message = `Will eject you from the room${
-                            msg ? `<br><br><span class="red">Reason: ${msg}</span>` : ''
+                            msg
+                                ? `<br><br><span class="red"><span>Reason:</span> <span class="notranslate">${msg}</span></span>`
+                                : ''
                         }`;
                         this.exit(true);
                         this.sound(action);
@@ -11121,6 +10014,7 @@ class RoomClient {
         });
     }
 
+    /** Ask for confirmation before applying participant moderation, preserving recipient consent for media starts. */
     confirmPeerAction(action, data) {
         console.log('Confirm peer action', action);
         switch (action) {
@@ -11159,12 +10053,11 @@ class RoomClient {
                 break;
             case 'eject':
                 let ejectConfirmed = false;
-                let whoEject = data.broadcast ? 'All participants except yourself?' : 'current participant?';
                 Swal.fire({
                     background: swalBackground,
                     position: 'center',
                     imageUrl: data.broadcast ? image.users : image.user,
-                    title: 'Eject ' + whoEject,
+                    title: data.broadcast ? 'Eject all other participants?' : 'Eject current participant?',
                     input: 'text',
                     inputPlaceholder: 'Eject reason',
                     showDenyButton: true,
@@ -11206,40 +10099,43 @@ class RoomClient {
             case 'stop':
             case 'start':
                 let muteHideStopConfirmed = false;
-                let who = data.broadcast ? 'everyone except yourself?' : 'current participant?';
                 let imageUrl, title, text;
                 switch (action) {
                     case 'mute':
                         imageUrl = image.mute;
-                        title = 'Mute ' + who;
+                        title = data.broadcast ? 'Mute all other participants?' : 'Mute current participant?';
                         text =
                             'Once muted, only the presenter will be able to unmute participants, but participants can unmute themselves at any time';
                         break;
                     case 'unmute':
                         imageUrl = image.unmute;
-                        title = 'Unmute ' + who;
+                        title = data.broadcast ? 'Unmute all other participants?' : 'Unmute current participant?';
                         text = 'A pop-up message will appear to prompt and allow this action.';
                         break;
                     case 'hide':
-                        title = 'Hide ' + who;
+                        title = data.broadcast ? 'Hide all other participants?' : 'Hide current participant?';
                         imageUrl = image.hide;
                         text =
                             'Once hidden, only the presenter will be able to unhide participants, but participants can unhide themselves at any time';
                         break;
                     case 'unhide':
-                        title = 'Unhide ' + who;
+                        title = data.broadcast ? 'Unhide all other participants?' : 'Unhide current participant?';
                         imageUrl = image.unhide;
                         text = 'A pop-up message will appear to prompt and allow this action.';
                         break;
                     case 'stop':
                         imageUrl = image.stop;
-                        title = 'Stop screen share to the ' + who;
+                        title = data.broadcast
+                            ? 'Stop screen sharing for all other participants?'
+                            : 'Stop current participant screen sharing?';
                         text =
                             "Once stopped, only the presenter will be able to start the participants' screens, but participants can start their screens themselves at any time";
                         break;
                     case 'start':
                         imageUrl = image.start;
-                        title = 'Start screen share to the ' + who;
+                        title = data.broadcast
+                            ? 'Start screen sharing for all other participants?'
+                            : 'Start current participant screen sharing?';
                         text = 'A pop-up message will appear to prompt and allow this action.';
                         break;
                     default:
@@ -11604,10 +10500,6 @@ class RoomClient {
                 this._moderator.chat_cant_chatgpt = data.status;
                 rc.roomMessage('chat_cant_chatgpt', data.status);
                 break;
-            case 'media_cant_sharing':
-                this._moderator.media_cant_sharing = data.status;
-                rc.roomMessage('media_cant_sharing', data.status);
-                break;
 
             default:
                 break;
@@ -11897,7 +10789,7 @@ class RoomClient {
             };
             this.socket.emit('updatePeerInfo', data);
         } else {
-            const canUpdateMediaStatus = !isBroadcastingEnabled || (isBroadcastingEnabled && presenter);
+            const canUpdateMediaStatus = true;
             switch (type) {
                 case 'name': {
                     const name = this.getId(peer_id + '__name');
@@ -12154,1184 +11046,28 @@ class RoomClient {
     }
 
     // ##############################################
-    // LiveAvatar Video AI
+
     // ##############################################
 
-    getAvatarList() {
-        this.socket
-            .request('getAvatarList')
-            .then(function (completion) {
-                const avatarVideoAIPreview = document.getElementById('avatarVideoAIPreview');
-                const avatarVideoAISpinner = document.getElementById('avatarVideoAISpinner');
-                const avatarVideoAIcontainer = document.getElementById('avatarVideoAIcontainer');
-                const avatarVideoAICount = document.getElementById('avatarVideoAICount');
-                const avatarVideoAISelectedName = document.getElementById('avatarVideoAISelectedName');
-                const avatarSearchInput = document.getElementById('avatarSearchInput');
-                avatarVideoAIcontainer.innerHTML = '';
-
-                const avatars = completion?.response?.avatars || [];
-                let firstPreviewSet = false;
-
-                avatarVideoAICount.innerText = `Avatars: ${avatars.length}`;
-
-                function selectAvatar(avatar, card) {
-                    document.querySelectorAll('.avatarCard').forEach((c) => c.classList.remove('selected'));
-                    card.classList.add('selected');
-                    VideoAI.avatarId = avatar.avatar_id;
-                    VideoAI.avatarName = avatar.avatar_name;
-                    avatarVideoAIPreview.src = avatar.preview_image_url;
-                    avatarVideoAIPreview.alt = avatar.avatar_name;
-                    avatarVideoAIPreview.onload = () => {
-                        if (avatarVideoAISpinner) avatarVideoAISpinner.style.display = 'none';
-                        avatarVideoAIPreview.classList.remove('hidden');
-                    };
-                    avatarVideoAISelectedName.textContent = avatar.avatar_name;
-                    console.log('Avatar image click event', { avatar });
-                }
-
-                avatars.forEach((avatar) => {
-                    const div = document.createElement('div');
-                    div.className = 'avatarCard';
-                    div.dataset.name = avatar.avatar_name.toLowerCase();
-                    div.title = avatar.avatar_name;
-                    const img = document.createElement('img');
-                    const label = document.createElement('label');
-                    label.className = 'avatarLabel';
-                    label.textContent = avatar.avatar_name;
-                    img.setAttribute('id', avatar.avatar_id);
-                    img.setAttribute('class', 'avatarImg');
-                    img.setAttribute('src', avatar.preview_image_url);
-                    img.setAttribute('alt', avatar.avatar_name);
-                    img.setAttribute('loading', 'lazy');
-                    div.onclick = () => selectAvatar(avatar, div);
-                    div.append(img);
-                    div.append(label);
-                    avatarVideoAIcontainer.append(div);
-
-                    if (!firstPreviewSet && avatar.preview_image_url) {
-                        selectAvatar(avatar, div);
-                        firstPreviewSet = true;
-                    }
-                });
-
-                // Search/filter avatars by name
-                avatarSearchInput.value = '';
-                avatarSearchInput.oninput = () => {
-                    const query = avatarSearchInput.value.toLowerCase().trim();
-                    const cards = avatarVideoAIcontainer.querySelectorAll('.avatarCard');
-                    let visible = 0;
-                    cards.forEach((card) => {
-                        const match = card.dataset.name.includes(query);
-                        card.style.display = match ? '' : 'none';
-                        if (match) visible++;
-                    });
-                    avatarVideoAICount.innerText = query
-                        ? `Avatars: ${visible}/${avatars.length}`
-                        : `Avatars: ${avatars.length}`;
-                };
-            })
-            .catch((err) => {
-                console.error('Video AI getAvatarList error:', err);
-                this.userLog('warning', 'Video AI getAvatarList error:\n' + err, 'top-end', 6000);
-                this.getId('tabVideoAI').style.display = 'none';
-                this.getId('tabVideoAIBtn').style.display = 'none';
-                this.getId('tabRoomBtn').click();
-            });
-    }
-
-    getVoiceList() {
-        this.socket
-            .request('getVoiceList')
-            .then((completion) => {
-                const voiceList = completion?.response?.voices || [];
-                if (!voiceList.length) {
-                    console.warn('No voices available in the response');
-                    return;
-                }
-
-                const selectElement = document.getElementById('avatarVoiceIDs');
-                selectElement.innerHTML = '<option value="">Select Avatar Voice</option>'; // Reset options with default
-
-                // Sort the list alphabetically by language
-                const sortedList = voiceList.sort((a, b) => (a.language ?? '').localeCompare(b.language ?? ''));
-
-                // Populate the select element with options
-                sortedList.forEach((voice) => {
-                    const { voice_id, language, name, gender } = voice;
-                    const option = document.createElement('option');
-                    option.value = voice_id;
-                    option.textContent = `${language ? language + ', ' : ''}${name || 'Unnamed'} (${gender || 'N/A'})`;
-                    selectElement.appendChild(option);
-                });
-
-                const voicePreviewPlayer = document.getElementById('avatarVoicePreview');
-
-                // Event listener for changes on the select element
-                selectElement.addEventListener('change', async (event) => {
-                    VideoAI.avatarVoice = event.target.value || null;
-
-                    // Fetch and play real voice preview from LiveAvatar API
-                    if (voicePreviewPlayer && event.target.value) {
-                        try {
-                            voicePreviewPlayer.pause();
-                            voicePreviewPlayer.src = '';
-                            const result = await this.socket.request(
-                                'previewVoice',
-                                {
-                                    voice_id: event.target.value,
-                                },
-                                0 // external API, no timeout
-                            );
-                            if (result?.audio) {
-                                voicePreviewPlayer.src = result.audio;
-                                voicePreviewPlayer.play().catch(() => {});
-                            }
-                        } catch (err) {
-                            console.warn('Voice preview failed', err);
-                        }
-                    } else if (voicePreviewPlayer) {
-                        voicePreviewPlayer.pause();
-                        voicePreviewPlayer.src = '';
-                    }
-
-                    if (VideoAI.active && VideoAI.avatarVoice) {
-                        console.log('Video AI voice changed during active session, restarting...');
-                        this.streamingStop();
-                        await this.createLiveAvatarSession();
-                    }
-                });
-            })
-            .catch((err) => {
-                console.error('Video AI getVoiceList error', err);
-            });
-    }
-
-    async handleVideoAI() {
-        if (!VideoAI.avatarId) {
-            return this.userLog('warning', 'Please select an avatar before starting', 'top-end', 6000);
-        }
-
-        const vb = document.createElement('div');
-        vb.setAttribute('id', 'avatar__vb');
-        vb.className = 'videoAvatarMenuBar fadein';
-
-        const interrupt = this.createButton('avatar__interrupt', html.stop);
-        const fs = this.createButton('avatar__fs', html.fullScreen);
-        const pin = this.createButton('avatar__pin', html.pin);
-        const ss = this.createButton('avatar__stopSession', html.kickOut);
-
-        // Mute avatar audio (local only) toggle button
-        const muteAvatarAudioBtn = this.createButton('avatar__muteAvatarAudio', html.volume);
-
-        // Share-to-room toggle button
-        const shareBtn = this.createButton('avatar__shareToRoom', html.share);
-
-        // ChatGPT interaction toggle button (only when ChatGPT is enabled)
-        let chatGPTToggleBtn = null;
-        if (this.chatGPTEnabled) {
-            chatGPTToggleBtn = this.createButton('avatar__chatGPTToggle', html.robot);
-            setColor(chatGPTToggleBtn, VideoAI.useChatGPT ? 'lime' : '');
-        }
-
-        const avatarName = document.createElement('div');
-        const an = document.createElement('span');
-        an.id = 'avatar__name';
-        an.className = html.userName;
-        an.innerText = VideoAI.avatarName;
-
-        // Create video container element
-        this.videoAIContainer = document.createElement('div');
-        this.videoAIContainer.className = 'Camera';
-        this.videoAIContainer.id = 'videoAIContainer';
-
-        // Create video element for avatar
-        this.videoAIElement = document.createElement('video');
-        this.videoAIElement.id = 'videoAIElement';
-        this.videoAIElement.setAttribute('playsinline', true);
-        this.videoAIElement.autoplay = true;
-        this.videoAIElement.muted = false;
-        this.videoAIElement.volume = 1;
-        this.videoAIElement.className = '';
-        this.videoAIElement.style.objectFit = 'cover';
-
-        const videoAILoader = this.createVideoLoader('videoAILoader');
-
-        // Session time limit countdown
-        const sessionTimerSpan = document.createElement('span');
-        sessionTimerSpan.id = 'avatar__sessionTimer';
-        sessionTimerSpan.className = 'avatar-session-timer notranslate';
-        sessionTimerSpan.style.display = 'none';
-
-        // Append elements to video container
-        vb.appendChild(ss);
-        this.isVideoFullScreenSupported && vb.appendChild(fs);
-        vb.appendChild(muteAvatarAudioBtn);
-        vb.appendChild(interrupt);
-        vb.appendChild(shareBtn);
-        chatGPTToggleBtn && vb.appendChild(chatGPTToggleBtn);
-        !this.isMobileDevice && vb.appendChild(pin);
-        vb.appendChild(sessionTimerSpan);
-        avatarName.appendChild(an);
-
-        this.videoAIContainer.appendChild(this.videoAIElement);
-        this.videoAIContainer.appendChild(videoAILoader);
-        this.videoAIContainer.appendChild(vb);
-        this.videoAIContainer.appendChild(avatarName);
-        this.videoMediaContainer.appendChild(this.videoAIContainer);
-
-        this.isVideoFullScreenSupported && this.handleFS(this.videoAIElement.id, fs.id);
-        this.handlePN(this.videoAIElement.id, pin.id, this.videoAIContainer.id, true, true);
-
-        muteAvatarAudioBtn.onclick = () => {
-            VideoAI.muteAvatarAudio = !VideoAI.muteAvatarAudio;
-            setColor(muteAvatarAudioBtn, VideoAI.muteAvatarAudio ? 'lime' : '');
-            console.log('Video AI muteAvatarAudio:', VideoAI.muteAvatarAudio);
-            if (this.videoAIElement) {
-                this.videoAIElement.muted = VideoAI.muteAvatarAudio;
-            }
-        };
-
-        interrupt.onclick = () => {
-            this.streamingInterrupt();
-        };
-
-        ss.onclick = () => {
-            this.stopSession();
-        };
-
-        shareBtn.onclick = async () => {
-            if (!VideoAI.shareToRoom) {
-                const result = await Swal.fire({
-                    background: swalBackground,
-                    position: 'top',
-                    title: 'Share Avatar to Room?',
-                    text: 'Are you sure you want to share the avatar video and audio with all participants?',
-                    showDenyButton: true,
-                    confirmButtonText: 'Yes',
-                    denyButtonText: 'No',
-                    showClass: { popup: 'animate__animated animate__fadeInDown' },
-                    hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-                });
-                if (!result.isConfirmed) return;
-            }
-
-            VideoAI.shareToRoom = !VideoAI.shareToRoom;
-            setColor(shareBtn, VideoAI.shareToRoom ? 'lime' : '');
-            console.log('Video AI shareToRoom:', VideoAI.shareToRoom);
-
-            if (VideoAI.shareToRoom) {
-                // Start sharing: produce current tracks from the live mediaStream
-                if (this.videoAIElement.srcObject) {
-                    const tracks = [
-                        ...this.videoAIElement.srcObject.getVideoTracks(),
-                        ...this.videoAIElement.srcObject.getAudioTracks(),
-                    ];
-                    for (const rawTrack of tracks) {
-                        await this.publishAvatarTrack(rawTrack);
-                    }
-                }
-            } else {
-                // Stop sharing: close avatar producers (host keeps seeing/hearing locally)
-                this.stopAvatarProducers();
-            }
-        };
-
-        if (chatGPTToggleBtn) {
-            chatGPTToggleBtn.onclick = () => {
-                VideoAI.useChatGPT = !VideoAI.useChatGPT;
-                setColor(chatGPTToggleBtn, VideoAI.useChatGPT ? 'lime' : '');
-                console.log('Video AI useChatGPT:', VideoAI.useChatGPT);
-            };
-        }
-
-        if (!this.isMobileDevice) {
-            this.setTippy(pin.id, 'Toggle Pin', 'bottom');
-            this.setTippy(muteAvatarAudioBtn.id, 'Mute avatar audio (local only)', 'bottom');
-            this.setTippy(interrupt.id, 'Interrupt avatar speaking', 'bottom');
-            this.setTippy(mic.id, 'Speech to avatar', 'bottom');
-            this.setTippy(shareBtn.id, 'Share avatar to room', 'bottom');
-            chatGPTToggleBtn && this.setTippy(chatGPTToggleBtn.id, 'Toggle ChatGPT interaction', 'bottom');
-            this.setTippy(fs.id, 'Toggle full screen', 'bottom');
-            this.setTippy(ss.id, 'Stop VideoAI session', 'bottom');
-        }
-
-        handleAspectRatio();
-
-        this.setVideoAIControlsDisabled(true);
-
-        await this.createLiveAvatarSession();
-    }
-
-    async createLiveAvatarSession() {
-        try {
-            const { quality, avatarId, avatarVoice } = VideoAI;
-
-            // Step 1: Create session token
-            const tokenResponse = await this.socket.request(
-                'createSessionToken',
-                {
-                    quality: quality,
-                    avatar_id: avatarId,
-                    voice_id: avatarVoice,
-                },
-                0 // external API, no timeout
-            );
-
-            if (!tokenResponse || Object.keys(tokenResponse).length === 0 || tokenResponse.error) {
-                const errMsg =
-                    tokenResponse?.error?.message || tokenResponse?.error || 'Error creating the avatar session';
-                this.userLog('warning', errMsg, 'top-end');
-                this.stopSession();
-                return;
-            }
-
-            if (tokenResponse.response.code !== 1000) {
-                this.userLog('warning', tokenResponse.response.message, 'top-end');
-                this.stopSession();
-                return;
-            }
-
-            const { session_id, session_token } = tokenResponse.response.data;
-            VideoAI.info = { session_id };
-            VideoAI.sessionToken = session_token;
-
-            console.log('Video AI createSessionToken', VideoAI);
-
-            // Step 2: Start session to get LiveKit credentials
-            const startResponse = await this.socket.request(
-                'startSession',
-                {
-                    session_token: session_token,
-                },
-                0 // external API, no timeout
-            );
-
-            if (!startResponse || startResponse.error) {
-                const errMsg =
-                    startResponse?.error?.message || startResponse?.error || 'Error starting the avatar session';
-                this.userLog('warning', errMsg, 'top-end');
-                this.stopSession();
-                return;
-            }
-
-            const { livekit_url, livekit_client_token } = startResponse.response;
-
-            console.log('Video AI startSession', { livekit_url, session_id });
-
-            // Step 3: Connect to LiveKit room
-            await this.connectToLiveKit(livekit_url, livekit_client_token);
-        } catch (error) {
-            const errMsg =
-                typeof error === 'string' ? error : error?.response?.data?.message || error?.message || 'Unknown error';
-            if (errMsg.toLowerCase().includes('insufficient credits') || errMsg === 'quota not enough') {
-                this.msgPopup(
-                    'warning',
-                    'Insufficient AI Avatar credits. Please check your LiveAvatar subscription.',
-                    6000,
-                    'top'
-                );
-            } else {
-                this.userLog('error', errMsg, 'top-end');
-            }
-            console.error('Video AI createLiveAvatarSession error:', errMsg);
-            this.stopSession();
-        }
-    }
-
-    async connectToLiveKit(livekitUrl, livekitToken) {
-        const { Room, RoomEvent } = LivekitClient;
-
-        const room = new Room();
-
-        // Collect tracks into a single MediaStream for the video element
-        const mediaStream = new MediaStream();
-        const deferredAudioTracks = new Map();
-
-        const attachLiveKitTrack = async (kind, mediaStreamTrack) => {
-            const existing = kind === 'video' ? mediaStream.getVideoTracks() : mediaStream.getAudioTracks();
-            existing.forEach((t) => mediaStream.removeTrack(t));
-
-            mediaStream.addTrack(mediaStreamTrack);
-
-            this.videoAIElement.srcObject = mediaStream;
-            this.videoAIElement.play().catch((error) => {
-                console.warn('Video AI playback blocked:', error?.message || error);
-            });
-
-            // Keep avatar audio on the selected output device when speaker changes.
-            if (sinkId && speakerSelect?.value) {
-                await this.changeAudioDestination(this.videoAIElement, false);
-            }
-
-            if (kind === 'video') {
-                this.hideVideoLoaderOnPlay(this.videoAIElement);
-            }
-
-            // Re-publish the avatar track into mediasoup so all participants see/hear it
-            if (VideoAI.shareToRoom) {
-                await this.publishAvatarTrack(mediaStreamTrack);
-            }
-        };
-
-        // Handle incoming tracks (avatar video/audio)
-        room.on(RoomEvent.TrackSubscribed, async (track, publication, participant) => {
-            const participantIdentity = participant?.identity || 'unknown';
-
-            console.log('Video AI LiveKit track subscribed:', track.kind, participantIdentity);
-
-            if (track.kind !== 'video' && track.kind !== 'audio') {
-                return;
-            }
-
-            const mediaStreamTrack = track.mediaStreamTrack;
-            if (!mediaStreamTrack) {
-                console.warn('Video AI: no mediaStreamTrack for', track.kind);
-                return;
-            }
-
-            // Bind media playback to a single LiveKit participant to avoid replacing avatar audio
-            // with secondary agent/system audio tracks from other participants.
-            if (track.kind === 'video') {
-                if (!VideoAI.mediaParticipantIdentity) {
-                    VideoAI.mediaParticipantIdentity = participantIdentity;
-                    console.log('Video AI selected media participant:', VideoAI.mediaParticipantIdentity);
-
-                    const deferredAudioTrack = deferredAudioTracks.get(VideoAI.mediaParticipantIdentity);
-                    if (deferredAudioTrack) {
-                        console.log(
-                            'Video AI attaching deferred audio track for selected participant:',
-                            VideoAI.mediaParticipantIdentity
-                        );
-                        await attachLiveKitTrack('audio', deferredAudioTrack);
-                        deferredAudioTracks.delete(VideoAI.mediaParticipantIdentity);
-                    }
-                } else if (participantIdentity !== VideoAI.mediaParticipantIdentity) {
-                    console.log('Video AI ignoring video track from non-selected participant:', participantIdentity);
-                    return;
-                }
-            }
-
-            if (track.kind === 'audio') {
-                if (!VideoAI.mediaParticipantIdentity) {
-                    deferredAudioTracks.set(participantIdentity, mediaStreamTrack);
-                    console.log(
-                        'Video AI deferring audio track until video participant is selected:',
-                        participantIdentity
-                    );
-                    return;
-                }
-                if (participantIdentity !== VideoAI.mediaParticipantIdentity) {
-                    console.log('Video AI ignoring audio track from non-selected participant:', participantIdentity);
-                    return;
-                }
-            }
-
-            await attachLiveKitTrack(track.kind, mediaStreamTrack);
-        });
-
-        // Handle track unsubscribed
-        room.on(RoomEvent.TrackUnsubscribed, (track) => {
-            console.log('Video AI LiveKit track unsubscribed:', track.kind);
-            track.detach();
-        });
-
-        // Handle server events from agent-response topic
-        room.on(RoomEvent.DataReceived, (payload, participant, kind, topic) => {
-            if (topic === 'agent-response') {
-                try {
-                    const event = JSON.parse(new TextDecoder().decode(payload));
-                    this.handleLiveAvatarEvent(event);
-                } catch (e) {
-                    console.warn('Video AI: failed to parse agent-response event', e);
-                }
-            }
-        });
-
-        room.on(RoomEvent.Disconnected, () => {
-            console.log('Video AI LiveKit room disconnected');
-        });
-
-        await room.connect(livekitUrl, livekitToken);
-
-        VideoAI.livekitRoom = room;
-        VideoAI.active = true;
-
-        this.startRendering();
-
-        this.isMobileDevice ? this.handleMobileVideoAiChat() : this.handleDesktopVideoAiChat();
-
-        this.startVideoAISessionTimer();
-
-        this.userLog('info', 'Video AI streaming started', 'top-end');
-    }
-
-    handleLiveAvatarEvent(event) {
-        console.log('Video AI LiveAvatar event:', event);
-        switch (event.event_type) {
-            case 'avatar.speak_started':
-                console.log('Video AI: Avatar started speaking');
-                break;
-            case 'avatar.speak_ended':
-                console.log('Video AI: Avatar finished speaking');
-                break;
-            case 'session.stopped':
-                console.log('Video AI: Session stopped:', event.end_reason);
-                this.stopSession();
-                break;
-            default:
-                break;
-        }
-    }
-
-    handleDesktopVideoAiChat() {
-        if (!this.isChatOpen) {
-            this.toggleChat();
-        }
-        this.sendMessageToVideoAi();
-    }
-
-    handleMobileVideoAiChat() {
-        if (this.videoMediaContainer.childElementCount <= 2) {
-            isHideMeActive = !isHideMeActive;
-            this.handleHideMe();
-        }
-    }
-
-    sendMessageToVideoAi() {
-        const tasks = [
-            { delay: 1000, action: () => this.chatPin() },
-            { delay: 1200, action: () => this.toggleShowParticipants() },
-            { delay: 1400, action: () => this.showPeerAboutAndMessages('ChatGPT', 'ChatGPT') },
-            { delay: 1600, action: () => this.streamingTask(`Welcome to ${BRAND.app.name}!`) },
-            {
-                delay: 2000,
-                action: () => {
-                    if (this.chatGPTEnabled && VideoAI.useChatGPT) {
-                        chatMessage.value = 'Hello!';
-                        this.sendMessage();
-                    } else {
-                        const hint = `I'm your AI Avatar. Type a message or use the microphone, and I will speak it for you.`;
-                        this.setMsgAvatar('right', 'Avatar');
-                        this.appendMessage('right', image.chatgpt, 'Avatar', this.peer_id, hint, 'VideoAI', 'Avatar');
-                        this.streamingTask(hint);
-                    }
-                },
-            },
-        ];
-        this.executeTasksSequentially(tasks);
-    }
-
-    executeTasksSequentially(tasks) {
-        tasks.reduce((promise, task) => {
-            return promise.then(
-                () =>
-                    new Promise((resolve) => {
-                        setTimeout(() => {
-                            task.action();
-                            resolve();
-                        }, task.delay);
-                    })
-            );
-        }, Promise.resolve());
-    }
-
-    streamingTask(message) {
-        if (VideoAI.enabled && VideoAI.active && message && VideoAI.livekitRoom) {
-            const event = {
-                event_type: 'avatar.speak_text',
-                session_id: VideoAI.info.session_id,
-                text: message,
-            };
-            const data = new TextEncoder().encode(JSON.stringify(event));
-            VideoAI.livekitRoom.localParticipant
-                .publishData(data, { topic: 'agent-control' })
-                .then(() => {
-                    console.log('Video AI streamingTask sent:', message);
-                })
-                .catch((err) => {
-                    console.error('Video AI streamingTask error:', err);
-                });
-        }
-    }
-
-    streamingInterrupt() {
-        if (VideoAI.enabled && VideoAI.active && VideoAI.info.session_id && VideoAI.livekitRoom) {
-            const event = {
-                event_type: 'avatar.interrupt',
-                session_id: VideoAI.info.session_id,
-            };
-            const data = new TextEncoder().encode(JSON.stringify(event));
-            VideoAI.livekitRoom.localParticipant
-                .publishData(data, { topic: 'agent-control' })
-                .then(() => {
-                    console.log('Video AI streamingInterrupt sent');
-                })
-                .catch((err) => {
-                    console.error('Video AI streamingInterrupt error:', err);
-                });
-        }
-    }
-
-    startRendering() {
-        // Ensure video playback starts reliably (autoplay can fail on subsequent sessions)
-        const ensurePlayback = () => {
-            if (this.videoAIElement && this.videoAIElement.paused && this.videoAIElement.srcObject) {
-                this.videoAIElement.play().catch(() => {});
-            }
-        };
-        setTimeout(ensurePlayback, 500);
-        setTimeout(ensurePlayback, 1500);
-    }
-
-    stopRendering() {
-        if (isHideMeActive) {
-            isHideMeActive = !isHideMeActive;
-            this.handleHideMe();
-        }
-    }
-
-    startVideoAISessionTimer() {
-        if (VideoAI.sessionTimeLimit > 0) {
-            console.log(`Video AI session time limit: ${VideoAI.sessionTimeLimit}s`);
-
-            let remaining = VideoAI.sessionTimeLimit;
-            const timerEl = this.getId('avatar__sessionTimer');
-
-            if (timerEl) {
-                timerEl.style.display = 'inline';
-                timerEl.innerText = this.formatSessionTime(remaining);
-            }
-
-            VideoAI.sessionCountdown = setInterval(() => {
-                remaining--;
-                if (timerEl) {
-                    timerEl.innerText = this.formatSessionTime(remaining);
-                    timerEl.style.color = remaining <= 10 ? '#ff4040' : 'white';
-                }
-                if (remaining <= 0) {
-                    console.log('Video AI session time limit reached, stopping session');
-                    this.userLog('warning', 'Video AI session time limit reached', 'top-end', 6000);
-                    this.stopSession();
-                }
-            }, 1000);
-        }
-    }
-
-    stopVideoAISessionTimer() {
-        if (VideoAI.sessionCountdown) {
-            clearInterval(VideoAI.sessionCountdown);
-            VideoAI.sessionCountdown = null;
-        }
-    }
-
-    formatSessionTime(seconds) {
-        const m = Math.floor(seconds / 60)
-            .toString()
-            .padStart(2, '0');
-        const s = (seconds % 60).toString().padStart(2, '0');
-        return `⏱️ ${m}:${s}`;
-    }
-
-    stopSession() {
-        this.stopVideoAISessionTimer();
-
-        // Restore avatar audio if muted
-        if (VideoAI.muteParticipants) {
-            if (this.videoAIElement) this.videoAIElement.muted = false;
-            VideoAI.muteParticipants = false;
-        }
-
-        const videoAIElement = this.getId('videoAIElement');
-        if (videoAIElement) {
-            // Stop old MediaStream tracks to release resources
-            if (videoAIElement.srcObject) {
-                videoAIElement.srcObject.getTracks().forEach((t) => t.stop());
-                videoAIElement.srcObject = null;
-            }
-            videoAIElement.parentNode.removeChild(videoAIElement);
-        }
-        const videoAIContainer = this.getId('videoAIContainer');
-        if (videoAIContainer) {
-            videoAIContainer.parentNode.removeChild(videoAIContainer);
-            if (this.isVideoPinned && this.pinnedVideoPlayerId === 'videoAIElement') {
-                this.removeVideoPinMediaContainer();
-            }
-        }
-
-        handleAspectRatio();
-
-        this.setVideoAIControlsDisabled(false);
-
-        this.streamingStop();
-    }
-
-    setVideoAIControlsDisabled(disabled) {
-        const ids = ['avatarQuality', 'avatarVoiceIDs', 'avatarVideoAIStart'];
-        ids.forEach((id) => {
-            const el = this.getId(id);
-            if (el) el.disabled = disabled;
-        });
-    }
-
-    async publishAvatarTrack(rawTrack) {
-        if (!this.producerTransport || this.producerTransport.closed) return;
-        // Guard: skip if we already have an active producer of the same kind (prevents duplicates on track reconnect)
-        if (VideoAI.avatarProducers.some((p) => !p.closed && p.kind === rawTrack.kind)) {
-            console.warn('Video AI: skipping duplicate producer for kind:', rawTrack.kind);
-            return;
-        }
-        try {
-            const avatarProducer = await this.producerTransport.produce({
-                track: rawTrack.clone(), // clone so producer.close() doesn't kill the local track
-                appData: { mediaType: rawTrack.kind === 'video' ? mediaType.video : mediaType.audio },
-            });
-            VideoAI.avatarProducers.push(avatarProducer);
-            console.log('Video AI published track to room:', rawTrack.kind, avatarProducer.id);
-        } catch (err) {
-            console.warn('Video AI failed to publish track to room:', err);
-        }
-    }
-
-    stopAvatarProducers() {
-        if (VideoAI.avatarProducers.length > 0) {
-            let hadVideoProducer = false;
-            VideoAI.avatarProducers.forEach((producer) => {
-                if (producer.kind === 'video') hadVideoProducer = true;
-                try {
-                    if (!producer.closed) {
-                        this.socket.emit('producerClosed', {
-                            peer_name: this.peer_name,
-                            producer_id: producer.id,
-                            type: producer.kind === 'video' ? 'videoAI' : 'audioAI',
-                            status: false,
-                        });
-                        producer.close();
-                    }
-                } catch (err) {
-                    console.warn('Video AI producer close error:', err);
-                }
-            });
-            VideoAI.avatarProducers = [];
-            // If avatar video was shared but host's real camera is off,
-            // notify other participants to re-show the video-off tile
-            if (hadVideoProducer && !this.peer_info.peer_video) {
-                this.sendVideoOff();
-            }
-        }
-    }
-
-    streamingStop() {
-        // Close mediasoup avatar producers and reset share state
-        this.stopAvatarProducers();
-        VideoAI.shareToRoom = false;
-        const shareBtn = this.getId('avatar__shareToRoom');
-        if (shareBtn) setColor(shareBtn, 'white');
-
-        // Disconnect LiveKit room
-        if (VideoAI.livekitRoom) {
-            console.info('Video AI LiveKit room disconnect');
-            VideoAI.livekitRoom.disconnect();
-            VideoAI.livekitRoom = null;
-        }
-        if (VideoAI.active && VideoAI.info && VideoAI.info.session_id) {
-            const sessionId = VideoAI.info.session_id;
-            this.socket
-                .request('stopSession', { session_id: sessionId })
-                .then(() => {
-                    console.info('Video AI stopSession done!');
-                })
-                .catch((error) => {
-                    console.warn('Video AI stopSession:', error?.message || error);
-                });
-        }
-
-        this.stopRendering();
-
-        VideoAI.active = false;
-        VideoAI.sessionToken = null;
-        VideoAI.mediaParticipantIdentity = null;
-    }
-
-    // ##############################################
-    // RTMP Custom Destination
     // ##############################################
 
-    initRtmpCustomDestination() {
-        const rtmpPresets = {
-            YouTube: { url: 'rtmp://a.rtmp.youtube.com/live2', placeholder: 'YouTube stream key' },
-            Facebook: { url: 'rtmps://live-api-s.facebook.com:443/rtmp', placeholder: 'Facebook stream key' },
-            Twitch: { url: 'rtmp://live.twitch.tv/app', placeholder: 'Twitch stream key' },
-            Custom: { url: '', placeholder: 'Stream key' },
-        };
-
-        const rtmpCustomUrl = this.getId('rtmpCustomUrl');
-        const rtmpCustomStreamKey = this.getId('rtmpCustomStreamKey');
-        const rtmpCustomClear = this.getId('rtmpCustomClear');
-
-        const showClearButton = () => {
-            elemDisplay('rtmpCustomClear', rtmpCustomUrl.value || rtmpCustomStreamKey.value ? true : false);
-        };
-
-        const setActivePreset = (activeBtn) => {
-            document.querySelectorAll('.btn-rtmp-preset').forEach((btn) => btn.classList.remove('active'));
-            activeBtn.classList.add('active');
-        };
-
-        rtmpCustomUrl.addEventListener('input', showClearButton);
-        rtmpCustomStreamKey.addEventListener('input', showClearButton);
-
-        this.getId('rtmpPresetYouTube').addEventListener('click', (e) => {
-            rtmpCustomUrl.value = rtmpPresets.YouTube.url;
-            rtmpCustomStreamKey.placeholder = rtmpPresets.YouTube.placeholder;
-            rtmpCustomStreamKey.value = '';
-            rtmpCustomStreamKey.focus();
-            setActivePreset(e.currentTarget);
-            showClearButton();
-        });
-        this.getId('rtmpPresetFacebook').addEventListener('click', (e) => {
-            rtmpCustomUrl.value = rtmpPresets.Facebook.url;
-            rtmpCustomStreamKey.placeholder = rtmpPresets.Facebook.placeholder;
-            rtmpCustomStreamKey.value = '';
-            rtmpCustomStreamKey.focus();
-            setActivePreset(e.currentTarget);
-            showClearButton();
-        });
-        this.getId('rtmpPresetTwitch').addEventListener('click', (e) => {
-            rtmpCustomUrl.value = rtmpPresets.Twitch.url;
-            rtmpCustomStreamKey.placeholder = rtmpPresets.Twitch.placeholder;
-            rtmpCustomStreamKey.value = '';
-            rtmpCustomStreamKey.focus();
-            setActivePreset(e.currentTarget);
-            showClearButton();
-        });
-        this.getId('rtmpPresetCustom').addEventListener('click', (e) => {
-            rtmpCustomUrl.value = rtmpPresets.Custom.url;
-            rtmpCustomStreamKey.placeholder = rtmpPresets.Custom.placeholder;
-            rtmpCustomUrl.placeholder = 'rtmp://your-server/app';
-            rtmpCustomStreamKey.value = '';
-            rtmpCustomUrl.focus();
-            setActivePreset(e.currentTarget);
-            showClearButton();
-        });
-
-        rtmpCustomClear.addEventListener('click', () => {
-            rtmpCustomUrl.value = '';
-            rtmpCustomStreamKey.value = '';
-            rtmpCustomUrl.placeholder = 'rtmp://a.rtmp.youtube.com/live2';
-            rtmpCustomStreamKey.placeholder = 'Stream key';
-            document.querySelectorAll('.btn-rtmp-preset').forEach((btn) => btn.classList.remove('active'));
-            showClearButton();
-        });
-    }
-
-    getCustomRtmpUrl() {
-        const rtmpCustomUrl = this.getId('rtmpCustomUrl')?.value?.trim();
-        const rtmpCustomStreamKey = this.getId('rtmpCustomStreamKey')?.value?.trim();
-        if (rtmpCustomUrl && rtmpCustomStreamKey) {
-            const separator = rtmpCustomUrl.endsWith('/') ? '' : '/';
-            return rtmpCustomUrl + separator + rtmpCustomStreamKey;
-        }
-        return null;
-    }
-
-    // ##############################################
-    // RTMP from FILE
     // ##############################################
 
-    getRTMP() {
-        this.socket.request('getRTMP').then(function (filenames) {
-            console.log('RTMP files', filenames);
-            if (filenames.length === 0) {
-                const fileNameDiv = rc.getId('file-name');
-                fileNameDiv.textContent = 'No file found to stream';
-                //elemDisplay('startRtmpButton', false);
-            }
-
-            //const f = Array.from({ length: 20 }, (_, index) => `My-file-video-to-stream-to-rtmp-server ${index + 1}`);
-
-            const fileListTbody = rc.getId('file-list');
-            fileListTbody.innerHTML = '';
-
-            filenames.forEach((filename) => {
-                const fileRow = document.createElement('tr');
-                const fileCell = document.createElement('td');
-                fileCell.textContent = filename;
-                fileCell.className = 'file-item';
-                fileCell.onclick = () => showFilename(fileCell, filename);
-                fileRow.appendChild(fileCell);
-                fileListTbody.appendChild(fileRow);
-            });
-
-            function showFilename(clickedItem, filename) {
-                const fileNameDiv = rc.getId('file-name');
-                fileNameDiv.textContent = `Selected file: ${filename}`;
-                rc.selectedRtmpFilename = filename;
-                const fileItems = document.querySelectorAll('.file-item');
-                fileItems.forEach((item) => item.classList.remove('selected'));
-
-                if (clickedItem) {
-                    clickedItem.classList.add('selected');
-                }
-            }
-        });
-    }
-
-    async startRTMP() {
-        if (!this.isRTMPVideoSupported(filterXSS(this.selectedRtmpFilename))) {
-            this.getId('file-name').textContent = '';
-            return this.userLog(
-                'warning',
-                "The provided File is not valid. Please ensure it's .mp4, webm or ogg video file",
-                'top-end'
-            );
-        }
-
-        this.socket
-            .request('startRTMP', {
-                file: filterXSS(this.selectedRtmpFilename),
-                peer_name: filterXSS(this.peer_name),
-                peer_uuid: filterXSS(this.peer_uuid),
-                customRtmpUrl: this.getCustomRtmpUrl(),
-            })
-            .then(function (rtmp) {
-                rc.event(_EVENTS.startRTMP);
-                rc.showRTMP(rtmp, 'file');
-                rc.rtmpFileStreamer = true;
-            });
-    }
-
-    stopRTMP() {
-        if (this.rtmpFileStreamer) {
-            this.socket.request('stopRTMP');
-            this.rtmpFileStreamer = false;
-            this.cleanRTMPUrl();
-            console.log('RTMP STOP');
-            this.event(_EVENTS.stopRTMP);
-        }
-    }
-
-    endRTMP(data) {
-        const rtmpMessage = `${data.rtmpUrl} processing finished!`;
-        this.rtmpFileStreamer = false;
-        this.userLog('info', rtmpMessage, 'top-end');
-        console.log(rtmpMessage);
-        this.cleanRTMPUrl();
-        this.socket.request('endOrErrorRTMP');
-        this.event(_EVENTS.endRTMP);
-    }
-
-    errorRTMP(data) {
-        const rtmpError = `${data.message}`;
-        this.rtmpFileStreamer = false;
-        this.userLog('error', rtmpError, 'top-end');
-        console.error(rtmpError);
-        this.cleanRTMPUrl();
-        this.socket.request('endOrErrorRTMP');
-        this.event(_EVENTS.endRTMP);
-    }
-
-    // ##############################################
-    // RTMP from URL
     // ##############################################
 
-    startRTMPfromURL(inputVideoURL) {
-        if (!this.isRTMPVideoSupported(filterXSS(inputVideoURL))) {
-            this.getId('rtmpStreamURL').value = '';
-            return this.userLog(
-                'warning',
-                'The provided URL is not valid. Please ensure it links to an .mp4 video file',
-                'top-end'
-            );
-        }
-
-        this.socket
-            .request('startRTMPfromURL', {
-                inputVideoURL: filterXSS(inputVideoURL),
-                peer_name: filterXSS(this.peer_name),
-                peer_uuid: filterXSS(this.peer_uuid),
-                customRtmpUrl: this.getCustomRtmpUrl(),
-            })
-            .then(function (rtmp) {
-                rc.event(_EVENTS.startRTMPfromURL);
-                rc.showRTMP(rtmp, 'url');
-                rc.rtmpUrlStreamer = true;
-            });
-    }
-
-    stopRTMPfromURL() {
-        if (this.rtmpUrlStreamer) {
-            this.socket.request('stopRTMPfromURL');
-            this.rtmpUrlStreamer = false;
-            this.cleanRTMPUrl();
-            console.log('RTMP from URL STOP');
-            this.event(_EVENTS.stopRTMPfromURL);
-        }
-    }
-
-    endRTMPfromURL(data) {
-        const rtmpMessage = `${data.rtmpUrl} processing finished!`;
-        this.rtmpUrlStreamer = false;
-        this.userLog('info', rtmpMessage, 'top-end');
-        console.log(rtmpMessage);
-        this.cleanRTMPUrl();
-        this.socket.request('endOrErrorRTMPfromURL');
-        this.event(_EVENTS.endRTMPfromURL);
-    }
-
-    errorRTMPfromURL(data) {
-        const rtmpError = `${data.message}`;
-        this.rtmpUrlStreamer = false;
-        this.userLog('error', rtmpError, 'top-end');
-        console.error(rtmpError);
-        this.cleanRTMPUrl();
-        this.socket.request('endOrErrorRTMPfromURL');
-        this.event(_EVENTS.endRTMPfromURL);
-    }
-
-    // ##############################################
-    // RTMP common
     // ##############################################
 
-    openRTMPStreamer() {
-        const themeColor = encodeURIComponent(themeCustom.color);
+    // ##############################################
 
-        const customRtmpUrl = this.getCustomRtmpUrl();
+    // ##############################################
 
-        const activePreset = document.querySelector('.btn-rtmp-preset.active');
-        const streamType = activePreset ? activePreset.textContent.trim() : customRtmpUrl ? 'Custom' : '';
+    // ##############################################
 
-        const options =
-            `&vr=${videoQuality.value}` +
-            `&vf=${videoFps.value}` +
-            `&sf=${screenFps.value}` +
-            `&ts=${selectTheme.value}` +
-            (themeCustom.keep ? `&tc=${themeColor}` : '') +
-            (customRtmpUrl ? `&customRtmpUrl=${encodeURIComponent(customRtmpUrl)}` : '') +
-            (streamType ? `&st=${encodeURIComponent(streamType)}` : '') +
-            (this.rtmpStreamToken ? `&rt=${encodeURIComponent(this.rtmpStreamToken)}` : '');
-
-        const url = `/rtmp?v=${videoSelect.value}&a=${microphoneSelect.value}${options}`;
-
-        openURL(url, true);
-    }
-
-    isRTMPVideoSupported(video) {
-        if (video.endsWith('.mp4') || video.endsWith('.webm')) return true;
-        return false;
-    }
-
-    copyRTMPUrl(url) {
-        if (!url) return this.userLog('info', 'No RTMP URL detected', 'top-end');
-        copyToClipboard(url);
-    }
-
-    cleanRTMPUrl() {
-        const rtmpUrl = rc.getId('rtmpLiveUrl');
-        rtmpUrl.value = '';
-        elemDisplay('rtmpUrlLiveContainer', true, 'grid');
-    }
-
-    showRTMP(rtmp, type = 'file') {
-        console.log('rtmp', rtmp);
-
-        if (!rtmp) {
-            switch (type) {
-                case 'file':
-                    this.event(_EVENTS.endRTMP);
-                    break;
-                case 'url':
-                    this.event(_EVENTS.endRTMPfromURL);
-                    break;
-                default:
-                    break;
-            }
-            return this.userLog(
-                'warning',
-                'Unable to start the RTMP stream. Please ensure the RTMP server is running. If the problem persists, contact the administrator',
-                'top-end',
-                6000
-            );
-        }
-
-        const isCustomDestination = this.getCustomRtmpUrl() !== null;
-
-        if (isCustomDestination) {
-            elemDisplay('rtmpUrlLiveContainer', false);
-        } else {
-            elemDisplay('rtmpUrlLiveContainer', true, 'grid');
-            const rtmpUrl = rc.getId('rtmpLiveUrl');
-            rtmpUrl.value = filterXSS(rtmp);
-        }
-
-        Swal.fire({
-            background: swalBackground,
-            imageUrl: image.rtmp,
-            position: 'center',
-            title: 'LIVE',
-            html: isCustomDestination
-                ? `<p style="background:transparent; color:rgb(8, 189, 89);">Streaming to external platform</p>`
-                : `<p style="background:transparent; color:rgb(8, 189, 89);">${rtmp}</p>`,
-            showDenyButton: false,
-            showCancelButton: false,
-            confirmButtonText: isCustomDestination ? 'OK' : 'Copy URL',
-            showClass: { popup: 'animate__animated animate__fadeInDown' },
-            hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-        }).then((result) => {
-            if (result.isConfirmed && !isCustomDestination) {
-                copyToClipboard(rtmp);
-            }
-        });
-    }
+    // ##############################################
 
     // ####################################################
     // ROOM SNAPSHOT WINDOW/SCREEN/TAB
     // ####################################################
-
-    async snapshotRoom() {
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        const video = document.createElement('video');
-
-        try {
-            const captureStream = await navigator.mediaDevices.getDisplayMedia({
-                video: true,
-            });
-
-            video.srcObject = captureStream;
-            video.onloadedmetadata = () => {
-                video.play();
-            };
-
-            // Wait for the video to start playing
-            video.onplay = async () => {
-                this.sound('snapshot');
-
-                // Sleep some ms
-                await this.sleep(1000);
-
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-                // Create a link element to download the image
-                const link = document.createElement('a');
-                link.href = canvas.toDataURL('image/png');
-                link.download = 'Room_' + this.room_id + '_' + getDataTimeString() + '_snapshot.png';
-                link.click();
-
-                // Stop all video tracks to release the capture stream
-                captureStream.getTracks().forEach((track) => track.stop());
-
-                // Clean up: remove references to avoid memory leaks
-                video.srcObject = null;
-                canvas.width = 0;
-                canvas.height = 0;
-            };
-        } catch (err) {
-            console.error('Error: ' + err);
-            this.userLog('error', 'Snapshot room error ' + err.message, 'top-end', 6000);
-        }
-    }
 
     // ####################################################
     // HELPERS
@@ -13348,4 +11084,4 @@ class RoomClient {
     sleep(ms) {
         return new Promise((resolve) => setTimeout(resolve, ms));
     }
-} // End
+}

@@ -50,8 +50,6 @@ const NUM_WORKERS = Math.min(process.env.SFU_NUM_WORKERS || NUM_CPUS, NUM_CPUS);
 // 3. FFmpeg Path Configuration
 // ==============================================
 
-const RTMP_FFMPEG_PATH = process.env.RTMP_FFMPEG_PATH || getFFmpegPath(PLATFORM);
-
 // ==============================================
 // Main Configuration Export
 // ==============================================
@@ -222,141 +220,6 @@ module.exports = {
                 windowMs: parseInt(process.env.RECORDING_RATE_LIMIT_WINDOW_MS) || 60 * 1000,
                 max: parseInt(process.env.RECORDING_RATE_LIMIT_MAX) || 300,
             },
-        },
-
-        /**
-         * RTMP Configuration
-         * =================
-         * Configures Real-Time Messaging Protocol (RTMP) for audio/video/data streaming.
-         *
-         * Core Settings
-         * ------------
-         * - enabled            : Enable/disable RTMP streaming (default: false)
-         * - fromFile           : Enable local file streaming (default: true)
-         * - fromUrl            : Enable URL streaming (default: true)
-         * - fromStream         : Enable live stream input (default: true)
-         * - maxStreams         : Maximum simultaneous streams (default: 1)
-         * - allowCustomUrl     : Allow presenters to set a custom RTMP destination (default: false)
-         * - useNodeMediaServer : Use NodeMediaServer instead of nginx-rtmp (default: true)
-         * - server             : RTMP server URL (default: 'rtmp://localhost:1935')
-         * - appName            : Application name (default: 'live')
-         * - streamKey          : Optional authentication key (auto-generated UUID if empty)
-         * - secret             : Must match NodeMediaServer's config.js (default: 'mirotalkRtmpSecret')
-         * - apiSecret          : WebRTC→RTMP API secret. NO DEFAULT: set RTMP_API_SECRET to a strong,
-         *                        random value. When empty, /activeStreams, /initRTMP, /streamRTMP and
-         *                        /stopRTMP reject every request.
-         * - expirationHours    : Stream URL expiry in hours (default: 4)
-         * - dir                : Video storage directory (Relative to app/src/ default: app/rtmp)
-         * - ffmpegPath         : FFmpeg binary path (auto-detected)
-         * - platform           : Current OS platform (auto-detected)
-         *
-         * Server Management
-         * ----------------
-         * NodeMediaServer (mirotalk/nms:latest):
-         *   - Start: npm run nms-start
-         *   - Stop:  npm run nms-stop
-         *   - Logs:  npm run nms-logs
-         *
-         * NGINX-RTMP (mirotalk/rtmp:latest):
-         *   - Start: npm run rtmp-start
-         *   - Stop:  npm run rtmp-stop
-         *   - Logs:  npm run rtmp-logs
-         *
-         * Implementation Notes:
-         * --------------------
-         * 1. For NodeMediaServer:
-         *    - Mandatory values: appName (falls back to 'live'), streamKey (auto-generated)
-         *    - URL format: rtmp://host:port/appName/streamKey?sign=expiration-token
-         *
-         * 2. Default Behavior:
-         *    - If server URL is empty, uses localhost:1935
-         *    - If no streamKey provided, generates UUIDv4
-         *    - When useNodeMediaServer=true, generates signed URLs with expiration
-         *
-         * Custom RTMP Destinations (YouTube, Facebook, Twitch)
-         * ---------------------------------------------------
-         * When allowCustomUrl=true, presenters can stream directly to external platforms
-         * from the meeting room UI. They select a preset or enter a custom RTMP URL,
-         * paste their stream key, and start streaming. Only rtmp:// and rtmps:// schemes
-         * are accepted by the server for security.
-         *
-         * YouTube Live:
-         *   - Go to https://studio.youtube.com → Go Live → Stream
-         *   - Copy your "Stream key" from the stream settings
-         *   - RTMP URL: rtmp://a.rtmp.youtube.com/live2
-         *   - Full URL: rtmp://a.rtmp.youtube.com/live2/YOUR_STREAM_KEY
-         *   - Env setup (server-wide default):
-         *       RTMP_SERVER=rtmp://a.rtmp.youtube.com
-         *       RTMP_APP_NAME=live2
-         *       RTMP_STREAM_KEY=xxxx-xxxx-xxxx-xxxx
-         *       RTMP_USE_NODE_MEDIA_SERVER=false
-         *
-         * Facebook Live:
-         *   - Go to https://www.facebook.com/live/producer → Use Stream Key
-         *   - Copy the "Stream key" shown
-         *   - RTMP URL: rtmps://live-api-s.facebook.com:443/rtmp
-         *   - Full URL: rtmps://live-api-s.facebook.com:443/rtmp/YOUR_STREAM_KEY
-         *   - Note: Facebook requires rtmps:// (TLS encrypted)
-         *   - Env setup (server-wide default):
-         *       RTMP_SERVER=rtmps://live-api-s.facebook.com:443
-         *       RTMP_APP_NAME=rtmp
-         *       RTMP_STREAM_KEY=your-facebook-stream-key
-         *       RTMP_USE_NODE_MEDIA_SERVER=false
-         *
-         * Twitch:
-         *   - Go to https://dashboard.twitch.tv/settings/stream
-         *   - Copy your "Primary Stream key"
-         *   - RTMP URL: rtmp://live.twitch.tv/app
-         *   - Full URL: rtmp://live.twitch.tv/app/YOUR_STREAM_KEY
-         *   - Env setup (server-wide default):
-         *       RTMP_SERVER=rtmp://live.twitch.tv
-         *       RTMP_APP_NAME=app
-         *       RTMP_STREAM_KEY=live_xxxxxxxxxxxx
-         *       RTMP_USE_NODE_MEDIA_SERVER=false
-         *
-         * Custom RTMP Server:
-         *   - Use any RTMP/RTMPS ingest endpoint
-         *   - Full URL: rtmp://your-server:1935/app/stream-key
-         *   - Env setup (server-wide default):
-         *       RTMP_SERVER=rtmp://your-server:1935
-         *       RTMP_APP_NAME=app
-         *       RTMP_STREAM_KEY=your-stream-key
-         *       RTMP_USE_NODE_MEDIA_SERVER=false
-         *
-         * Per-room custom destination (no env changes needed):
-         *   - Set RTMP_ALLOW_CUSTOM_URL=true in .env
-         *   - Presenters will see preset buttons (YouTube/Facebook/Twitch/Custom)
-         *     in the RTMP tab of the meeting room
-         *   - They select a platform, paste their stream key, and start streaming
-         *   - The custom URL overrides the server default for that specific stream only
-         *
-         * Requirements:
-         * -------------
-         * - RTMP server must be running (or streaming to external platform)
-         * - Port 1935 must be accessible (or 443 for rtmps)
-         * - FFmpeg must be installed
-         *
-         * Documentation:
-         * --------------
-         * - https://docs.mirotalk.com/mirotalk-sfu/rtmp/
-         */
-        rtmp: {
-            enabled: process.env.RTMP_ENABLED === 'true',
-            fromFile: process.env.RTMP_FROM_FILE !== 'false',
-            fromUrl: process.env.RTMP_FROM_URL !== 'false',
-            fromStream: process.env.RTMP_FROM_STREAM !== 'false',
-            maxStreams: parseInt(process.env.RTMP_MAX_STREAMS) || 1,
-            allowCustomUrl: process.env.RTMP_ALLOW_CUSTOM_URL === 'true',
-            useNodeMediaServer: process.env.RTMP_USE_NODE_MEDIA_SERVER !== 'false',
-            server: process.env.RTMP_SERVER || 'rtmp://localhost:1935',
-            appName: process.env.RTMP_APP_NAME || 'live',
-            streamKey: process.env.RTMP_STREAM_KEY || '',
-            secret: process.env.RTMP_SECRET || 'mirotalkRtmpSecret',
-            apiSecret: process.env.RTMP_API_SECRET || '',
-            expirationHours: parseInt(process.env.RTMP_EXPIRATION_HOURS) || 4,
-            dir: process.env.RTMP_DIR || '../rtmp',
-            ffmpegPath: RTMP_FFMPEG_PATH,
-            platform: PLATFORM,
         },
     },
 
@@ -732,42 +595,6 @@ module.exports = {
             model: process.env.DEEP_SEEK_MODEL || 'deepseek-v4-flash',
             max_tokens: parseInt(process.env.DEEP_SEEK_MAX_TOKENS) || 1024,
             temperature: parseInt(process.env.DEEP_SEEK_TEMPERATURE) || 0.7,
-        },
-
-        /**
-         * LiveAvatar Video AI Configuration
-         * =================================
-         * AI-powered avatar streaming integration (migrated from HeyGen)
-         *
-         * Setup Instructions:
-         * ------------------
-         * 1. Go to https://app.liveavatar.com
-         * 2. Create your LiveAvatar account
-         * 3. Generate your API key from settings
-         *
-         * Core Settings:
-         * -------------
-         * - enabled    : Enable/disable Video AI [true/false] (default: false)
-         * - basePath   : LiveAvatar API endpoint (default: 'https://api.liveavatar.com')
-         * - apiKey     : From LiveAvatar account (ALWAYS store in .env)
-         * - mode       : Session mode - FULL (managed LLM) or LITE (custom pipeline)
-         * - contextId  : Optional context ID for avatar personality/knowledge
-         *
-         * AI Behavior:
-         * -----------
-         * - systemLimit: Personality/behavior instructions for the AI avatar
-         *                (default: Streaming avatar instructions for MiroTalk SFU)
-         */
-        videoAI: {
-            enabled: process.env.VIDEOAI_ENABLED === 'true',
-            basePath: process.env.VIDEOAI_BASE_PATH || 'https://api.liveavatar.com',
-            apiKey: process.env.VIDEOAI_API_KEY || '',
-            mode: process.env.VIDEOAI_MODE || 'FULL',
-            contextId: process.env.VIDEOAI_CONTEXT_ID || '',
-            systemLimit: process.env.VIDEOAI_SYSTEM_LIMIT || 'You are a streaming avatar from MiroTalk SFU...',
-            sessionTimeLimit: process.env.VIDEOAI_SESSION_TIME_LIMIT
-                ? parseInt(process.env.VIDEOAI_SESSION_TIME_LIMIT, 10)
-                : 0, // Session time limit in seconds (0 = unlimited)
         },
 
         /**
@@ -1260,24 +1087,7 @@ module.exports = {
             /** About dialog for the meeting, with the deployed source revision. */
             about: {
                 sourceRevision: process.env.MIROTALK_SOURCE_REVISION || '',
-                title: `WebRTC SFU v${packageJson.version}`,
-                html: `
-                    <div class="about-content">
-                        <p class="about-description">
-                            Self-hosted group video meetings with scalable WebRTC conferencing.
-                        </p>
-                        <a
-                            class="about-primary-action"
-                            data-umami-event="About button"
-                            href="${process.env.SUPPORT_URL || 'https://docs.mirotalk.com/sites/sfu'}"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                        >
-                            <i class="fas fa-info-circle" aria-hidden="true"></i>
-                            <span>${process.env.SUPPORT_TEXT || 'About'}</span>
-                        </a>
-                    </div>
-                `,
+                version: packageJson.version,
             },
 
             /**
@@ -1373,7 +1183,7 @@ module.exports = {
             // Main control buttons visible in the UI
             main: {
                 shareButton: process.env.SHOW_SHARE_BUTTON !== 'false',
-                hideMeButton: process.env.SHOW_HIDE_ME !== 'false',
+
                 fullScreenButton: process.env.SHOW_FULLSCREEN_BUTTON !== 'false',
                 startAudioButton: process.env.SHOW_AUDIO_BUTTON !== 'false',
                 startVideoButton: process.env.SHOW_VIDEO_BUTTON !== 'false',
@@ -1382,12 +1192,7 @@ module.exports = {
                 chatButton: process.env.SHOW_CHAT_BUTTON !== 'false',
                 participantsButton: process.env.SHOW_PARTICIPANTS_BUTTON !== 'false',
 
-                breakoutRoomButton: process.env.SHOW_BREAKOUT_ROOM_BUTTON !== 'false',
-
                 raiseHandButton: process.env.SHOW_RAISE_HAND !== 'false',
-
-                documentPiPButton: process.env.SHOW_DOCUMENT_PIP !== 'false',
-                snapshotRoomButton: process.env.SHOW_SNAPSHOT !== 'false',
 
                 settingsButton: process.env.SHOW_SETTINGS !== 'false',
                 aboutButton: process.env.SHOW_ABOUT !== 'false',
@@ -1400,15 +1205,15 @@ module.exports = {
                 fileSharing: process.env.ENABLE_FILE_SHARING !== 'false',
                 lockRoomButton: process.env.SHOW_LOCK_ROOM !== 'false',
                 unlockRoomButton: process.env.SHOW_UNLOCK_ROOM !== 'false',
-                broadcastingButton: process.env.SHOW_BROADCASTING !== 'false',
+
                 lobbyButton: process.env.SHOW_LOBBY !== 'false',
                 joinLockButton: process.env.SHOW_JOIN_LOCK !== 'false',
                 sendEmailInvitation: false,
                 micOptionsButton: process.env.SHOW_MIC_OPTIONS !== 'false',
-                tabRTMPStreamingBtn: process.env.SHOW_RTMP_TAB !== 'false',
+
                 tabNotificationsBtn: process.env.SHOW_NOTIFICATIONS_TAB !== 'false',
                 tabModerator: process.env.SHOW_MODERATOR_TAB !== 'false',
-                tabVideoAIBtn: process.env.SHOW_VIDEOAI_TAB !== 'false',
+
                 tabRecording: process.env.SHOW_RECORDING_TAB !== 'false',
                 host_only_recording: process.env.HOST_ONLY_RECORDING !== 'false',
                 pushToTalk: process.env.ENABLE_PUSH_TO_TALK !== 'false',
@@ -1423,7 +1228,7 @@ module.exports = {
                 videoMirrorButton: process.env.SHOW_MIRROR_BUTTON !== 'false',
                 pinVideoButton: process.env.SHOW_PIN_BUTTON !== 'false',
                 fullScreenButton: process.env.SHOW_FULLSCREEN !== 'false',
-                snapShotButton: process.env.SHOW_SNAPSHOT_BUTTON !== 'false',
+
                 focusVideoButton: process.env.SHOW_FOCUS_BUTTON !== 'false',
                 muteAudioButton: process.env.SHOW_MUTE_AUDIO !== 'false',
                 videoPrivacyButton: process.env.SHOW_PRIVACY_TOGGLE !== 'false',
@@ -1436,12 +1241,12 @@ module.exports = {
                 videoMirrorButton: process.env.SHOW_MIRROR_BUTTON !== 'false',
                 pinVideoButton: process.env.SHOW_PIN_BUTTON !== 'false',
                 fullScreenButton: process.env.SHOW_FULLSCREEN !== 'false',
-                snapShotButton: process.env.SHOW_SNAPSHOT_BUTTON !== 'false',
+
                 focusVideoButton: process.env.SHOW_FOCUS_BUTTON !== 'false',
                 hideFromGridButton: process.env.SHOW_HIDE_FROM_GRID_BUTTON !== 'false',
                 sendMessageButton: process.env.SHOW_SEND_MESSAGE !== 'false',
                 sendFileButton: process.env.SHOW_SEND_FILE !== 'false',
-                sendVideoButton: process.env.SHOW_SEND_VIDEO !== 'false',
+
                 muteVideoButton: process.env.SHOW_MUTE_VIDEO !== 'false',
                 muteAudioButton: process.env.SHOW_MUTE_AUDIO !== 'false',
                 audioVolumeInput: process.env.SHOW_VOLUME_CONTROL !== 'false',
@@ -1457,19 +1262,13 @@ module.exports = {
                 hideFromGridButton: process.env.SHOW_HIDE_FROM_GRID_BUTTON !== 'false',
                 sendMessageButton: process.env.SHOW_SEND_MESSAGE !== 'false',
                 sendFileButton: process.env.SHOW_SEND_FILE !== 'false',
-                sendVideoButton: process.env.SHOW_SEND_VIDEO !== 'false',
+
                 muteAudioButton: process.env.SHOW_MUTE_AUDIO !== 'false',
                 audioVolumeInput: process.env.SHOW_VOLUME_CONTROL !== 'false',
                 geolocationButton: false,
                 banButton: process.env.SHOW_BAN_BUTTON !== 'false',
                 ejectButton: process.env.SHOW_EJECT_BUTTON !== 'false',
                 presenterRoleButton: process.env.SHOW_PRESENTER_ROLE_BUTTON !== 'false',
-            },
-
-            // Controls for shared video/audio feeds
-            videoShare: {
-                pinVideoButton: process.env.SHOW_PIN_BUTTON !== 'false',
-                fullScreenButton: process.env.SHOW_FULLSCREEN !== 'false',
             },
 
             // Chat interface controls

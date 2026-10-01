@@ -32,13 +32,15 @@
 
         <!-- StyleSheet -->
         <link rel="stylesheet" href="../css/Root.css?v=bodrik-1" />
-        <link rel="stylesheet" href="../css/Room.css?v=bodrik-8" />
+        <link rel="stylesheet" href="../css/Room.css?v=bodrik-11" />
         <link rel="stylesheet" href="../css/VideoGrid.css?v=bodrik-2" />
         <link rel="stylesheet" href="../css/GroupChat.css?v=bodrik-2" />
         <link rel="stylesheet" href="../css/ChatListActions.css?v=bodrik-2" />
 
         <link rel="stylesheet" href="../css/Translate.css" />
         <link rel="stylesheet" href="../css/ThemeControls.css?v=bodrik-1" />
+        <link rel="stylesheet" href="../css/MeetingAbout.css?v=1" />
+        <link rel="stylesheet" href="../css/CameraAccess.css?v=1" />
 
         <!-- https://cdnjs.com/libraries/font-awesome -->
 
@@ -97,14 +99,16 @@
         <script defer src="https://cdn.jsdelivr.net/npm/ua-parser-js@latest/dist/ua-parser.min.js"></script>
 
         <script async src="../js/Stats.js"></script>
-        <script defer src="../js/Brand.js?v=bodrik-2"></script>
-        <script defer src="../js/I18n.js?v=bodrik-2"></script>
+        <script defer src="../js/Brand.js?v=bodrik-3"></script>
+        <script defer src="../js/I18n.js?v=bodrik-4"></script>
+        <script defer src="../js/BodrikToast.js?v=2"></script>
+        <script defer src="../js/BodrikAbout.js?v=3"></script>
 
         <!-- Js scripts https://cdn.jsdelivr.net -->
 
         <script defer src="https://cdn.jsdelivr.net/npm/@simonwep/pickr/dist/pickr.min.js"></script>
         <script defer src="https://cdn.jsdelivr.net/npm/@simonwep/pickr/dist/pickr.es5.min.js"></script>
-        <script defer src="https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.umd.js"></script>
+
         <script defer src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
         <script defer src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
 
@@ -123,9 +127,12 @@
 
         <script defer src="/socket.io/socket.io.js"></script>
         <script defer src="../sfu/MediasoupClient.js"></script>
-        <script defer src="../js/LocalStorage.js?v=bodrik-3"></script>
-        <script defer src="../js/Rules.js?v=bodrik-6"></script>
+        <script defer src="../js/LocalStorage.js?v=bodrik-5"></script>
+        <script defer src="../js/Rules.js?v=bodrik-12"></script>
         <script defer src="../js/Helpers.js"></script>
+        <script defer src="../js/BodrikAudioGain.js?v=2"></script>
+        <script defer src="../js/BodrikRecordingAudio.js?v=3"></script>
+        <script defer src="../js/BodrikRecordingLifecycle.js?v=1"></script>
         <script defer src="../js/VideoGrid.js?v=bodrik-3"></script>
         <script defer src="../js/VirtualBackground.js"></script>
         <script defer src="../js/NodeProcessor.js"></script>
@@ -135,12 +142,14 @@
         <script defer src="../js/WakeLock.js"></script>
         <script defer src="../js/RoomTemplate.js"></script>
         <script defer src="../js/BodrikNetworkRecovery.js?v=1"></script>
-        <script defer src="../js/RoomClient.js?v=bodrik-23"></script>
+        <script defer src="../js/RoomClient.js?v=bodrik-34"></script>
         <script defer src="../js/BodrikProfile.js?v=2"></script>
         <script defer src="../js/BodrikChatImage.js?v=3"></script>
         <script defer src="../js/BodrikTheme.js?v=3"></script>
-        <script defer src="../js/Room.js?v=bodrik-29"></script>
+        <script defer src="../js/Room.js?v=bodrik-37"></script>
+        <script defer src="../js/BodrikCameraDevices.js?v=1"></script>
         <script defer src="../js/BodrikSettingsEscape.js?v=2"></script>
+        <script defer src="../js/BodrikCameraAccess.js?v=3"></script>
     </head>
     <body>
         <noscript>You need to enable JavaScript to run this app.</noscript>
@@ -274,24 +283,6 @@
             </div>
         </div>
 
-        <!-- Breakout Room: Return to Main Toolbar -->
-        <div id="breakoutToolbar" class="breakout-toolbar hidden">
-            <div id="breakoutToolbarHandle" class="breakout-toolbar-handle">
-                <i class="fas fa-object-ungroup breakout-accent"></i>
-                <span class="breakout-toolbar-label">Breakout:</span>
-                <span id="breakoutToolbarRoomName" class="breakout-toolbar-room"></span>
-            </div>
-            <span id="breakoutTimer" class="breakout-toolbar-timer hidden">
-                <i class="fas fa-clock"></i> <span id="breakoutTimerDisplay">00:00:00</span>
-            </span>
-            <button id="breakoutHelpBtn" class="breakout-toolbar-help-btn">
-                <i class="fas fa-hand-paper"></i> Ask for Help
-            </button>
-            <button id="breakoutReturnBtn" class="breakout-toolbar-btn">
-                <i class="fas fa-arrow-rotate-left"></i> Return to Main
-            </button>
-        </div>
-
         <div id="bottomButtons" class="fadein">
             <div id="startAudioSplit" class="split-btn">
                 <span id="pushToTalkStatus" class="push-to-talk-status hidden" role="status" aria-live="polite"
@@ -381,9 +372,6 @@
                     <button type="button" data-participant-view="speaker-1:1">
                         <i class="fa-solid fa-square"></i> Speaker 1:1
                     </button>
-                    <button type="button" data-participant-view="livestream">
-                        <i class="fa-solid fa-tower-broadcast"></i> Livestream
-                    </button>
                 </div>
             </div>
             <div id="settingsSplit" class="split-btn">
@@ -422,12 +410,9 @@
 
                         <div class="device-menu-divider extra-menu-divider" data-group="sharing"></div>
 
-                        <!-- RECORDING & CAPTURE -->
-                        <div
-                            class="device-menu-header extra-menu-group"
-                            data-buttons="startRecButton,stopRecButton,snapshotRoomButton"
-                        >
-                            RECORDING & CAPTURE
+                        <!-- TOOLS -->
+                        <div class="device-menu-header extra-menu-group" data-buttons="startRecButton,stopRecButton">
+                            TOOLS
                         </div>
                         <button id="startRecButton" class="hidden">
                             <i class="fas fa-record-vinyl"></i> Start Recording
@@ -435,40 +420,16 @@
                         <button id="stopRecButton" class="hidden">
                             <i class="fas fa-record-vinyl cr"></i> Stop Recording
                         </button>
-                        <button id="snapshotRoomButton" class="hidden">
-                            <i class="fas fas fa-camera-retro"></i> Snapshot
-                        </button>
-
-                        <div class="device-menu-divider extra-menu-divider" data-group="recording"></div>
-
-                        <!-- TOOLS -->
-                        <div
-                            class="device-menu-header extra-menu-group"
-                            data-buttons="documentPiPButton,breakoutRoomButton"
-                        >
-                            TOOLS
-                        </div>
-
-                        <button id="breakoutRoomButton" class="hidden">
-                            <i class="fas fa-object-ungroup"></i> Breakout Rooms
-                        </button>
-
-                        <button id="documentPiPButton" class="hidden">
-                            <i class="fas fa-images"></i> Document PiP
-                        </button>
 
                         <div class="device-menu-divider extra-menu-divider" data-group="tools"></div>
 
                         <!-- VIEW & SETTINGS -->
                         <div
                             class="device-menu-header extra-menu-group"
-                            data-buttons="hideMeButton,fullScreenButton,restartICEButton,aboutButton"
+                            data-buttons="fullScreenButton,restartICEButton,aboutButton"
                         >
                             VIEW & SETTINGS
                         </div>
-                        <button id="hideMeButton" class="hidden">
-                            <i id="hideMeIcon" class="fas fa-user"></i> Hide Me
-                        </button>
                         <button id="fullScreenButton" class="hidden">
                             <i id="fullScreenIcon" class="fas fa-expand-alt"></i> Full Screen
                         </button>
@@ -512,16 +473,7 @@
                     <button id="tabAudioDevicesBtn" class="fas fa-microphone tablinks">
                         <p class="tabButtonText">Audio</p>
                     </button>
-                    <span class="settings-nav-label">Share and stream</span>
-                    <button id="tabVideoAIBtn" class="fas fa-robot tablinks">
-                        <p class="tabButtonText">AI avatar</p>
-                    </button>
-                    <button id="tabVideoShareBtn" class="fab fa-youtube tablinks">
-                        <p class="tabButtonText">Share media</p>
-                    </button>
-                    <button id="tabRTMPStreamingBtn" class="fa-solid fa-satellite-dish tablinks">
-                        <p class="tabButtonText">Live stream</p>
-                    </button>
+
                     <span class="settings-nav-label">Personal</span>
                     <button id="tabProfileBtn" class="fas fa-user tablinks">
                         <p class="tabButtonText">Profile</p>
@@ -589,22 +541,6 @@
                         </button>
                         <hr />
                         <table class="settingsTable">
-                            <tr id="broadcastingButton" class="hidden">
-                                <td>
-                                    <div class="title">
-                                        <i class="fa-solid fa-wifi"></i>
-                                        <span class="settings-option-copy">
-                                            <strong>Broadcast mode</strong>
-                                            <small>Present one-way to a large audience</small>
-                                        </span>
-                                    </div>
-                                </td>
-                                <td>
-                                    <div class="form-check form-switch form-switch-md title">
-                                        <input id="switchBroadcasting" class="form-check-input" type="checkbox" />
-                                    </div>
-                                </td>
-                            </tr>
                             <tr id="lobbyButton" class="hidden">
                                 <td>
                                     <div class="title">
@@ -764,6 +700,14 @@
                         </div>
                         <br />
                         <select id="videoSelect" class="form-select text-light bg-dark"></select>
+                        <div id="cameraAccessNotice" class="camera-access-notice" hidden>
+                            <p>No accessible cameras.</p>
+                            <p>Devices may be unavailable or camera access may not be granted.</p>
+                            <button id="cameraAccessRetry" type="button" class="btn-custom">
+                                Request camera access
+                            </button>
+                            <p id="cameraAccessStatus" role="status" aria-live="polite"></p>
+                        </div>
                         <br />
                         <div class="title">
                             <i class="fas fa-palette"></i>
@@ -1171,24 +1115,6 @@
                                     </div>
                                 </td>
                             </tr>
-                            <tr id="everyoneCantMediaSharingBtn">
-                                <td>
-                                    <div class="title">
-                                        <i class="fab fa-youtube red"></i>
-                                        <p>Disable Media Sharing</p>
-                                    </div>
-                                </td>
-                                <td>
-                                    <div class="form-check form-switch form-switch-md">
-                                        <input
-                                            id="switchEveryoneCantMediaSharing"
-                                            class="form-check-input"
-                                            type="checkbox"
-                                            checked
-                                        />
-                                    </div>
-                                </td>
-                            </tr>
 
                             <tr id="disconnectAllOnLeave">
                                 <td>
@@ -1292,281 +1218,6 @@
                         </div>
                         <br />
                         <div id="lastRecordingInfo" class="hidden"></div>
-                    </div>
-
-                    <div id="tabVideoAI" class="tabcontent">
-                        <div class="settings-section-intro">
-                            <h3>AI avatar</h3>
-                            <p>Select an avatar and voice to present in the meeting.</p>
-                        </div>
-                        <div class="avatarsVideoAI">
-                            <div id="avatarVideoAIPreviewContainer" class="avatar-preview-container">
-                                <div id="avatarVideoAISpinner" class="loading-spinner">
-                                    <div class="spinner-ring"></div>
-                                    <img class="spinner-logo" src="../images/bodrik-ava.png" alt="" />
-                                </div>
-                                <img id="avatarVideoAIPreview" src="" alt="Avatar Preview" class="hidden" />
-                            </div>
-                            <div id="avatarVideoAISelectedName" class="avatarSelectedName"></div>
-                            <hr />
-                            <div class="container-flex">
-                                <div class="avatarSearchRow">
-                                    <div id="avatarVideoAICount" class="avatarCount"></div>
-                                    <input
-                                        id="avatarSearchInput"
-                                        type="text"
-                                        class="form-control avatarSearch"
-                                        placeholder="Search avatars..."
-                                    />
-                                </div>
-                                <div id="avatarVideoAIcontainer"></div>
-                                <hr />
-                                <select id="avatarQuality" class="form-select text-light bg-dark">
-                                    <option value="low">Avatar Quality - Low (360p)</option>
-                                    <option value="medium">Avatar Quality - Medium (480p)</option>
-                                    <option value="high" selected>Avatar Quality - High (720p)</option>
-                                    <option value="very_high">Avatar Quality - Very High (1080p)</option>
-                                </select>
-                                <select
-                                    id="avatarVoiceIDs"
-                                    name="avatarVoiceIDs"
-                                    class="form-select text-light bg-dark"
-                                >
-                                    <option value="">Select Avatar Voice</option>
-                                </select>
-                                <audio id="avatarVoicePreview"></audio>
-                                <button id="avatarVideoAIStart" class="btn-custom">
-                                    <i class="fas fa-play"></i> Start Avatar Session
-                                </button>
-                                <hr />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div id="tabVideoShare" class="tabcontent">
-                        <div class="settings-section-intro">
-                            <h3>Share media</h3>
-                            <p>Play a video or audio source for everyone in the room.</p>
-                        </div>
-                        <div class="share-media-field">
-                            <label for="shareMediaUrlInput">Video or audio URL</label>
-                            <div class="share-media-row">
-                                <input
-                                    id="shareMediaUrlInput"
-                                    type="url"
-                                    placeholder="Paste a video or audio URL..."
-                                    maxlength="2048"
-                                />
-                                <button id="videoShareButton" class="btn-custom">
-                                    <i class="fas fa-share-nodes"></i>
-                                    <p>Share</p>
-                                </button>
-                            </div>
-                            <p class="share-media-hint">Supported: YouTube links, .mp4, .mp3, .webm, .ogg</p>
-                        </div>
-                        <br />
-                        <button id="videoCloseBtn" class="hidden btn-custom">
-                            <i class="fas fa-times"></i>
-                            <p>Close Video or Audio</p>
-                        </button>
-                    </div>
-
-                    <div id="tabRTMPStreaming" class="tabcontent">
-                        <div id="rtmpUrlLive">
-                            <div class="rtmp-intro">
-                                <span class="rtmp-intro-icon" aria-hidden="true">
-                                    <i class="fa-solid fa-satellite-dish"></i>
-                                </span>
-                                <div>
-                                    <h3>Broadcast with RTMP</h3>
-                                    <p>Choose a destination, then select one source to send live.</p>
-                                </div>
-                            </div>
-
-                            <section class="rtmp-section" aria-labelledby="rtmpDestinationTitle">
-                                <div class="rtmp-section-heading">
-                                    <span class="rtmp-step">1</span>
-                                    <div>
-                                        <h4 id="rtmpDestinationTitle">Confirm destination</h4>
-                                        <p>The room RTMP server is used unless you choose an override.</p>
-                                    </div>
-                                </div>
-                                <div class="rtmp-default-destination">
-                                    <i class="fa-solid fa-server" aria-hidden="true"></i>
-                                    <span
-                                        ><strong>Room default</strong
-                                        ><small>Configured by your administrator</small></span
-                                    >
-                                </div>
-                                <div id="rtmpCustomDestination">
-                                    <p class="rtmp-override-label">Override destination</p>
-                                    <div class="rtmp-preset-buttons">
-                                        <button
-                                            id="rtmpPresetYouTube"
-                                            class="btn-rtmp-preset"
-                                            title="Stream to YouTube Live"
-                                        >
-                                            <i class="fa-brands fa-youtube"></i> YouTube
-                                        </button>
-                                        <button
-                                            id="rtmpPresetFacebook"
-                                            class="btn-rtmp-preset"
-                                            title="Stream to Facebook Live"
-                                        >
-                                            <i class="fa-brands fa-facebook"></i> Facebook
-                                        </button>
-                                        <button id="rtmpPresetTwitch" class="btn-rtmp-preset" title="Stream to Twitch">
-                                            <i class="fa-brands fa-twitch"></i> Twitch
-                                        </button>
-                                        <button
-                                            id="rtmpPresetCustom"
-                                            class="btn-rtmp-preset"
-                                            title="Use a custom RTMP server"
-                                        >
-                                            <i class="fa-solid fa-globe"></i> Custom
-                                        </button>
-                                    </div>
-                                    <div class="rtmp-field">
-                                        <label for="rtmpCustomUrl">Server URL</label>
-                                        <input
-                                            id="rtmpCustomUrl"
-                                            type="text"
-                                            value=""
-                                            placeholder="rtmp://a.rtmp.youtube.com/live2"
-                                            autocomplete="off"
-                                        />
-                                        <small>The ingest server address provided by your streaming platform.</small>
-                                    </div>
-                                    <div class="rtmp-field">
-                                        <label for="rtmpCustomStreamKey">Stream key</label>
-                                        <input
-                                            id="rtmpCustomStreamKey"
-                                            type="password"
-                                            value=""
-                                            placeholder="Stream key"
-                                            autocomplete="off"
-                                        />
-                                        <small>Keep this private. It authorizes publishing to your channel.</small>
-                                    </div>
-                                    <button id="rtmpCustomClear" class="btn-custom">
-                                        <i class="fa-solid fa-eraser"></i>&nbsp;Use room default
-                                    </button>
-                                </div>
-                            </section>
-
-                            <div class="rtmp-section rtmp-sources" aria-labelledby="rtmpSourceTitle">
-                                <div class="rtmp-section-heading">
-                                    <span class="rtmp-step">2</span>
-                                    <div>
-                                        <h4 id="rtmpSourceTitle">Choose one source</h4>
-                                        <p>Only one RTMP source can be active at a time.</p>
-                                    </div>
-                                </div>
-
-                                <section id="rtmpFromFile" class="rtmp-source" aria-labelledby="rtmpFileTitle">
-                                    <div class="rtmp-source-heading">
-                                        <span class="rtmp-source-icon"><i class="fa-solid fa-file-video"></i></span>
-                                        <div>
-                                            <h5 id="rtmpFileTitle">Server video file</h5>
-                                            <p>Broadcast a video already uploaded to this server.</p>
-                                        </div>
-                                    </div>
-                                    <table class="file-table">
-                                        <thead>
-                                            <tr>
-                                                <th>
-                                                    <span>Available files</span>
-                                                    <button
-                                                        id="refreshVideoFiles"
-                                                        type="button"
-                                                        aria-label="Refresh video files"
-                                                        title="Refresh video files"
-                                                    >
-                                                        <i class="fa-solid fa-rotate" aria-hidden="true"></i>
-                                                    </button>
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="file-list">
-                                            <!-- File items will be dynamically added here -->
-                                        </tbody>
-                                    </table>
-                                    <div id="file-name"></div>
-                                    <!-- <hr /> -->
-                                    <button id="startRtmpButton" class="hidden btn-custom">
-                                        <i class="fa-solid fa-play"></i>&nbsp;Start RTMP File Streaming
-                                    </button>
-                                    <button id="stopRtmpButton" class="hidden btn-custom rtmp-stop-button">
-                                        <i class="fas fa-stop-circle"></i>&nbsp;Stop RTMP File Streaming
-                                    </button>
-                                </section>
-
-                                <section id="rtmpFromUrl" class="rtmp-source" aria-labelledby="rtmpUrlTitle">
-                                    <div class="rtmp-source-heading">
-                                        <span class="rtmp-source-icon"><i class="fa-solid fa-link"></i></span>
-                                        <div>
-                                            <h5 id="rtmpUrlTitle">Online media URL</h5>
-                                            <p>Relay a publicly reachable video file or media URL.</p>
-                                        </div>
-                                    </div>
-                                    <div class="rtmp-field">
-                                        <label for="rtmpStreamURL">Media URL</label>
-                                        <input
-                                            id="rtmpStreamURL"
-                                            type="text"
-                                            value=""
-                                            placeholder="https://domain/path/file.mp4"
-                                        />
-                                    </div>
-                                    <button id="startRtmpURLButton" class="hidden btn-custom">
-                                        <i class="fa-solid fa-play"></i>&nbsp;Start RTMP URL Streaming
-                                    </button>
-                                    <button id="stopRtmpURLButton" class="hidden btn-custom rtmp-stop-button">
-                                        <i class="fas fa-stop-circle"></i>&nbsp;Stop RTMP URL Streaming
-                                    </button>
-                                </section>
-
-                                <section id="rtmpFromStream" class="rtmp-source" aria-labelledby="rtmpLiveTitle">
-                                    <div class="rtmp-source-heading">
-                                        <span class="rtmp-source-icon"><i class="fa-solid fa-video"></i></span>
-                                        <div>
-                                            <h5 id="rtmpLiveTitle">Camera or screen</h5>
-                                            <p>Open the broadcast studio and stream live from this device.</p>
-                                        </div>
-                                    </div>
-                                    <button id="streamerRtmpButton" class="hidden btn-custom">
-                                        <i class="fa-solid fa-arrow-up-right-from-square"></i>&nbsp;Open broadcast
-                                        studio
-                                    </button>
-                                </section>
-                            </div>
-
-                            <section class="rtmp-section rtmp-output" aria-labelledby="rtmpOutputTitle">
-                                <div class="rtmp-section-heading">
-                                    <span class="rtmp-step">3</span>
-                                    <div>
-                                        <h4 id="rtmpOutputTitle">Live output</h4>
-                                        <p>The active RTMP address appears here after streaming starts.</p>
-                                    </div>
-                                </div>
-                                <div id="rtmpUrlLiveContainer" class="input-container">
-                                    <input
-                                        id="rtmpLiveUrl"
-                                        type="text"
-                                        value=""
-                                        placeholder="No active RTMP stream"
-                                        readonly
-                                        aria-label="Active RTMP stream URL"
-                                    />
-                                    <button
-                                        id="copyRtmpUrlButton"
-                                        class="fas fa-copy"
-                                        aria-label="Copy active RTMP URL"
-                                        title="Copy active RTMP URL"
-                                    ></button>
-                                </div>
-                            </section>
-                        </div>
                     </div>
 
                     <div id="tabProfile" class="tabcontent">
@@ -1691,11 +1342,6 @@
                                         <td><strong>Toggle settings</strong></td>
                                     </tr>
                                     <tr>
-                                        <td><i class="fa-solid fa-x"></i></td>
-                                        <td><i class="fas fa-user"></i></td>
-                                        <td><strong>Toggle hide myself</strong></td>
-                                    </tr>
-                                    <tr>
                                         <td><i class="fa-solid fa-r"></i></td>
                                         <td><i class="fas fa-record-vinyl"></i></td>
                                         <td><strong>Toggle recording</strong></td>
@@ -1707,16 +1353,6 @@
                                         <td><strong>Toggle captions</strong></td>
                                     </tr>
 
-                                    <tr>
-                                        <td><i class="fa-solid fa-d"></i></td>
-                                        <td><i class="fas fa-images"></i></td>
-                                        <td><strong>Toggle document PIP</strong></td>
-                                    </tr>
-                                    <tr>
-                                        <td><i class="fa-solid fa-t"></i></td>
-                                        <td><i class="fas fas fa-camera-retro"></i></td>
-                                        <td><strong>Snapshot screen/window/tab</strong></td>
-                                    </tr>
                                     <tr>
                                         <td><i class="fa-solid fa-f"></i></td>
                                         <td><i class="fas fa-folder-open"></i></td>
@@ -1744,7 +1380,6 @@
                             <option value="speaker-left">Speaker left</option>
                             <option value="speaker-right">Speaker right</option>
                             <option value="speaker-1:1">Speaker 1:1</option>
-                            <option value="livestream">Livestream</option>
                         </select>
                         <br />
                         <div id="pinUnpinGridDiv" class="hidden">
@@ -2303,125 +1938,6 @@
             </div>
         </section>
 
-        <!-- Breakout Rooms Panel -->
-        <section id="breakoutPanel" class="breakout-panel fadein center hidden">
-            <header id="breakoutPanelHeader" class="breakout-panel-header">
-                <div class="breakout-panel-title">
-                    <span class="breakout-title-mark" aria-hidden="true">
-                        <i class="fas fa-object-ungroup"></i>
-                    </span>
-                    <span class="breakout-title-text">Breakout Rooms</span>
-                </div>
-                <div class="breakout-panel-header-actions">
-                    <div class="breakout-tool-group" aria-label="Breakout room controls">
-                        <button
-                            id="breakoutTogglePin"
-                            class="fas fa-map-pin hidden"
-                            aria-label="Toggle pin"
-                            aria-pressed="false"
-                        ></button>
-                        <button id="breakoutMaxButton" aria-label="Maximize breakout rooms">
-                            <i class="fas fa-expand"></i>
-                        </button>
-                        <button id="breakoutMinButton" class="hidden" aria-label="Restore breakout rooms">
-                            <i class="fas fa-compress"></i>
-                        </button>
-                        <button id="breakoutRefreshBtn" class="fas fa-sync-alt" aria-label="Refresh rooms"></button>
-                        <button
-                            id="breakoutDeleteAllBtn"
-                            class="breakout-header-action-btn hidden"
-                            type="button"
-                            aria-label="Delete all rooms"
-                        >
-                            <i class="fas fa-trash"></i>
-                        </button>
-                        <button
-                            id="breakoutPanelCloseBtn"
-                            class="fas fa-times"
-                            aria-label="Close breakout rooms"
-                        ></button>
-                    </div>
-                </div>
-            </header>
-            <main class="breakout-panel-body">
-                <!-- Create Room -->
-                <div class="breakout-create-section">
-                    <div class="breakout-create-row">
-                        <button id="breakoutAddRoomBtn" class="breakout-action-btn" type="button">
-                            <i class="fas fa-plus"></i> Add Room
-                        </button>
-                        <button
-                            id="breakoutLaunchBtn"
-                            class="breakout-action-btn breakout-launch-btn hidden"
-                            type="button"
-                        >
-                            <i class="fas fa-rocket"></i> Launch
-                        </button>
-                    </div>
-                </div>
-                <!-- Rooms -->
-                <div class="breakout-section">
-                    <div class="breakout-section-label">
-                        <span id="breakoutRoomsLabel">Rooms</span>
-                    </div>
-                    <div id="breakoutRoomsList" class="breakout-rooms-list"></div>
-                    <div id="breakoutEmptyState" class="breakout-empty-state">
-                        <i class="fas fa-door-open"></i>
-                        <span>No rooms yet, set a duration and add one above</span>
-                    </div>
-                </div>
-                <!-- Actions -->
-                <div id="breakoutActionsBar" class="breakout-actions-bar hidden">
-                    <div class="breakout-actions-row">
-                        <button id="breakoutEndAllBtn" class="breakout-end-all-btn hidden" type="button">
-                            <i class="fas fa-stop-circle"></i> End All Sessions
-                        </button>
-                    </div>
-                    <div id="breakoutBroadcastInline" class="breakout-broadcast-inline">
-                        <input
-                            id="breakoutBroadcastInput"
-                            class="breakout-broadcast-input"
-                            type="text"
-                            placeholder="Broadcast message..."
-                            maxlength="500"
-                        />
-                        <button
-                            id="breakoutBroadcastAllBtn"
-                            class="breakout-broadcast-all-btn"
-                            type="button"
-                            title="Send to all rooms"
-                            aria-label="Send message to all rooms"
-                        >
-                            <i class="fas fa-paper-plane"></i>
-                        </button>
-                    </div>
-                </div>
-                <!-- Participants -->
-                <div class="breakout-section">
-                    <div class="breakout-section-label">
-                        <span id="breakoutParticipantsLabel">Participants</span>
-                        <button
-                            id="breakoutAutoAssignBtn"
-                            class="breakout-auto-assign-btn hidden"
-                            title="Auto-assign participants randomly"
-                            type="button"
-                        >
-                            <i class="fas fa-random"></i> Auto-assign
-                        </button>
-                    </div>
-                    <input
-                        id="breakoutParticipantSearch"
-                        class="breakout-participant-search"
-                        type="text"
-                        placeholder="Search participants..."
-                        aria-label="Search participants"
-                        maxlength="100"
-                    />
-                    <div id="breakoutParticipantsList" class="breakout-participants-list"></div>
-                </div>
-            </main>
-        </section>
-
         <section id="lobby" class="fadein center">
             <header id="lobbyHeader" class="lobby-header">
                 <div class="lobby-header-copy">
@@ -2541,7 +2057,7 @@
 
         <template id="popupRecordingInfoTemplate">
             <div class="popup-template-copy popup-template-copy--left">
-                <span data-template-text="indicator"></span> <span data-template-text="recType"></span> Recording Info:
+                <span data-template-text="indicator"></span> <span data-template-text="recordingLocation"></span>
                 <div data-template-html="recordingInfo"></div>
                 <div data-template-text="recordingMsg"></div>
             </div>
@@ -2585,8 +2101,25 @@ Note</textarea>
         </template>
 
         <template id="popupAboutTemplate">
-            <br />
-            <div id="about" data-template-html="aboutContent"></div>
+            <div class="meeting-about">
+                <span class="meeting-about-version" data-template-text="version"></span>
+                <section class="meeting-about-card">
+                    <h3><i class="fas fa-video" aria-hidden="true"></i> Meeting platform</h3>
+                    <p data-template-text="platformDescription"></p>
+                    <a href="https://sfu.mirotalk.com" target="_blank" rel="noopener noreferrer">
+                        <span>Learn more about MiroTalk SFU</span>
+                        <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
+                    </a>
+                </section>
+                <section class="meeting-about-card">
+                    <h3><i class="fas fa-code" aria-hidden="true"></i> License and source code</h3>
+                    <p data-template-text="licenseDescription"></p>
+                    <a data-template-attr-href="sourceUrl" target="_blank" rel="noopener noreferrer">
+                        <span>Source code of our version</span>
+                        <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
+                    </a>
+                </section>
+            </div>
         </template>
 
         <template id="popupMirotalkFilePickerTemplate">
@@ -2635,208 +2168,6 @@ Note</textarea>
                         placeholder="Choose date and time"
                         aria-label="Meeting date and time"
                     />
-                </div>
-            </div>
-        </template>
-
-        <!-- Breakout Templates -->
-
-        <template id="breakoutRoomOptionTemplate">
-            <option data-template-attr-value="value" data-template-text="label"></option>
-        </template>
-
-        <template id="breakoutNoParticipantsTemplate">
-            <div class="breakout-no-participants">No other participants in the room</div>
-        </template>
-
-        <template id="popupBreakoutLaunchTemplate">
-            <div class="breakout-popup breakout-popup--launch">
-                <div class="breakout-popup-hero">
-                    <span class="breakout-popup-icon breakout-popup-icon--launch"><i class="fas fa-rocket"></i></span>
-                    <div class="breakout-popup-copy">
-                        <p class="breakout-popup-eyebrow">Ready to start</p>
-                        <p class="breakout-popup-message">
-                            Move <strong><span data-template-text="participantCount"></span></strong>
-                            <span data-template-text="participantLabel"></span> into breakout sessions.
-                        </p>
-                    </div>
-                </div>
-                <div class="breakout-popup-summary" data-template-html="summary"></div>
-            </div>
-        </template>
-
-        <template id="popupBreakoutSummaryRowTemplate">
-            <div class="breakout-popup-summary-row">
-                <span class="breakout-popup-summary-room">
-                    <i data-template-attr-class="roomIconClass"></i>
-                    <span data-template-text="roomName"></span>
-                </span>
-                <span class="breakout-popup-summary-count">
-                    <i data-template-attr-class="countIconClass"></i>
-                    <span data-template-text="countValue"></span>
-                </span>
-            </div>
-        </template>
-
-        <template id="breakoutRoomCardTemplate">
-            <div data-template-attr-class="cardClass">
-                <div class="breakout-room-info">
-                    <i class="fas fa-door-open breakout-accent"></i>
-                    <span
-                        class="breakout-room-name"
-                        data-template-attr-id="nameId"
-                        data-template-attr-onclick="nameOnClick"
-                        data-template-attr-title="nameTitle"
-                        data-template-text="displayName"
-                    ></span>
-                    <span
-                        class="breakout-room-count"
-                        data-template-attr-id="countId"
-                        data-template-text="peerCountLabel"
-                    ></span>
-                    <span
-                        class="breakout-room-duration"
-                        data-template-attr-id="durationId"
-                        data-template-attr-onclick="durationOnClick"
-                        data-template-attr-title="durationTitle"
-                        data-template-html="durationDisplay"
-                    ></span>
-                </div>
-                <div class="breakout-room-actions">
-                    <button
-                        class="breakout-room-join-btn"
-                        type="button"
-                        aria-label="Join breakout room"
-                        data-template-attr-onclick="joinOnClick"
-                    >
-                        <i class="fas fa-sign-in-alt"></i> Join
-                    </button>
-                    <button
-                        class="breakout-room-msg-btn"
-                        type="button"
-                        aria-label="Send message to this room"
-                        data-template-attr-onclick="messageOnClick"
-                        title="Send message to this room"
-                    >
-                        <i class="fas fa-paper-plane"></i>
-                    </button>
-                    <button
-                        class="breakout-room-remove-btn"
-                        type="button"
-                        aria-label="Remove breakout room"
-                        data-template-attr-onclick="removeOnClick"
-                    >
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-            </div>
-        </template>
-
-        <template id="breakoutParticipantRowTemplate">
-            <div class="breakout-participant-row">
-                <div class="breakout-participant-info">
-                    <img data-template-attr-src="avatarSrc" alt="avatar" class="breakout-peer-avatar" />
-                    <span class="breakout-peer-name" data-template-text="peerName"></span>
-                </div>
-                <select
-                    class="breakout-room-select"
-                    data-template-attr-data-peer-id="peerId"
-                    data-template-attr-data-peer-name="peerNameAttr"
-                    data-template-html="roomOptions"
-                ></select>
-            </div>
-        </template>
-
-        <template id="popupBreakoutDurationPickerTemplate">
-            <div class="breakout-duration-picker-wrapper">
-                <input type="text" id="breakoutDurationPicker" class="breakout-duration-picker-input" />
-            </div>
-        </template>
-
-        <template id="popupBreakoutHelpTemplate">
-            <div class="breakout-popup breakout-popup--help">
-                <div class="breakout-popup-hero">
-                    <span class="breakout-popup-icon breakout-popup-icon--help"><i class="fas fa-hand-paper"></i></span>
-                    <div class="breakout-popup-copy">
-                        <p class="breakout-popup-eyebrow">Presenter assist</p>
-                        <p class="breakout-popup-message">
-                            <strong data-template-text="peerName"></strong> in
-                            <strong data-template-text="roomLabel"></strong> is asking for help.
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </template>
-
-        <template id="popupBreakoutJoinTemplate">
-            <div class="breakout-popup breakout-popup--join">
-                <div class="breakout-assign-spinner" aria-hidden="true">
-                    <div class="breakout-spinner-orbit">
-                        <span class="breakout-spinner-core"></span>
-                        <span class="breakout-spinner-dot breakout-spinner-dot--one"></span>
-                        <span class="breakout-spinner-dot breakout-spinner-dot--two"></span>
-                        <span class="breakout-spinner-dot breakout-spinner-dot--three"></span>
-                    </div>
-                </div>
-                <div class="breakout-popup-hero breakout-popup-hero--stacked">
-                    <span class="breakout-popup-icon breakout-popup-icon--join"
-                        ><i class="fas fa-object-ungroup"></i
-                    ></span>
-                    <div class="breakout-popup-copy">
-                        <p class="breakout-popup-eyebrow">Assigned session</p>
-                        <p class="breakout-popup-message">
-                            You have been assigned to <strong data-template-text="displayName"></strong>.
-                        </p>
-                    </div>
-                </div>
-                <div data-template-html="durationChip"></div>
-            </div>
-        </template>
-
-        <template id="popupBreakoutEndTemplate">
-            <div class="breakout-popup breakout-popup--end">
-                <div class="breakout-popup-hero breakout-popup-hero--stacked">
-                    <span class="breakout-popup-icon breakout-popup-icon--end"><i class="fas fa-door-open"></i></span>
-                    <div class="breakout-popup-copy">
-                        <p class="breakout-popup-eyebrow">Return everyone</p>
-                        <p class="breakout-popup-message">
-                            Notify <strong><span data-template-text="participantCount"></span></strong>
-                            <span data-template-text="participantLabel"></span> to rejoin the main room and close every
-                            breakout session.
-                        </p>
-                    </div>
-                </div>
-                <div class="breakout-popup-summary breakout-popup-summary--end">
-                    <div class="breakout-popup-summary-row">
-                        <span class="breakout-popup-summary-room">
-                            <i class="fas fa-users"></i>
-                            <span>Participants returning</span>
-                        </span>
-                        <span
-                            class="breakout-popup-summary-count breakout-popup-summary-count--end"
-                            data-template-text="participantCount"
-                        ></span>
-                    </div>
-                    <div class="breakout-popup-summary-row">
-                        <span class="breakout-popup-summary-room">
-                            <i class="fas fa-layer-group"></i>
-                            <span>Breakout rooms removed</span>
-                        </span>
-                        <span class="breakout-popup-summary-count breakout-popup-summary-count--end">All rooms</span>
-                    </div>
-                </div>
-                <div class="breakout-countdown-card">
-                    <label for="breakoutEndCountdown" class="breakout-countdown-label">Countdown before closing</label>
-                    <select
-                        id="breakoutEndCountdown"
-                        class="form-select text-light bg-dark breakout-countdown-select breakout-countdown-select--end"
-                    >
-                        <option value="0">Immediately</option>
-                        <option value="10">10 seconds</option>
-                        <option value="30" selected>30 seconds</option>
-                        <option value="60">60 seconds</option>
-                        <option value="120">2 minutes</option>
-                    </select>
                 </div>
             </div>
         </template>

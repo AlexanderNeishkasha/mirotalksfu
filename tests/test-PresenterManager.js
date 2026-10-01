@@ -58,14 +58,14 @@ describe('PresenterManager', () => {
         room.sendToAll.notCalled.should.be.true();
     });
 
-    it('does not assign fallback presenters in breakout rooms', () => {
+    it('treats retired breakout-style names as ordinary rooms', () => {
         const peer = createPeer('peer-id', 'Participant');
         const room = createRoom([peer]);
 
         const promotedPeer = assignFallbackPresenter('room1_breakout_1', room, { room1_breakout_1: {} }, true);
 
-        (promotedPeer === null).should.be.true();
-        peer.updatePeerInfo.notCalled.should.be.true();
-        room.sendToAll.notCalled.should.be.true();
+        (promotedPeer === peer).should.be.true();
+        peer.updatePeerInfo.calledOnce.should.be.true();
+        room.sendToAll.calledOnce.should.be.true();
     });
 });

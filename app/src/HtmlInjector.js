@@ -48,7 +48,7 @@ class HtmlInjector {
         filePaths.forEach((filePath) => this.loadFileToCache(filePath));
     }
 
-    // Function to watch files for changes using chokidar
+    /** Keep cached pages current across native writes and Docker Compose file replacement/sync. */
     watchFiles(filePaths) {
         if (this.watcher) {
             this.watcher.close(); // Close existing watcher if any
@@ -57,11 +57,15 @@ class HtmlInjector {
         this.watcher = chokidar.watch(filePaths, {
             persistent: true,
             ignoreInitial: true, // Ignore initial 'add' events
+            // Docker sync can miss native change events; poll only in local development.
+            usePolling: process.env.NODE_ENV === 'development',
+            interval: 250,
             // Compose sync writes HTML in chunks; cache only after the write settles.
             awaitWriteFinish: { stabilityThreshold: 500, pollInterval: 100 },
         });
 
         this.watcher
+            .on('add', (filePath) => this.loadFileToCache(filePath))
             .on('change', (filePath) => {
                 log.debug(`File changed: ${filePath}`);
                 this.loadFileToCache(filePath);

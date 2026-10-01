@@ -1,0 +1,38 @@
+#videoSelect[hidden],
+.camera-access-notice[hidden] {
+    display: none !important;
+}
+
+.camera-access-notice {
+    max-width: 560px;
+    margin: 12px 0 24px;
+    padding: 16px;
+    border: 1px solid color-mix(in srgb, var(--room-switch-accent) 28%, transparent);
+    border-radius: 12px;
+    background: var(--btns-bg-color);
+    color: var(--dd-color);
+}
+
+.camera-access-notice p {
+    margin: 0 0 12px !important;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.camera-access-notice p:first-child {
+    font-weight: 600;
+}
+
+#mySettings #cameraAccessRetry {
+    width: auto;
+    padding-inline: 16px;
+    margin: 0;
+}
+
+#cameraAccessStatus:not(:empty) {
+    margin: 12px 0 0 !important;
+}
+
+#cameraAccessStatus:empty {
+    display: none;
+}
