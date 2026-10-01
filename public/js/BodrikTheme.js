@@ -32,7 +32,6 @@
             '--select-focus-color': accent,
             '--tab-btn-active': raised,
             '--settings-bg': card,
-            '--wb-bg': bg,
             '--btns-bg-color': card,
             '--dd-color': text,
             '--room-switch-accent': accent,

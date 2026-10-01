@@ -2308,14 +2308,14 @@ function startServer() {
         server.listen(config?.server?.listen?.port || 3010, config?.server?.listen?.ip || '127.0.0.1', () => {
             log.log(
                 `%c
-    
+
         ███████╗██╗ ██████╗ ███╗   ██╗      ███████╗███████╗██████╗ ██╗   ██╗███████╗██████╗ 
         ██╔════╝██║██╔════╝ ████╗  ██║      ██╔════╝██╔════╝██╔══██╗██║   ██║██╔════╝██╔══██╗
         ███████╗██║██║  ███╗██╔██╗ ██║█████╗███████╗█████╗  ██████╔╝██║   ██║█████╗  ██████╔╝
         ╚════██║██║██║   ██║██║╚██╗██║╚════╝╚════██║██╔══╝  ██╔══██╗╚██╗ ██╔╝██╔══╝  ██╔══██╗
         ███████║██║╚██████╔╝██║ ╚████║      ███████║███████╗██║  ██║ ╚████╔╝ ███████╗██║  ██║
         ╚══════╝╚═╝ ╚═════╝ ╚═╝  ╚═══╝      ╚══════╝╚══════╝╚═╝  ╚═╝  ╚═══╝  ╚══════╝╚═╝  ╚═╝ started...
-    
+
         `,
                 'font-family:monospace'
             );
@@ -3318,6 +3318,9 @@ function startServer() {
                     // Only the server API (endMeeting) may force a redirect, never a peer
                     delete data.redirect;
                     break;
+                case 'roomEmoji':
+                    // Do not relay retired room reactions from stale clients.
+                    return;
                 case 'peerAudio':
                     // Legacy clients must not change participant volume for the whole room.
                     return;
@@ -3793,9 +3796,7 @@ function startServer() {
                 case 'chat_cant_chatgpt':
                 case 'chat_cant_deep_seek':
                 case 'media_cant_sharing':
-                case 'polls_cant_create':
-                    room.broadCast(socket.id, 'updateRoomModerator', moderator);
-                    break;
+
                 default:
                     break;
             }
@@ -3955,210 +3956,7 @@ function startServer() {
                 : room.sendTo(data.peer_id, 'shareVideoAction', data);
         });
 
-        socket.on('wbCanvasToJson', (dataObject) => {
-            if (!roomExists(socket)) return;
-
-            // Security: cap whiteboard payload size. Fabric canvas JSON should comfortably
-            // fit in well under 2 MB; anything larger is either accidental (huge embedded
-            // images) or an attempt to abuse the broadcast channel as cheap amplification.
-            const rawSize =
-                typeof dataObject === 'string' ? dataObject.length : dataObject ? JSON.stringify(dataObject).length : 0;
-            if (rawSize > 2_000_000) {
-                log.debug('wbCanvasToJson blocked: payload too large', { size: rawSize });
-                return;
-            }
-
-            const room = getRoom(socket);
-
-            // Security: require the sender to be an actual joined peer of the room.
-            // Without this a socket that only called `createRoom` (which sets socket.room_id
-            // before the "already exists" check) could broadcast whiteboard payloads to all
-            // real peers without ever joining the room / appearing in the attendee list.
-            const peer = room.getPeer(socket.id);
-            if (!peer) {
-                log.debug('wbCanvasToJson blocked: sender is not a joined peer', {
-                    room_id: socket.room_id,
-                    socket_id: socket.id,
-                });
-                return;
-            }
-
-            // Security: when the whiteboard is locked, only the presenter may overwrite
-            // the shared canvas. The lock state is server-authoritative and does not
-            // depend on the client toggling its local `wbIsLock` flag.
-            const isPresenter = isPeerPresenter(
-                socket.room_id,
-                socket.id,
-                peer.peer_info?.peer_name,
-                peer.peer_info?.peer_uuid
-            );
-            if (!isPresenter && room.getWhiteboardLock()) {
-                log.debug('wbCanvasToJson blocked: whiteboard is locked and sender is not presenter', {
-                    peer_name: peer.peer_info?.peer_name,
-                });
-                return;
-            }
-
-            const data = checkXSS(dataObject);
-
-            // Security: strip fabric `image` objects whose `src` is not a safe http(s) URL
-            // or `data:image/*` URI. This prevents SSRF probes (http://127.0.0.1, AWS IMDS,
-            // 192.168/10/172.16/8 ranges…) and dangerous schemes (javascript:, file:, blob:)
-            // from being rendered by every other peer's browser.
-            const sanitized = Validator.sanitizeWbCanvasJson(data, ({ src }) => {
-                log.debug('wbCanvasToJson dropped unsafe image src', { src });
-            });
-
-            // const objLength = bytesToSize(Object.keys(data).length);
-
-            // log.debug('Send Whiteboard canvas JSON', { length: objLength });
-
-            room.broadCast(socket.id, 'wbCanvasToJson', sanitized);
-        });
-
-        socket.on('whiteboardObject', (dataObject) => {
-            if (!roomExists(socket)) return;
-
-            const room = getRoom(socket);
-            const peer = room.getPeer(socket.id);
-            if (!peer || !dataObject || typeof dataObject !== 'object') return;
-
-            let rawSize;
-            try {
-                rawSize = JSON.stringify(dataObject).length;
-            } catch (_) {
-                return;
-            }
-            if (rawSize > 2_000_000) return;
-
-            const isPresenter = isPeerPresenter(
-                socket.room_id,
-                socket.id,
-                peer.peer_info?.peer_name,
-                peer.peer_info?.peer_uuid
-            );
-            if (!isPresenter && room.getWhiteboardLock()) return;
-
-            const data = checkXSS(dataObject);
-            if (!['upsert', 'remove'].includes(data.action)) return;
-            if (typeof data.object_id !== 'string' || data.object_id.length > 200) return;
-
-            if (data.action === 'upsert') {
-                if (!data.object || typeof data.object !== 'object') return;
-                const sanitized = Validator.sanitizeWbCanvasJson({ objects: [data.object] });
-                if (sanitized.objects.length !== 1) return;
-                data.object = sanitized.objects[0];
-                data.object.wbId = data.object_id;
-                data.object.wbAuthor = String(peer.peer_info?.peer_name || 'Participant').slice(0, 40);
-                data.object.wbAuthorId = socket.id;
-            } else {
-                delete data.object;
-            }
-
-            room.broadCast(socket.id, 'whiteboardObject', data);
-        });
-
-        socket.on('whiteboardPointer', (dataObject) => {
-            if (!roomExists(socket)) return;
-
-            const room = getRoom(socket);
-            if (!room.getWhiteboardParticipantNames()) return;
-            const peer = room.getPeer(socket.id);
-            if (!peer || !dataObject || typeof dataObject !== 'object') return;
-
-            const now = Date.now();
-            if (dataObject.active && now - (socket.lastWhiteboardPointerAt || 0) < 25) return;
-            socket.lastWhiteboardPointerAt = now;
-
-            const x = Number(dataObject.x);
-            const y = Number(dataObject.y);
-            if (!Number.isFinite(x) || !Number.isFinite(y) || Math.abs(x) > 100_000 || Math.abs(y) > 100_000) return;
-
-            const isPresenter = isPeerPresenter(
-                socket.room_id,
-                socket.id,
-                peer.peer_info?.peer_name,
-                peer.peer_info?.peer_uuid
-            );
-            if (!isPresenter && room.getWhiteboardLock()) return;
-
-            room.broadCast(socket.id, 'whiteboardPointer', {
-                peer_id: socket.id,
-                peer_name: String(peer.peer_info?.peer_name || 'Participant').slice(0, 40),
-                x,
-                y,
-                active: Boolean(dataObject.active),
-            });
-        });
-
-        socket.on('whiteboardAction', (dataObject) => {
-            if (!roomExists(socket)) return;
-
-            const room = getRoom(socket);
-
-            // Security: require the sender to be an actual joined peer of the room
-            // (see wbCanvasToJson above for rationale).
-            const peer = room.getPeer(socket.id);
-            if (!peer) {
-                log.debug('whiteboardAction blocked: sender is not a joined peer', {
-                    room_id: socket.room_id,
-                    socket_id: socket.id,
-                });
-                return;
-            }
-
-            const data = checkXSS(dataObject);
-
-            if (!Validator.isValidData(data)) return;
-
-            // Security: whiteboardAction mutates global whiteboard state (clear / undo / redo /
-            // bgcolor / lock / unlock) for every other peer. Only the presenter is allowed
-            // to trigger these. Verify against server-known peer identity, not client-supplied
-            // peer_name / peer_uuid (which are attacker-controlled in the request body).
-            const isPresenter = isPeerPresenter(
-                socket.room_id,
-                socket.id,
-                peer.peer_info?.peer_name,
-                peer.peer_info?.peer_uuid
-            );
-            if (!isPresenter) {
-                log.debug('whiteboardAction blocked: sender is not presenter', {
-                    action: data.action,
-                    peer_name: peer.peer_info?.peer_name,
-                });
-                return;
-            }
-
-            // Overwrite the broadcast peer_name with the server-known value so a presenter
-            // can't be tricked into proxying an HTML payload supplied in the request body
-            // (the client renders `data.peer_name` inside a SweetAlert toast).
-            data.peer_name = peer.peer_info?.peer_name || data.peer_name;
-
-            // Track lock state server-side so late-joining peers / future requests are
-            // gated even if the presenter never re-toggles the button.
-            if (data.action === 'lock') room.setWhiteboardLock(true);
-            if (data.action === 'unlock') room.setWhiteboardLock(false);
-            if (data.action === 'participantNames') {
-                data.status = Boolean(data.status);
-                room.setWhiteboardParticipantNames(data.status);
-            }
-
-            log.debug('Whiteboard', data);
-            room.broadCast(socket.id, 'whiteboardAction', data);
-        });
-
         // Video drawing overlay: relay batched drawing strokes to all peers in the room
-        socket.on('videoDrawing', (dataObject) => {
-            if (!roomExists(socket)) return;
-            const data = checkXSS(dataObject);
-            const room = getRoom(socket);
-            const peer = room.getPeer(socket.id);
-            if (!peer) return;
-            data.drawerId = socket.id;
-            data.peer_name = peer.peer_info?.peer_name || peer.peer_name;
-            // log.debug('Video drawing', data);
-            room.broadCast(socket.id, 'videoDrawing', data);
-        });
 
         socket.on('setVideoOff', (dataObject) => {
             if (!roomExists(socket)) return;
@@ -4866,180 +4664,6 @@ function startServer() {
             if (!roomExists(socket)) return;
 
             log.debug('endRTMPfromURL - rtmpTotalActiveStreamsCount ---->', getRtmpTotalActiveStreamsCount());
-        });
-
-        socket.on('createPoll', (dataObject) => {
-            if (!roomExists(socket)) return;
-
-            const data = checkXSS(dataObject);
-
-            if (!Validator.isValidData(data)) return;
-
-            const { question, options } = data;
-
-            const room = getRoom(socket);
-
-            // Enforce the moderator "only presenter can create/edit/delete polls" rule server-side.
-            if (room._moderator && room._moderator.polls_cant_create) {
-                const peer = room.getPeer(socket.id);
-                const isPresenter = isPeerPresenter(
-                    socket.room_id,
-                    socket.id,
-                    peer?.peer_info?.peer_name,
-                    peer?.peer_info?.peer_uuid
-                );
-                if (!isPresenter) {
-                    log.debug('createPoll blocked by moderator rule (polls_cant_create)', {
-                        peer_name: peer?.peer_info?.peer_name,
-                    });
-                    return;
-                }
-            }
-
-            const newPoll = {
-                question: question,
-                options: options,
-                voters: new Map(),
-            };
-
-            const roomPolls = room.getPolls();
-
-            roomPolls.push(newPoll);
-            room.sendToAll('updatePolls', room.convertPolls(roomPolls));
-            log.debug('[Poll] createPoll', roomPolls);
-        });
-
-        socket.on('vote', (dataObject) => {
-            if (!roomExists(socket)) return;
-
-            const data = checkXSS(dataObject);
-
-            if (!Validator.isValidData(data)) return;
-
-            const { room, peer } = getRoomAndPeer(socket);
-
-            const { peer_name } = peer || socket.id;
-
-            const roomPolls = room.getPolls();
-
-            const poll = roomPolls[data.pollIndex];
-            if (poll) {
-                poll.voters.set(peer_name, data.option);
-                room.sendToAll('updatePolls', room.convertPolls(roomPolls));
-                log.debug('[Poll] vote', roomPolls);
-            }
-        });
-
-        socket.on('updatePoll', () => {
-            if (!roomExists(socket)) return;
-
-            const room = getRoom(socket);
-
-            const roomPolls = room.getPolls();
-
-            if (roomPolls.length > 0) {
-                room.sendToAll('updatePolls', room.convertPolls(roomPolls));
-                log.debug('[Poll] updatePoll', roomPolls);
-            }
-        });
-
-        socket.on('editPoll', (dataObject) => {
-            if (!roomExists(socket)) return;
-
-            const data = checkXSS(dataObject);
-
-            if (!Validator.isValidData(data)) return;
-
-            const { index, question, options } = data;
-
-            const room = getRoom(socket);
-
-            // Enforce the moderator "only presenter can create/edit/delete polls" rule server-side.
-            if (room._moderator && room._moderator.polls_cant_create) {
-                const peer = room.getPeer(socket.id);
-                const isPresenter = isPeerPresenter(
-                    socket.room_id,
-                    socket.id,
-                    peer?.peer_info?.peer_name,
-                    peer?.peer_info?.peer_uuid
-                );
-                if (!isPresenter) {
-                    log.debug('editPoll blocked by moderator rule (polls_cant_create)', {
-                        peer_name: peer?.peer_info?.peer_name,
-                    });
-                    return;
-                }
-            }
-
-            const roomPolls = room.getPolls();
-
-            if (roomPolls[index]) {
-                roomPolls[index].question = question;
-                roomPolls[index].options = options;
-                room.sendToAll('updatePolls', roomPolls);
-                log.debug('[Poll] editPoll', roomPolls);
-            }
-        });
-
-        socket.on('deletePoll', async (data) => {
-            if (!roomExists(socket)) return;
-
-            const { index, peer_name, peer_uuid } = checkXSS(data);
-
-            const room = getRoom(socket);
-
-            // Enforce the moderator "only presenter can create/edit/delete polls" rule server-side.
-            if (room._moderator && room._moderator.polls_cant_create) {
-                const isPresenter = isPeerPresenter(socket.room_id, socket.id, peer_name, peer_uuid);
-                if (!isPresenter) {
-                    log.debug('deletePoll blocked by moderator rule (polls_cant_create)', { peer_name });
-                    return;
-                }
-            }
-
-            const roomPolls = room.getPolls();
-
-            if (roomPolls[index]) {
-                roomPolls.splice(index, 1);
-                room.sendToAll('updatePolls', roomPolls);
-                log.debug('[Poll] deletePoll', roomPolls);
-            }
-        });
-
-        // Room collaborative editor
-
-        socket.on('editorChange', (dataObject) => {
-            if (!roomExists(socket)) return;
-
-            //const data = checkXSS(dataObject);
-            const data = dataObject;
-
-            const room = getRoom(socket);
-
-            room.broadCast(socket.id, 'editorChange', data);
-        });
-
-        socket.on('editorActions', (dataObject) => {
-            if (!roomExists(socket)) return;
-
-            const data = checkXSS(dataObject);
-
-            const room = getRoom(socket);
-
-            log.debug('editorActions', data);
-
-            room.broadCast(socket.id, 'editorActions', data);
-        });
-
-        socket.on('editorUpdate', (dataObject) => {
-            if (!roomExists(socket)) return;
-
-            //const data = checkXSS(dataObject);
-            const data = dataObject;
-
-            const room = getRoom(socket);
-
-            room.broadCast(socket.id, 'editorUpdate', data);
         });
 
         socket.on('disconnect', (reason) => {

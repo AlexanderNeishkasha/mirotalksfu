@@ -10,7 +10,6 @@
     --msger-bg: linear-gradient(135deg, #0e0e14, #1e1e28);
     --wb-width: 1920px;
     --wb-height: 1080px;
-    --wb-bg: linear-gradient(135deg, #0e0e14, #1e1e28);
     --select-bg: #161622;
     --select-border-radius: 12px;
     --select-focus-color: rgba(102, 190, 255, 0.5);
@@ -36,9 +35,6 @@
     --transcription-width: 420px;
     --trx-bg: linear-gradient(135deg, #0e0e14, #1e1e28);
 
-    --editor-container-width: 100%;
-    --editor-container-height: 100%;
-    --editor-height: 85vh;
 
     --vmi-wh: 15vw;
     /* https://developer.mozilla.org/en-US/docs/Web/CSS/object-fit */

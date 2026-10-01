@@ -31,13 +31,12 @@
         <meta property="og:url" content="{{OG_URL}}" />
 
         <!-- StyleSheet -->
-        <link rel="stylesheet" href="../css/Root.css" />
-        <link rel="stylesheet" href="../css/Room.css?v=bodrik-7" />
-        <link rel="stylesheet" href="../css/VideoGrid.css?v=bodrik-1" />
+        <link rel="stylesheet" href="../css/Root.css?v=bodrik-1" />
+        <link rel="stylesheet" href="../css/Room.css?v=bodrik-8" />
+        <link rel="stylesheet" href="../css/VideoGrid.css?v=bodrik-2" />
         <link rel="stylesheet" href="../css/GroupChat.css?v=bodrik-2" />
         <link rel="stylesheet" href="../css/ChatListActions.css?v=bodrik-2" />
-        <link rel="stylesheet" href="../css/Polls.css" />
-        <link rel="stylesheet" href="../css/Editor.css" />
+
         <link rel="stylesheet" href="../css/Translate.css" />
         <link rel="stylesheet" href="../css/ThemeControls.css?v=bodrik-1" />
 
@@ -70,10 +69,6 @@
             rel="stylesheet"
             href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/atom-one-dark.min.css"
         />
-
-        <!-- Quill  https://github.com/slab/quill -->
-
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.snow.css" />
 
         <!-- Bootstrap 5 -->
 
@@ -112,27 +107,26 @@
         <script defer src="https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.umd.js"></script>
         <script defer src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
         <script defer src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
-        <script defer src="https://cdn.jsdelivr.net/npm/fabric@5.3.0-browser/dist/fabric.min.js"></script>
+
         <script defer src="https://cdn.jsdelivr.net/npm/sweetalert2@11.4.8"></script>
         <script defer src="https://cdn.jsdelivr.net/npm/emoji-mart@latest/dist/browser.js"></script>
         <script defer src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/2.11.8/umd/popper.min.js"></script>
         <script defer src="https://cdnjs.cloudflare.com/ajax/libs/tippy.js/6.3.7/tippy-bundle.umd.min.js"></script>
         <script defer src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-        <script defer src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+
         <script defer src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
         <script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
-        <script defer src="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.js"></script>
+
         <script defer src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation"></script>
         <script defer src="https://cdn.jsdelivr.net/npm/gifler@0.1.0/gifler.min.js"></script>
         <script defer src="https://cdn.jsdelivr.net/npm/xss/dist/xss.min.js"></script>
 
         <script defer src="/socket.io/socket.io.js"></script>
         <script defer src="../sfu/MediasoupClient.js"></script>
-        <script defer src="../js/LocalStorage.js?v=bodrik-2"></script>
-        <script defer src="../js/Rules.js?v=bodrik-4"></script>
+        <script defer src="../js/LocalStorage.js?v=bodrik-3"></script>
+        <script defer src="../js/Rules.js?v=bodrik-6"></script>
         <script defer src="../js/Helpers.js"></script>
-        <script defer src="../js/VideoDrawing.js"></script>
-        <script defer src="../js/VideoGrid.js?v=bodrik-2"></script>
+        <script defer src="../js/VideoGrid.js?v=bodrik-3"></script>
         <script defer src="../js/VirtualBackground.js"></script>
         <script defer src="../js/NodeProcessor.js"></script>
         <script defer src="../js/BodrikMicProcessing.js?v=1"></script>
@@ -141,11 +135,11 @@
         <script defer src="../js/WakeLock.js"></script>
         <script defer src="../js/RoomTemplate.js"></script>
         <script defer src="../js/BodrikNetworkRecovery.js?v=1"></script>
-        <script defer src="../js/RoomClient.js?v=bodrik-21"></script>
+        <script defer src="../js/RoomClient.js?v=bodrik-23"></script>
         <script defer src="../js/BodrikProfile.js?v=2"></script>
         <script defer src="../js/BodrikChatImage.js?v=3"></script>
-        <script defer src="../js/BodrikTheme.js?v=2"></script>
-        <script defer src="../js/Room.js?v=bodrik-28"></script>
+        <script defer src="../js/BodrikTheme.js?v=3"></script>
+        <script defer src="../js/Room.js?v=bodrik-29"></script>
         <script defer src="../js/BodrikSettingsEscape.js?v=2"></script>
     </head>
     <body>
@@ -450,25 +444,17 @@
                         <!-- TOOLS -->
                         <div
                             class="device-menu-header extra-menu-group"
-                            data-buttons="pollButton,editorButton,whiteboardButton,documentPiPButton,emojiRoomButton,breakoutRoomButton"
+                            data-buttons="documentPiPButton,breakoutRoomButton"
                         >
                             TOOLS
                         </div>
-                        <button id="pollButton" class="hidden">
-                            <i class="fas fa-square-poll-horizontal"></i> Poll
-                        </button>
+
                         <button id="breakoutRoomButton" class="hidden">
                             <i class="fas fa-object-ungroup"></i> Breakout Rooms
                         </button>
-                        <button id="editorButton" class="hidden"><i class="fas fa-pen-to-square"></i> Editor</button>
-                        <button id="whiteboardButton" class="hidden">
-                            <i class="fas fa-chalkboard-teacher"></i> Whiteboard
-                        </button>
+
                         <button id="documentPiPButton" class="hidden">
                             <i class="fas fa-images"></i> Document PiP
-                        </button>
-                        <button id="emojiRoomButton" class="hidden">
-                            <i class="fas fa-face-smile"></i> Room Emoji
                         </button>
 
                         <div class="device-menu-divider extra-menu-divider" data-group="tools"></div>
@@ -499,9 +485,6 @@
                 </button>
             </div>
         </div>
-
-        <div id="emojiPickerContainer" class="roomEmoji fadein"></div>
-        <div id="userEmoji" class="userEmoji"></div>
 
         <section id="mySettings" class="fadein center hidden">
             <header id="mySettingsHeader">
@@ -1206,24 +1189,7 @@
                                     </div>
                                 </td>
                             </tr>
-                            <tr id="everyoneCantPollsBtn">
-                                <td>
-                                    <div class="title">
-                                        <i class="fas fa-chart-bar red"></i>
-                                        <p>Presenter-only Polls</p>
-                                    </div>
-                                </td>
-                                <td>
-                                    <div class="form-check form-switch form-switch-md">
-                                        <input
-                                            id="switchEveryoneCantPolls"
-                                            class="form-check-input"
-                                            type="checkbox"
-                                            checked
-                                        />
-                                    </div>
-                                </td>
-                            </tr>
+
                             <tr id="disconnectAllOnLeave">
                                 <td>
                                     <div class="title">
@@ -1734,31 +1700,13 @@
                                         <td><i class="fas fa-record-vinyl"></i></td>
                                         <td><strong>Toggle recording</strong></td>
                                     </tr>
-                                    <tr>
-                                        <td><i class="fa-solid fa-j"></i></td>
-                                        <td><i class="fas fa-face-smile"></i></td>
-                                        <td><strong>Toggle emoji</strong></td>
-                                    </tr>
+
                                     <tr>
                                         <td><i class="fa-solid fa-k"></i></td>
                                         <td><i class="fas fa-closed-captioning"></i></td>
                                         <td><strong>Toggle captions</strong></td>
                                     </tr>
-                                    <tr>
-                                        <td><i class="fa-solid fa-p"></i></td>
-                                        <td><i class="fas fa-square-poll-horizontal"></i></td>
-                                        <td><strong>Toggle polls</strong></td>
-                                    </tr>
-                                    <tr>
-                                        <td><i class="fa-solid fa-e"></i></td>
-                                        <td><i class="fas fa-pen-to-square"></i></td>
-                                        <td><strong>Toggle editor</strong></td>
-                                    </tr>
-                                    <tr>
-                                        <td><i class="fa-solid fa-w"></i></td>
-                                        <td><i class="fas fa-chalkboard-teacher"></i></td>
-                                        <td><strong>Toggle whiteboard</strong></td>
-                                    </tr>
+
                                     <tr>
                                         <td><i class="fa-solid fa-d"></i></td>
                                         <td><i class="fas fa-images"></i></td>
@@ -2054,240 +2002,6 @@
                 </div>
             </div>
         </div>
-
-        <section id="whiteboard" class="fadein center hidden">
-            <header id="whiteboardHeader" class="whiteboard-header">
-                <div id="whiteboardTitle" class="whiteboard-header-title">
-                    <span class="whiteboard-title-mark" aria-hidden="true"><i class="fas fa-pen-ruler"></i></span>
-                    <span class="whiteboard-title-text">Whiteboard</span>
-                    <button
-                        id="whiteboardUnlockBtn"
-                        class="fa-solid fa-lock-open hidden"
-                        aria-label="Unlock whiteboard"
-                    ></button>
-                    <button
-                        id="whiteboardLockBtn"
-                        class="fa-solid fa-lock hidden"
-                        aria-label="Lock whiteboard"
-                    ></button>
-                </div>
-                <div id="whiteboardOptions" class="whiteboard-header-options">
-                    <div class="whiteboard-tool-group whiteboard-canvas-tools" aria-label="Canvas appearance">
-                        <label class="whiteboard-color-control" aria-label="Background color">
-                            <span>Canvas</span>
-                            <input
-                                id="wbBackgroundColorEl"
-                                class="whiteboardColorPicker"
-                                type="color"
-                                value="#000000"
-                            />
-                        </label>
-                        <button
-                            id="whiteboardGhostButton"
-                            class="whiteboard-responsive-action"
-                            aria-label="Toggle transparent background"
-                            aria-pressed="false"
-                        >
-                            <i class="fas fa-circle-half-stroke"></i>
-                            <span>Transparency</span>
-                        </button>
-                        <button
-                            id="whiteboardGridBtn"
-                            class="whiteboard-responsive-action hidden"
-                            aria-label="Toggle canvas grid"
-                            aria-pressed="false"
-                        >
-                            <i class="fas fa-table-cells-large"></i>
-                            <span>Grid</span>
-                        </button>
-                    </div>
-                    <div class="whiteboard-tool-group whiteboard-drawing-tools" aria-label="Drawing tools">
-                        <label class="whiteboard-color-control" aria-label="Drawing color">
-                            <span>Ink</span>
-                            <input id="wbDrawingColorEl" class="whiteboardColorPicker" type="color" value="#FFFFFF" />
-                        </label>
-                        <button
-                            id="whiteboardPencilBtn"
-                            class="fas fa-pencil-alt"
-                            aria-label="Pencil tool"
-                            aria-pressed="false"
-                        ></button>
-                        <button
-                            id="whiteboardVanishingBtn"
-                            class="whiteboard-responsive-action"
-                            aria-label="Vanishing pen"
-                            aria-pressed="false"
-                        >
-                            <i class="fas fa-highlighter"></i>
-                            <span>Vanishing pen</span>
-                        </button>
-                        <button
-                            id="whiteboardObjectBtn"
-                            class="fas fa-mouse-pointer"
-                            aria-label="Select objects"
-                            aria-pressed="false"
-                        ></button>
-                        <button
-                            id="whiteboardEraserBtn"
-                            class="whiteboard-responsive-action"
-                            aria-label="Eraser tool"
-                            aria-pressed="false"
-                        >
-                            <i class="fas fa-eraser"></i>
-                            <span>Eraser</span>
-                        </button>
-                    </div>
-                    <div class="whiteboard-tool-group whiteboard-history-tools" aria-label="Edit history">
-                        <button id="whiteboardUndoBtn" class="whiteboard-responsive-action" aria-label="Undo">
-                            <i class="fas fa-undo"></i>
-                            <span>Undo</span>
-                        </button>
-                        <button id="whiteboardRedoBtn" class="whiteboard-responsive-action" aria-label="Redo">
-                            <i class="fas fa-redo"></i>
-                            <span>Redo</span>
-                        </button>
-                    </div>
-                    <div class="dropdown">
-                        <button
-                            class="dropdown-toggle"
-                            type="button"
-                            id="whiteboardDropDownMenu"
-                            data-bs-toggle="dropdown"
-                            aria-expanded="false"
-                        >
-                            <i class="fas fa-bars"></i>
-                        </button>
-                        <div class="dropdown-menu text-start" aria-labelledby="whiteboardDropDownMenu">
-                            <label id="whiteboardParticipantNamesControl" class="whiteboard-menu-switch hidden">
-                                <span><i class="fas fa-user-tag"></i> Participant names</span>
-                                <span class="form-check form-switch form-switch-md">
-                                    <input
-                                        id="whiteboardParticipantNamesSwitch"
-                                        class="form-check-input"
-                                        type="checkbox"
-                                        role="switch"
-                                        aria-label="Show participant names on the whiteboard"
-                                    />
-                                </span>
-                            </label>
-                            <button class="whiteboard-narrow-action" data-panel-action-target="whiteboardGhostButton">
-                                <i class="fas fa-circle-half-stroke"></i> Toggle background
-                            </button>
-                            <button class="whiteboard-compact-action" data-panel-action-target="whiteboardGridBtn">
-                                <i class="fas fa-table-cells-large"></i> Toggle grid
-                            </button>
-                            <button class="whiteboard-compact-action" data-panel-action-target="whiteboardVanishingBtn">
-                                <i class="fas fa-highlighter"></i> Vanishing pen
-                            </button>
-                            <button class="whiteboard-compact-action" data-panel-action-target="whiteboardObjectBtn">
-                                <i class="fas fa-mouse-pointer"></i> Object mode
-                            </button>
-                            <button class="whiteboard-compact-action" data-panel-action-target="whiteboardEraserBtn">
-                                <i class="fas fa-eraser"></i> Eraser
-                            </button>
-                            <button id="whiteboardImgFileBtn"><i class="far fa-image"></i> Add image file</button>
-                            <button id="whiteboardImgUrlBtn"><i class="fas fa-link"></i> Add image URL</button>
-                            <button id="whiteboardPdfFileBtn"><i class="far fa-file-pdf"></i> Add pdf file</button>
-                            <button id="whiteboardTextBtn"><i class="fas fa-spell-check"></i> Add text</button>
-                            <button id="whiteboardStickyNoteBtn">
-                                <i class="fas fa-sticky-note"></i> Add sticky note
-                            </button>
-                            <button id="whiteboardLineBtn"><i class="fas fa-slash"></i> Add line</button>
-                            <button id="whiteboardArrowBtn"><i class="fas fa-arrow-right-long"></i> Add arrow</button>
-                            <button id="whiteboardRectBtn"><i class="far fa-square"></i> Add rectangle</button>
-                            <button id="whiteboardDiamondBtn"><i class="far fa-gem"></i> Add diamond</button>
-                            <button id="whiteboardTriangleBtn">
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    width="1em"
-                                    height="1em"
-                                    viewBox="0 0 24 24"
-                                    fill="#FFFFFF"
-                                >
-                                    <path d="M12 5.887l8.468 14.113h-16.936l8.468-14.113zm0-3.887l-12 20h24l-12-20z" />
-                                </svg>
-                                Add triangle
-                            </button>
-                            <button id="whiteboardCircleBtn"><i class="far fa-circle"></i> Add circle</button>
-                            <button id="whiteboardFrameBtn"><i class="far fa-object-group"></i> Add frame</button>
-                            <button id="whiteboardGroupBtn"><i class="fas fa-object-group"></i> Group selection</button>
-                            <button id="whiteboardUngroupBtn">
-                                <i class="fas fa-object-ungroup"></i> Ungroup selection
-                            </button>
-                            <button id="whiteboardSaveBtn"><i class="fas fa-save"></i> Save</button>
-                            <button id="whiteboardCleanBtn"><i class="fas fa-trash"></i> Clean</button>
-                            <button id="whiteboardShortcutsBtn"><i class="fas fa-keyboard"></i> Shortcuts</button>
-                        </div>
-                    </div>
-                    <button
-                        id="whiteboardCloseBtn"
-                        class="fas fa-times whiteboard-close-button"
-                        aria-label="Close whiteboard"
-                    ></button>
-                </div>
-            </header>
-            <main class="whiteboard-canvas-area">
-                <canvas id="wbCanvas"></canvas>
-                <div id="whiteboardParticipantLabels" class="whiteboard-participant-labels" aria-live="polite"></div>
-                <div id="whiteboardAuthorLabel" class="whiteboard-author-label hidden" aria-live="polite"></div>
-                <div id="whiteboardShortcutsContent">
-                    <div class="wb-shortcuts-container">
-                        <h3 class="wb-shortcuts-title"><i class="fas fa-keyboard"></i> General Shortcuts</h3>
-                        <ul class="wb-shortcuts-list">
-                            <li><strong>Clone:</strong> <span class="wb-shortcut-key">⌘/Ctrl + C</span></li>
-                            <li><strong>Erase:</strong> <span class="wb-shortcut-key">⌘/Ctrl + X</span></li>
-                            <li><strong>Undo:</strong> <span class="wb-shortcut-key">⌘/Ctrl + Z</span></li>
-                            <li>
-                                <strong>Redo:</strong> <span class="wb-shortcut-key">⌘/Ctrl + Shift + Z</span> or
-                                <span class="wb-shortcut-key">⌘/Ctrl + Y</span>
-                            </li>
-                            <li>
-                                <strong>Delete/Remove:</strong> <span class="wb-shortcut-key">Delete</span> or
-                                <span class="wb-shortcut-key">Backspace</span>
-                            </li>
-                        </ul>
-                        <h3 class="wb-shortcuts-title"><i class="fas fa-pencil-alt"></i> Create Objects</h3>
-                        <div class="wb-shortcuts-subsection">
-                            <ul class="wb-shortcuts-list">
-                                <li><strong>Hold:</strong> <span class="wb-shortcut-key">Alt + Cmd (Mac)</span></li>
-                                <li>
-                                    <strong>Hold:</strong> <span class="wb-shortcut-key">Alt + Ctrl (Win/Linux)</span>
-                                </li>
-                            </ul>
-                            <h3 class="wb-shortcuts-title">Then press</h3>
-                            <ul class="wb-shortcuts-list">
-                                <li><span class="wb-shortcut-key">T</span> = Text</li>
-                                <li><span class="wb-shortcut-key">L</span> = Line</li>
-                                <li><span class="wb-shortcut-key">A</span> = Arrow</li>
-                                <li><span class="wb-shortcut-key">C</span> = Circle</li>
-                                <li><span class="wb-shortcut-key">R</span> = Rectangle</li>
-                                <li><span class="wb-shortcut-key">G</span> = Triangle</li>
-                                <li><span class="wb-shortcut-key">D</span> = Diamond</li>
-                                <li><span class="wb-shortcut-key">F</span> = Frame</li>
-                                <li><span class="wb-shortcut-key">N</span> = Sticky Note</li>
-                                <li><span class="wb-shortcut-key">U</span> = Image URL</li>
-                                <li><span class="wb-shortcut-key">I</span> = Image</li>
-                                <li><span class="wb-shortcut-key">P</span> = PDF</li>
-                                <li><span class="wb-shortcut-key">V</span> = Vanishing Pen</li>
-                                <li><span class="wb-shortcut-key">Q</span> = Clear all</li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            </main>
-            <!-- Bottom-left secondary drag handle -->
-            <div
-                id="whiteboardBottomLeftDragHandle"
-                class="whiteboard-bottom-left-handle"
-                title="Drag to move whiteboard"
-            >
-                <i class="fas fa-arrows-alt"></i>
-            </div>
-            <!-- Bottom-right secondary drag handle -->
-            <div id="whiteboardBottomDragHandle" class="whiteboard-bottom-handle" title="Drag to move whiteboard">
-                <i class="fas fa-arrows-alt"></i>
-            </div>
-        </section>
 
         <!-- CHAT ROOM CONTAINER -->
         <section id="chatRoom" class="chat-container container fadein hidden">
@@ -2587,150 +2301,6 @@
                     </div>
                 </div>
             </div>
-        </section>
-
-        <section id="pollRoom" class="pls-container fadein hidden">
-            <div id="pollHeader" class="poll-header">
-                <div class="poll-header-title">
-                    <span class="poll-title-mark" aria-hidden="true">
-                        <i class="fas fa-square-poll-horizontal"></i>
-                    </span>
-                    <span class="poll-title-text">Polls</span>
-                </div>
-                <div class="poll-header-btns">
-                    <div class="poll-tool-group poll-layout-tools" aria-label="Panel layout">
-                        <button id="pollTogglePin" class="hidden" aria-label="Pin polls" aria-pressed="false">
-                            <i class="fas fa-map-pin"></i>
-                        </button>
-                        <button id="pollMaxButton" class="hidden" aria-label="Maximize polls">
-                            <i class="fas fa-expand"></i>
-                        </button>
-                        <button id="pollMinButton" class="hidden" aria-label="Restore polls">
-                            <i class="fas fa-compress"></i>
-                        </button>
-                    </div>
-                    <div class="poll-tool-group poll-document-tools" aria-label="Poll actions">
-                        <button id="pollSaveButton" aria-label="Save poll results">
-                            <i class="fas fa-floppy-disk"></i>
-                        </button>
-                    </div>
-                    <button id="pollCloseBtn" aria-label="Close polls">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-            </div>
-            <div id="pollForm" class="poll-creation">
-                <form id="pollCreateForm" class="form">
-                    <div class="form-group">
-                        <label for="question">Question</label>
-                        <input
-                            type="text"
-                            id="question"
-                            name="question"
-                            placeholder="What would you like to ask?"
-                            required
-                        />
-                    </div>
-                    <div class="form-group">
-                        <div class="poll-options-heading">
-                            <span class="poll-field-label">Options</span>
-                            <div class="poll-option-actions" aria-label="Manage poll options">
-                                <button type="button" id="pollAddOptionBtn" aria-label="Add option">
-                                    <i class="fas fa-plus"></i>
-                                </button>
-                                <button type="button" id="pollDelOptionBtn" aria-label="Remove last option">
-                                    <i class="fas fa-minus"></i>
-                                </button>
-                            </div>
-                        </div>
-                        <div id="optionsContainer">
-                            <input type="text" name="option" class="option-input" placeholder="Option 1" required />
-                            <input type="text" name="option" class="option-input" placeholder="Option 2" required />
-                        </div>
-                        <div class="poll-btns">
-                            <button type="submit" id="addPollButton" class="poll-primary-btn">
-                                <i class="fas fa-square-poll-horizontal"></i> Create Poll
-                            </button>
-                        </div>
-                    </div>
-                </form>
-            </div>
-            <div class="polls">
-                <div id="pollsContainer" class="polls-container"></div>
-            </div>
-        </section>
-
-        <section id="editorRoom" class="editor-container fadein hidden">
-            <div id="editorHeader" class="editor-header">
-                <div class="editor-header-title">
-                    <span class="editor-title-mark" aria-hidden="true"><i class="fas fa-file-pen"></i></span>
-                    <span class="editor-title-text">Editor</span>
-                </div>
-                <div class="editor-header-btns">
-                    <div class="editor-tool-group editor-session-tools" aria-label="Editor mode">
-                        <button
-                            id="editorTogglePin"
-                            class="fas fa-map-pin hidden"
-                            aria-label="Pin editor"
-                            aria-pressed="false"
-                        ></button>
-                        <button
-                            id="editorUnlockBtn"
-                            class="fa-solid fa-lock-open hidden"
-                            aria-label="Unlock editor"
-                        ></button>
-                        <button id="editorLockBtn" class="fa-solid fa-lock hidden" aria-label="Lock editor"></button>
-                        <button
-                            id="editorCollabBtn"
-                            class="fa-solid fa-users"
-                            aria-label="Switch to private note"
-                            aria-pressed="false"
-                        ></button>
-                        <button
-                            id="editorPrivateBtn"
-                            class="fa-solid fa-user-secret hidden"
-                            aria-label="Return to collaborative editor"
-                            aria-pressed="true"
-                        ></button>
-                    </div>
-                    <div class="editor-tool-group editor-history-tools" aria-label="Edit history">
-                        <button id="editorUndoBtn" class="fas fa-undo" aria-label="Undo"></button>
-                        <button id="editorRedoBtn" class="fas fa-redo" aria-label="Redo"></button>
-                    </div>
-                    <div class="editor-tool-group editor-document-tools" aria-label="Document actions">
-                        <button id="editorCopyBtn" class="fas fa-paste" aria-label="Copy"></button>
-                        <button id="editorSaveBtn" class="fas fa-floppy-disk" aria-label="Save"></button>
-                        <button id="editorCleanBtn" class="fas fa-trash" aria-label="Clean"></button>
-                    </div>
-                    <div class="dropdown editor-compact-menu">
-                        <button
-                            class="dropdown-toggle fas fa-bars"
-                            type="button"
-                            id="editorDropDownMenu"
-                            data-bs-toggle="dropdown"
-                            aria-expanded="false"
-                            aria-label="More editor actions"
-                        ></button>
-                        <div class="dropdown-menu dropdown-menu-end text-start" aria-labelledby="editorDropDownMenu">
-                            <button class="editor-narrow-action" data-panel-action-target="editorUndoBtn">
-                                <i class="fas fa-undo"></i> Undo
-                            </button>
-                            <button class="editor-narrow-action" data-panel-action-target="editorRedoBtn">
-                                <i class="fas fa-redo"></i> Redo
-                            </button>
-                            <button data-panel-action-target="editorCopyBtn"><i class="fas fa-paste"></i> Copy</button>
-                            <button data-panel-action-target="editorSaveBtn">
-                                <i class="fas fa-floppy-disk"></i> Save
-                            </button>
-                            <button data-panel-action-target="editorCleanBtn">
-                                <i class="fas fa-trash"></i> Clean
-                            </button>
-                        </div>
-                    </div>
-                    <button id="editorCloseBtn" class="fas fa-times" aria-label="Close editor"></button>
-                </div>
-            </div>
-            <div class="editor" id="editor"></div>
         </section>
 
         <!-- Breakout Rooms Panel -->

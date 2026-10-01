@@ -102,19 +102,6 @@ const initUser = document.getElementById('initUser');
 const initVideoContainerClass = document.querySelector('.init-video-container');
 const bars = document.querySelectorAll('.volume-bar');
 
-const Base64Prefix = 'data:application/pdf;base64,';
-
-// Whiteboard
-const wbImageInput = 'image/*';
-const wbPdfInput = 'application/pdf';
-// Reference dimensions for whiteboard (16:9 aspect ratio)
-const wbReferenceWidth = 1920;
-const wbReferenceHeight = 1080;
-const wbGridSize = 20;
-const wbStroke = '#cccccc63';
-let wbGridLines = [];
-let wbGridVisible = false;
-
 const swalImageUrl = '../images/pricing-illustration.svg';
 
 // Media
@@ -341,24 +328,6 @@ let recTimer = null;
 let recElapsedTime = null;
 let recShowInfo = true;
 
-let wbCanvas = null;
-let wbIsLock = false;
-let wbIsDrawing = false;
-let wbIsOpen = false;
-let wbIsRedoing = false;
-let wbIsObject = false;
-let wbIsEraser = false;
-let wbIsPencil = false;
-let wbIsVanishing = false;
-let wbIsBgTransparent = false;
-let wbIsApplyingRemote = false;
-let wbShowParticipantNames = false;
-let wbObjectIdCounter = 0;
-let wbLastPointerEmitAt = 0;
-const wbTextSyncTimers = new Map();
-const wbParticipantLabels = new Map();
-let wbPop = [];
-let wbVanishingObjects = [];
 let coords = {};
 
 let isButtonsVisible = false;
@@ -392,8 +361,6 @@ try {
 } catch {}
 
 let isExiting = false;
-
-let quill = null;
 
 // ####################################################
 // INIT ROOM
@@ -491,20 +458,7 @@ async function initClient() {
         );
         setTippy('refreshVideoFiles', 'Refresh', 'left');
         setTippy('switchServerRecording', 'The recording will be stored on the server rather than locally', 'right');
-        setTippy('whiteboardGhostButton', 'Toggle transparent background', 'bottom');
-        setTippy('whiteboardGridBtn', 'Toggle whiteboard grid', 'bottom');
-        setTippy('wbBackgroundColorEl', 'Background color', 'bottom');
-        setTippy('wbDrawingColorEl', 'Drawing color', 'bottom');
-        setTippy('whiteboardPencilBtn', 'Drawing mode', 'bottom');
-        setTippy('whiteboardVanishingBtn', 'Vanishing pen (disappears in 5s)', 'bottom');
-        setTippy('whiteboardEraserBtn', 'Eraser', 'bottom');
-        setTippy('whiteboardObjectBtn', 'Object mode', 'bottom');
-        setTippy('whiteboardUndoBtn', 'Undo', 'bottom');
-        setTippy('whiteboardRedoBtn', 'Redo', 'bottom');
-        setTippy('whiteboardLockBtn', 'Toggle Lock whiteboard', 'right');
-        setTippy('whiteboardUnlockBtn', 'Toggle Lock whiteboard', 'right');
-        setTippy('whiteboardParticipantNamesSwitch', 'Show participant names on the whiteboard', 'left');
-        setTippy('whiteboardCloseBtn', 'Close', 'bottom');
+
         setTippy('chatCleanTextButton', 'Clean', 'top');
         setTippy('chatPasteButton', 'Paste', 'top');
         setTippy('chatSendButton', 'Send', 'top');
@@ -520,35 +474,19 @@ async function initClient() {
         setTippy('chatHideParticipantsList', 'Hide', 'bottom');
         setTippy('chatMaxButton', 'Maximize', 'bottom');
         setTippy('chatMinButton', 'Minimize', 'bottom');
-        setTippy('pollTogglePin', 'Toggle pin', 'bottom');
+
         setTippy('breakoutTogglePin', 'Toggle pin', 'bottom');
         setTippy('breakoutMaxButton', 'Maximize', 'bottom');
         setTippy('breakoutMinButton', 'Minimize', 'bottom');
         setTippy('breakoutRefreshBtn', 'Refresh rooms', 'bottom');
         setTippy('breakoutDeleteAllBtn', 'Delete all rooms', 'bottom');
         setTippy('breakoutPanelCloseBtn', 'Close', 'bottom');
-        setTippy('pollMaxButton', 'Maximize', 'bottom');
-        setTippy('pollMinButton', 'Minimize', 'bottom');
-        setTippy('pollSaveButton', 'Save results', 'bottom');
-        setTippy('pollCloseBtn', 'Close', 'bottom');
-        setTippy('editorLockBtn', 'Toggle Lock editor', 'bottom');
-        setTippy('editorUnlockBtn', 'Toggle Lock editor', 'bottom');
-        setTippy('editorCollabBtn', 'Switch to Private Note (your notes will NOT be shared)', 'bottom');
-        setTippy('editorPrivateBtn', 'Switch back to Collaborative editor', 'bottom');
-        setTippy('editorTogglePin', 'Toggle pin', 'bottom');
-        setTippy('editorUndoBtn', 'Undo', 'bottom');
-        setTippy('editorRedoBtn', 'Redo', 'bottom');
-        setTippy('editorCopyBtn', 'Copy', 'bottom');
-        setTippy('editorSaveBtn', 'Save', 'bottom');
-        setTippy('editorCloseBtn', 'Close', 'bottom');
-        setTippy('editorCleanBtn', 'Clean', 'bottom');
-        setTippy('pollAddOptionBtn', 'Add option', 'top');
-        setTippy('pollDelOptionBtn', 'Delete option', 'top');
+
         setTippy('participantsRaiseHandBtn', 'Toggle raise hands', 'bottom');
         setTippy('participantsUnreadMessagesBtn', 'Toggle unread messages', 'bottom');
         setTippy('participantsHiddenBtn', 'Hidden participants', 'bottom');
     }
-    setupWhiteboard();
+
     initEnumerateDevices();
     setupInitButtons();
 }
@@ -1820,10 +1758,9 @@ function roomIsReady() {
     }
     BUTTONS.main.chatButton && show(chatButton);
     BUTTONS.main.participantsButton && show(participantsButton);
-    BUTTONS.main.pollButton && show(pollButton);
-    BUTTONS.main.editorButton && show(editorButton);
+
     BUTTONS.main.raiseHandButton && show(raiseHandButton);
-    BUTTONS.main.emojiRoomButton && show(emojiRoomButton);
+
     show(fileShareExtraButton);
     !BUTTONS.chat.chatSaveButton && hide(chatSaveButton);
     BUTTONS.chat.chatEmojiButton && show(chatEmojiButton);
@@ -1831,14 +1768,9 @@ function roomIsReady() {
     BUTTONS.chat.chatMarkdownButton && show(chatMarkdownButton);
     show(fileShareChatButton);
 
-    !BUTTONS.poll.pollSaveButton && hide(pollSaveButton);
-
     show(chatCleanTextButton);
     show(chatPasteButton);
     show(chatSendButton);
-    if (isDesktopDevice) {
-        show(whiteboardGridBtn);
-    }
     if (isMobileDevice) {
         hide(initVideoAudioRefreshButton);
         BUTTONS.main.swapCameraButton && show(swapCameraButton);
@@ -1846,21 +1778,13 @@ function roomIsReady() {
         hide(chatTogglePin);
         hide(chatMaxButton);
         hide(chatMinButton);
-        rc.pollMaximize();
-        hide(pollTogglePin);
-        hide(editorTogglePin);
+
         hide(breakoutTogglePin);
-        hide(pollMaxButton);
-        hide(pollMinButton);
     } else {
-        //rc.makeDraggable(emojiPickerContainer, emojiPickerHeader);
         rc.makeDraggable(chatRoom, chatHeader);
-        rc.makeDraggable(pollRoom, pollHeader);
-        //rc.makeDraggable(editorRoom, editorHeader);
+
         rc.makeDraggable(mySettings, mySettingsHeader);
-        rc.makeDraggable(whiteboard, whiteboardHeader);
-        rc.makeDraggable(whiteboard, whiteboardBottomDragHandle);
-        rc.makeDraggable(whiteboard, whiteboardBottomLeftDragHandle);
+
         rc.makeDraggable(sendFileDiv, sendFileDragHandle);
         rc.makeDraggable(receiveFileDiv, receiveFileDragHandle);
         rc.makeDraggable(lobby, lobbyHeader);
@@ -1876,10 +1800,9 @@ function roomIsReady() {
         }
         BUTTONS.chat.chatPinButton && !isMobileDevice && show(chatTogglePin);
         BUTTONS.chat.chatMaxButton && show(chatMaxButton);
-        BUTTONS.poll.pollPinButton && show(pollTogglePin);
-        show(editorTogglePin);
+
         show(breakoutTogglePin);
-        BUTTONS.poll.pollMaxButton && show(pollMaxButton);
+
         if (BUTTONS.settings.pushToTalk) {
             show(audioFocusControlsDiv);
             show(pushToTalkDiv);
@@ -1898,7 +1821,7 @@ function roomIsReady() {
     } else {
         hide(fullScreenButton);
     }
-    BUTTONS.main.whiteboardButton && show(whiteboardButton);
+
     if (BUTTONS.main.documentPiPButton && showDocumentPipBtn) show(documentPiPButton);
     BUTTONS.main.settingsButton && show(settingsButton);
     updateParticipantViewButtonVisibility();
@@ -1935,8 +1858,7 @@ function roomIsReady() {
     handleSelects();
     handleInputs();
     handleChatEmojiPicker();
-    handleRoomEmojiPicker();
-    handleEditor();
+
     loadSettingsFromLocalStorage();
     startSessionTimer();
     handleButtonsBar();
@@ -2537,34 +2459,7 @@ function handleButtons() {
     participantsButton.onclick = async () => {
         rc.toggleParticipants();
     };
-    // Polls
-    pollButton.onclick = () => {
-        rc.togglePoll();
-    };
-    pollMaxButton.onclick = () => {
-        rc.pollMaximize();
-    };
-    pollMinButton.onclick = () => {
-        rc.pollMinimize();
-    };
-    pollCloseBtn.onclick = () => {
-        rc.togglePoll();
-    };
-    pollTogglePin.onclick = () => {
-        rc.togglePollPin();
-    };
-    pollSaveButton.onclick = () => {
-        rc.pollSaveResults();
-    };
-    pollAddOptionBtn.onclick = () => {
-        rc.pollAddOptions();
-    };
-    pollDelOptionBtn.onclick = () => {
-        rc.pollDeleteOptions();
-    };
-    pollCreateForm.onsubmit = (e) => {
-        rc.pollCreateNewForm(e);
-    };
+
     // Breakout Rooms
     breakoutRoomButton.onclick = () => {
         toggleBreakoutPanel();
@@ -2614,48 +2509,7 @@ function handleButtons() {
     breakoutParticipantSearch.addEventListener('input', () => {
         filterBreakoutParticipants();
     });
-    editorButton.onclick = () => {
-        rc.toggleEditor();
-        if (isPresenter && !rc.editorIsLocked()) {
-            rc.editorSendAction('open');
-        }
-    };
-    editorCloseBtn.onclick = () => {
-        rc.toggleEditor();
-        if (isPresenter && !rc.editorIsLocked()) {
-            rc.editorSendAction('close');
-        }
-    };
-    editorTogglePin.onclick = () => {
-        rc.toggleEditorPin();
-    };
-    editorLockBtn.onclick = () => {
-        rc.toggleLockUnlockEditor();
-    };
-    editorUnlockBtn.onclick = () => {
-        rc.toggleLockUnlockEditor();
-    };
-    editorCollabBtn.onclick = () => {
-        rc.toggleEditorPrivate();
-    };
-    editorPrivateBtn.onclick = () => {
-        rc.toggleEditorPrivate();
-    };
-    editorCleanBtn.onclick = () => {
-        rc.editorClean();
-    };
-    editorCopyBtn.onclick = () => {
-        rc.editorCopy();
-    };
-    editorSaveBtn.onclick = () => {
-        rc.editorSave();
-    };
-    editorUndoBtn.onclick = () => {
-        rc.editorUndo();
-    };
-    editorRedoBtn.onclick = () => {
-        rc.editorRedo();
-    };
+
     chatHideParticipantsList.onclick = (e) => {
         rc.toggleShowParticipants(true);
     };
@@ -2886,106 +2740,14 @@ function handleButtons() {
     receiveHideBtn.onclick = () => {
         rc.hideFileTransfer();
     };
-    whiteboardButton.onclick = () => {
-        toggleWhiteboard();
-    };
+
     documentPiPButton.onclick = () => {
         rc.toggleDocumentPIP();
     };
     snapshotRoomButton.onclick = () => {
         rc.snapshotRoom();
     };
-    whiteboardPencilBtn.onclick = () => {
-        whiteboardResetAllMode();
-        whiteboardIsPencilMode(true);
-    };
-    whiteboardVanishingBtn.onclick = () => {
-        whiteboardResetAllMode();
-        whiteboardIsVanishingMode(true);
-    };
-    whiteboardObjectBtn.onclick = () => {
-        whiteboardResetAllMode();
-        whiteboardIsObjectMode(true);
-    };
-    whiteboardUndoBtn.onclick = () => {
-        whiteboardAction(getWhiteboardAction('undo'));
-    };
-    whiteboardRedoBtn.onclick = () => {
-        whiteboardAction(getWhiteboardAction('redo'));
-    };
-    whiteboardSaveBtn.onclick = () => {
-        wbCanvasSaveImg();
-    };
-    whiteboardImgFileBtn.onclick = () => {
-        whiteboardAddObj('imgFile');
-    };
-    whiteboardPdfFileBtn.onclick = () => {
-        whiteboardAddObj('pdfFile');
-    };
-    whiteboardImgUrlBtn.onclick = () => {
-        whiteboardAddObj('imgUrl');
-    };
-    whiteboardTextBtn.onclick = () => {
-        whiteboardAddObj('text');
-    };
-    whiteboardStickyNoteBtn.onclick = () => {
-        whiteboardAddObj('stickyNote');
-    };
-    whiteboardLineBtn.onclick = () => {
-        whiteboardAddObj('line');
-    };
-    whiteboardArrowBtn.onclick = () => {
-        whiteboardAddObj('arrow');
-    };
-    whiteboardRectBtn.onclick = () => {
-        whiteboardAddObj('rect');
-    };
-    whiteboardDiamondBtn.onclick = () => {
-        whiteboardAddObj('diamond');
-    };
-    whiteboardTriangleBtn.onclick = () => {
-        whiteboardAddObj('triangle');
-    };
-    whiteboardCircleBtn.onclick = () => {
-        whiteboardAddObj('circle');
-    };
-    whiteboardFrameBtn.onclick = () => {
-        whiteboardAddObj('frame');
-    };
-    whiteboardGroupBtn.onclick = () => {
-        whiteboardGroupSelection();
-    };
-    whiteboardUngroupBtn.onclick = () => {
-        whiteboardUngroupSelection();
-    };
-    whiteboardEraserBtn.onclick = () => {
-        whiteboardResetAllMode();
-        whiteboardIsEraserMode(true);
-    };
-    whiteboardCleanBtn.onclick = () => {
-        confirmClearBoard();
-    };
-    whiteboardParticipantNamesControl.onclick = (event) => {
-        event.stopPropagation();
-    };
-    whiteboardParticipantNamesSwitch.onchange = (event) => {
-        if (!isPresenter) return setWhiteboardParticipantNames(wbShowParticipantNames);
-        const status = event.currentTarget.checked;
-        setWhiteboardParticipantNames(status);
-        whiteboardAction({ ...getWhiteboardAction('participantNames'), status });
-    };
-    whiteboardShortcutsBtn.onclick = () => {
-        showWhiteboardShortcuts();
-    };
-    whiteboardCloseBtn.onclick = () => {
-        whiteboardAction(getWhiteboardAction('close'));
-    };
-    whiteboardLockBtn.onclick = () => {
-        toggleLockUnlockWhiteboard();
-    };
-    whiteboardUnlockBtn.onclick = () => {
-        toggleLockUnlockWhiteboard();
-    };
+
     document.querySelectorAll('[data-panel-action-target]').forEach((button) => {
         button.onclick = () => {
             document.getElementById(button.dataset.panelActionTarget)?.click();
@@ -3739,23 +3501,7 @@ function handleSelects() {
         lS.setSettings(localStorageSettings);
         e.target.blur();
     };
-    // whiteboard options
-    wbDrawingColorEl.onchange = () => {
-        wbCanvas.freeDrawingBrush.color = wbDrawingColorEl.value;
-        whiteboardResetAllMode();
-        whiteboardIsPencilMode(true);
-    };
-    wbBackgroundColorEl.onchange = () => {
-        setWhiteboardBgColor(wbBackgroundColorEl.value);
-    };
-    whiteboardGhostButton.onclick = (e) => {
-        wbIsBgTransparent = !wbIsBgTransparent;
-        setWhiteboardControlState(whiteboardGhostButton, wbIsBgTransparent);
-        wbIsBgTransparent ? wbCanvasBackgroundColor('rgba(0, 0, 0, 0.100)') : setTheme();
-    };
-    whiteboardGridBtn.onclick = (e) => {
-        toggleCanvasGrid();
-    };
+
     // room moderator rules
     switchEveryonePrivacy.onchange = (e) => {
         const videoStartPrivacy = e.currentTarget.checked;
@@ -3831,14 +3577,7 @@ function handleSelects() {
         lS.setSettings(localStorageSettings);
         e.target.blur();
     };
-    switchEveryoneCantPolls.onchange = (e) => {
-        const pollsCantCreate = e.currentTarget.checked;
-        rc.updateRoomModerator({ type: 'polls_cant_create', status: pollsCantCreate });
-        rc.roomMessage('polls_cant_create', pollsCantCreate);
-        localStorageSettings.moderator_polls_cant_create = pollsCantCreate;
-        lS.setSettings(localStorageSettings);
-        e.target.blur();
-    };
+
     switchDisconnectAllOnLeave.onchange = (e) => {
         const disconnectAll = e.currentTarget.checked;
         rc.roomMessage('disconnect_all_on_leave', disconnectAll);
@@ -3873,15 +3612,6 @@ function handleKeyboardShortcuts() {
         };
 
         document.addEventListener('keydown', (event) => {
-            if (
-                !isShortcutsEnabled ||
-                rc.isChatOpen ||
-                wbIsOpen ||
-                rc.isEditorOpen ||
-                (!isPresenter && isBroadcastingEnabled)
-            )
-                return;
-
             const key = event.key.toLowerCase(); // Convert to lowercase for simplicity
             console.log(`Detected shortcut: ${key}`);
 
@@ -3944,34 +3674,6 @@ function handleKeyboardShortcuts() {
                         break;
                     }
                     isRecording ? stopRecButton.click() : startRecButton.click();
-                    break;
-                case 'j':
-                    if (notPresenter && !BUTTONS.main.emojiRoomButton) {
-                        userLog('warning', 'The presenter has disabled your ability to open the room emoji', 'top-end');
-                        break;
-                    }
-                    emojiRoomButton.click();
-                    break;
-                case 'p':
-                    if (notPresenter && !BUTTONS.main.pollButton) {
-                        userLog('warning', 'The presenter has disabled your ability to start a poll', 'top-end');
-                        break;
-                    }
-                    pollButton.click();
-                    break;
-                case 'e':
-                    if (notPresenter && !BUTTONS.main.editorButton) {
-                        userLog('warning', 'The presenter has disabled your ability to open the editor', 'top-end');
-                        break;
-                    }
-                    editorButton.click();
-                    break;
-                case 'w':
-                    if (notPresenter && !BUTTONS.main.whiteboardButton) {
-                        userLog('warning', 'The presenter has disabled your ability to open the whiteboard', 'top-end');
-                        break;
-                    }
-                    whiteboardButton.click();
                     break;
                 case 'd':
                     if (!showDocumentPipBtn) {
@@ -4171,227 +3873,9 @@ function handleChatEmojiPicker() {
     });
 }
 
-function handleRoomEmojiPicker() {
-    const soundEmojis = [
-        { emoji: '👍', shortcodes: ':+1:' },
-        { emoji: '👎', shortcodes: ':-1:' },
-        { emoji: '👌', shortcodes: ':ok_hand:' },
-        { emoji: '😀', shortcodes: ':grinning:' },
-        { emoji: '😃', shortcodes: ':smiley:' },
-        { emoji: '😂', shortcodes: ':joy:' },
-        { emoji: '😘', shortcodes: ':kissing_heart:' },
-        { emoji: '❤️', shortcodes: ':heart:' },
-        { emoji: '🎺', shortcodes: ':trumpet:' },
-        { emoji: '🎉', shortcodes: ':tada:' },
-        { emoji: '😮', shortcodes: ':open_mouth:' },
-        { emoji: '👏', shortcodes: ':clap:' },
-        { emoji: '✨', shortcodes: ':sparkles:' },
-        { emoji: '⭐', shortcodes: ':star:' },
-        { emoji: '🌟', shortcodes: ':star2:' },
-        { emoji: '💫', shortcodes: ':dizzy:' },
-        { emoji: '🚀', shortcodes: ':rocket:' },
-    ];
-
-    const header = document.createElement('div');
-    header.className = 'room-emoji-header';
-
-    const title = document.createElement('div');
-    title.className = 'room-emoji-title';
-
-    const titleMark = document.createElement('span');
-    titleMark.className = 'room-emoji-title-mark';
-    titleMark.innerHTML = '<i class="fas fa-face-smile" aria-hidden="true"></i>';
-
-    const titleText = document.createElement('span');
-    titleText.className = 'room-emoji-title-text';
-    titleText.textContent = 'Room Emoji';
-
-    title.appendChild(titleMark);
-    title.appendChild(titleText);
-
-    const closeBtn = document.createElement('button');
-    closeBtn.type = 'button';
-    closeBtn.className = 'room-emoji-close-btn';
-    closeBtn.setAttribute('aria-label', 'Close room emoji');
-    closeBtn.innerHTML = '<i class="fa fa-times" aria-hidden="true"></i>';
-
-    header.appendChild(title);
-    header.appendChild(closeBtn);
-
-    const tabContainer = document.createElement('div');
-    tabContainer.className = 'room-emoji-tab-container';
-    tabContainer.setAttribute('role', 'tablist');
-    tabContainer.setAttribute('aria-label', 'Room emoji categories');
-
-    const allTab = document.createElement('button');
-    allTab.type = 'button';
-    allTab.innerHTML = '<i class="fas fa-face-smile" aria-hidden="true"></i><span>All</span>';
-    allTab.className = 'room-emoji-tab active';
-    allTab.setAttribute('role', 'tab');
-    allTab.setAttribute('aria-selected', 'true');
-    allTab.setAttribute('aria-controls', 'roomEmojiMart');
-
-    const soundTab = document.createElement('button');
-    soundTab.type = 'button';
-    soundTab.innerHTML = '<i class="fas fa-volume-high" aria-hidden="true"></i><span>Sounds</span>';
-    soundTab.className = 'room-emoji-tab';
-    soundTab.setAttribute('role', 'tab');
-    soundTab.setAttribute('aria-selected', 'false');
-    soundTab.setAttribute('aria-controls', 'roomEmojiSounds');
-
-    tabContainer.appendChild(allTab);
-    tabContainer.appendChild(soundTab);
-
-    const emojiMartDiv = document.createElement('div');
-    emojiMartDiv.id = 'roomEmojiMart';
-    emojiMartDiv.className = 'room-emoji-mart';
-    emojiMartDiv.setAttribute('role', 'tabpanel');
-    const pickerRoomOptions = {
-        theme: 'dark',
-        onEmojiSelect: sendEmojiToRoom,
-    };
-    const emojiRoomPicker = new EmojiMart.Picker(pickerRoomOptions);
-    emojiMartDiv.appendChild(emojiRoomPicker);
-
-    const emojiGrid = document.createElement('div');
-    emojiGrid.id = 'roomEmojiSounds';
-    emojiGrid.className = 'room-emoji-grid';
-    emojiGrid.setAttribute('role', 'tabpanel');
-
-    function showEmojiGrid() {
-        emojiGrid.classList.add('visible');
-    }
-    function hideEmojiGrid() {
-        emojiGrid.classList.remove('visible');
-    }
-
-    soundEmojis.forEach(({ emoji, shortcodes }) => {
-        const btn = document.createElement('button');
-        btn.textContent = emoji;
-        btn.className = 'room-emoji-btn';
-        btn.onclick = () => sendEmojiToRoom({ native: emoji, shortcodes });
-        emojiGrid.appendChild(btn);
-    });
-
-    function setActiveRoomEmojiTab(activeTab) {
-        const isAllActive = activeTab === allTab;
-        allTab.classList.toggle('active', isAllActive);
-        soundTab.classList.toggle('active', !isAllActive);
-        allTab.setAttribute('aria-selected', String(isAllActive));
-        soundTab.setAttribute('aria-selected', String(!isAllActive));
-    }
-
-    allTab.onclick = () => {
-        setActiveRoomEmojiTab(allTab);
-        emojiMartDiv.style.display = 'block';
-        hideEmojiGrid();
-    };
-    soundTab.onclick = () => {
-        setActiveRoomEmojiTab(soundTab);
-        emojiMartDiv.style.display = 'none';
-        showEmojiGrid();
-    };
-
-    emojiPickerContainer.innerHTML = '';
-    emojiPickerContainer.appendChild(header);
-    emojiPickerContainer.appendChild(tabContainer);
-    emojiPickerContainer.appendChild(emojiMartDiv);
-    emojiPickerContainer.appendChild(emojiGrid);
-    emojiPickerContainer.style.display = 'none';
-
-    if (!isMobileDevice) {
-        rc.makeDraggable(emojiPickerContainer, header);
-    }
-
-    emojiRoomButton.onclick = () => {
-        toggleEmojiPicker();
-    };
-    closeBtn.addEventListener('click', (e) => {
-        toggleEmojiPicker();
-    });
-
-    function sendEmojiToRoom(data) {
-        console.log('Selected Emoji', data.native);
-        const cmd = {
-            type: 'roomEmoji',
-            peer_name: peer_name,
-            emoji: data.native,
-            shortcodes: data.shortcodes,
-            broadcast: true,
-        };
-        if (rc.thereAreParticipants()) {
-            rc.emitCmd(cmd);
-        }
-        rc.handleCmd(cmd);
-        // toggleEmojiPicker();
-    }
-
-    function toggleEmojiPicker() {
-        const emojiRoomIcon = emojiRoomButton.querySelector('i');
-        const isOpen = emojiPickerContainer.style.display !== 'block';
-        emojiPickerContainer.style.display = isOpen ? 'block' : 'none';
-        emojiRoomButton.classList.toggle('is-active', isOpen);
-        emojiRoomButton.setAttribute('aria-pressed', String(isOpen));
-        setColor(emojiRoomIcon, isOpen ? '#FFD600' : 'white');
-    }
-}
-
-// ####################################################
-// ROOM EDITOR
 // ####################################################
 
-function handleEditor() {
-    const toolbarOptions = [
-        [{ header: [1, 2, 3, false] }, { align: [] }, { background: [] }],
-        ['bold', 'italic', 'underline', 'strike', 'link', 'image', 'code-block'],
-        [{ list: 'ordered' }, { list: 'bullet' }, { list: 'check' }],
-        [{ indent: '+1' }, { indent: '-1' }],
-        ['clean'], // Custom button to clear formatting
-        //...
-    ];
-
-    quill = new Quill('#editor', {
-        modules: {
-            toolbar: {
-                container: toolbarOptions,
-            },
-            syntax: true,
-        },
-        theme: 'snow',
-    });
-
-    applySyntaxHighlighting();
-
-    // In Private Note mode strip media/embeds pasted from the clipboard so notes stay
-    // lightweight (text-only) and fit safely in localStorage.
-    const QuillDelta = Quill.import('delta');
-    const stripIfPrivate = (node, delta) => (rc && rc.isEditorPrivate ? new QuillDelta() : delta);
-    quill.clipboard.addMatcher('IMG', stripIfPrivate);
-    quill.clipboard.addMatcher('VIDEO', stripIfPrivate);
-    quill.clipboard.addMatcher('IFRAME', stripIfPrivate);
-
-    quill.on('text-change', (delta, oldDelta, source) => {
-        if (!isPresenter && rc.editorIsLocked() && !rc.isEditorPrivate) {
-            return;
-        }
-        // console.log('text-change', { delta, oldDelta, source });
-        applySyntaxHighlighting();
-        if (rc.isEditorPrivate) {
-            // Private mode: never broadcast, never persist
-            return;
-        }
-        if (rc.thereAreParticipants() && source === 'user') {
-            socket.emit('editorChange', delta);
-        }
-    });
-}
-
-function applySyntaxHighlighting() {
-    const codeBlocks = document.querySelectorAll('.ql-syntax');
-    codeBlocks.forEach((block) => {
-        hljs.highlightElement(block);
-    });
-}
+// ####################################################
 
 // ####################################################
 // LOAD SETTINGS FROM LOCAL STORAGE
@@ -4902,15 +4386,6 @@ function handleDropdownHover(dropdownElement = null) {
 }
 
 function showButtons() {
-    if (
-        wbIsBgTransparent ||
-        isButtonsBarOver ||
-        isButtonsVisible ||
-        rc.isVideoBarDropDownOpen ||
-        (isMobileDevice && rc.isChatOpen) ||
-        (isMobileDevice && rc.isMySettingsOpen)
-    )
-        return;
     bottomButtons.style.display = 'flex';
     toggleClassElements('username', 'flex');
     isButtonsVisible = true;
@@ -5796,1460 +5271,6 @@ function setupQuickDeviceSwitchDropdowns() {
 }
 
 // ####################################################
-// HANDLE WHITEBOARD
-// ####################################################
-
-function toggleWhiteboard() {
-    if (!wbIsOpen) rc.sound('open');
-    whiteboardCenter();
-    whiteboard.classList.toggle('show');
-    wbIsOpen = !wbIsOpen;
-}
-
-function whiteboardCenter() {
-    whiteboard.style.top = '50%';
-    whiteboard.style.left = '50%';
-    whiteboard.style.transform = 'translate(-50%, -50%)';
-}
-
-function setupWhiteboard() {
-    setupWhiteboardCanvas();
-    setupWhiteboardCanvasSize();
-    setupWhiteboardLocalListeners();
-    setupWhiteboardShortcuts();
-    setupWhiteboardDragAndDrop();
-    setupWhiteboardResizeListener();
-}
-
-function setupWhiteboardCanvas() {
-    wbCanvas = new fabric.Canvas('wbCanvas');
-    wbCanvas.freeDrawingBrush.color = '#FFFFFF';
-    wbCanvas.freeDrawingBrush.width = 3;
-    whiteboardIsPencilMode(true);
-}
-
-function setupWhiteboardCanvasSize() {
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-
-    const containerPadding = isMobileDevice ? 10 : 20;
-    const headerHeight = isMobileDevice ? 40 : 60;
-    const extraMargin = 20;
-
-    const availableWidth = viewportWidth - containerPadding - extraMargin;
-    const availableHeight = viewportHeight - containerPadding - headerHeight - extraMargin;
-
-    const scaleX = availableWidth / wbReferenceWidth;
-    const scaleY = availableHeight / wbReferenceHeight;
-    const scale = Math.min(scaleX, scaleY);
-
-    const canvasWidth = wbReferenceWidth * scale;
-    const canvasHeight = wbReferenceHeight * scale;
-
-    wbCanvas.setWidth(canvasWidth);
-    wbCanvas.setHeight(canvasHeight);
-    wbCanvas.setZoom(scale);
-
-    setWhiteboardSize(canvasWidth + containerPadding, canvasHeight + headerHeight + containerPadding);
-
-    whiteboardCenter();
-
-    wbCanvas.calcOffset();
-    wbCanvas.renderAll();
-    wbRepositionParticipantLabels();
-}
-
-function setWhiteboardSize(w, h) {
-    document.documentElement.style.setProperty('--wb-width', `${w}px`);
-    document.documentElement.style.setProperty('--wb-height', `${h}px`);
-}
-
-function setupWhiteboardResizeListener() {
-    let resizeFrame;
-    window.addEventListener('resize', () => {
-        if (resizeFrame) cancelAnimationFrame(resizeFrame);
-        resizeFrame = requestAnimationFrame(() => {
-            if (wbCanvas && wbIsOpen) {
-                setupWhiteboardCanvasSize();
-            }
-        });
-    });
-    window.addEventListener('orientationchange', () => {
-        setTimeout(() => {
-            if (wbCanvas && wbIsOpen) {
-                setupWhiteboardCanvasSize();
-            }
-        }, 300);
-    });
-}
-
-function drawCanvasGrid() {
-    // Use reference dimensions for grid, zoom will handle scaling
-    const width = wbReferenceWidth;
-    const height = wbReferenceHeight;
-
-    removeCanvasGrid();
-
-    // Draw vertical lines
-    for (let i = 0; i <= width; i += wbGridSize) {
-        wbGridLines.push(createGridLine(i, 0, i, height));
-    }
-    // Draw horizontal lines
-    for (let i = 0; i <= height; i += wbGridSize) {
-        wbGridLines.push(createGridLine(0, i, width, i));
-    }
-
-    // Create a group for grid lines and send it to the back
-    const gridGroup = new fabric.Group(wbGridLines, { selectable: false, evented: false });
-    wbCanvas.add(gridGroup);
-    gridGroup.sendToBack();
-    wbCanvas.renderAll();
-    setWhiteboardControlState(whiteboardGridBtn, true);
-}
-
-function createGridLine(x1, y1, x2, y2) {
-    return new fabric.Line([x1, y1, x2, y2], {
-        stroke: wbStroke,
-        selectable: false,
-        evented: false,
-    });
-}
-
-function removeCanvasGrid() {
-    const gridGroup = wbGridLines[0]?.group;
-    wbGridLines.forEach((line) => {
-        line.set({ stroke: wbGridVisible ? wbStroke : 'rgba(255, 255, 255, 0)' });
-        wbCanvas.remove(line);
-    });
-    if (gridGroup) wbEmitObjectUpsert(gridGroup);
-    wbGridLines = [];
-    wbCanvas.renderAll();
-    setWhiteboardControlState(whiteboardGridBtn, false);
-}
-
-function toggleCanvasGrid() {
-    wbGridVisible = !wbGridVisible;
-    wbGridVisible ? drawCanvasGrid() : removeCanvasGrid();
-}
-
-function setWhiteboardBgColor(color) {
-    let data = {
-        peer_name: peer_name,
-        action: 'bgcolor',
-        color: color,
-    };
-    whiteboardAction(data);
-}
-
-function whiteboardResetAllMode() {
-    whiteboardIsPencilMode(false);
-    whiteboardIsVanishingMode(false);
-    whiteboardIsObjectMode(false);
-    whiteboardIsEraserMode(false);
-}
-
-function setWhiteboardControlState(button, isActive) {
-    button.classList.toggle('is-active', isActive);
-    button.setAttribute('aria-pressed', String(isActive));
-}
-
-function whiteboardIsPencilMode(status) {
-    wbCanvas.isDrawingMode = status;
-    wbIsPencil = status;
-    setWhiteboardControlState(whiteboardPencilBtn, wbIsPencil);
-}
-
-function whiteboardIsVanishingMode(status) {
-    wbCanvas.isDrawingMode = status;
-    wbIsVanishing = status;
-    wbCanvas.freeDrawingBrush.color = wbIsVanishing ? 'yellow' : wbDrawingColorEl.value;
-    setWhiteboardControlState(whiteboardVanishingBtn, wbIsVanishing);
-}
-
-function whiteboardIsObjectMode(status) {
-    wbIsObject = status;
-    setWhiteboardControlState(whiteboardObjectBtn, status);
-}
-
-function whiteboardIsEraserMode(status) {
-    wbIsEraser = status;
-    setWhiteboardControlState(whiteboardEraserBtn, wbIsEraser);
-}
-
-function whiteboardAddObj(type) {
-    wbCanvas.freeDrawingBrush.color = wbDrawingColorEl.value;
-
-    switch (type) {
-        case 'imgUrl':
-            Swal.fire({
-                background: swalBackground,
-                title: 'Image URL',
-                input: 'text',
-                showCancelButton: true,
-                confirmButtonText: 'OK',
-                showClass: { popup: 'animate__animated animate__fadeInDown' },
-                hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    let wbCanvasImgURL = result.value;
-                    if (isImageURL(wbCanvasImgURL)) {
-                        fabric.Image.fromURL(wbCanvasImgURL, function (myImg) {
-                            addWbCanvasObj(myImg);
-                        });
-                    } else {
-                        userLog('error', 'The URL is not a valid image', 'top-end');
-                    }
-                }
-            });
-            break;
-        case 'imgFile':
-            setupFileSelection('Select the image', wbImageInput, renderImageToCanvas);
-            break;
-        case 'pdfFile':
-            setupFileSelection('Select the PDF', wbPdfInput, renderPdfToCanvas);
-            break;
-        case 'text':
-            const text = new fabric.IText('Lorem Ipsum', {
-                top: 0,
-                left: 0,
-                fontFamily: 'Montserrat',
-                fill: wbCanvas.freeDrawingBrush.color,
-                strokeWidth: wbCanvas.freeDrawingBrush.width,
-                stroke: wbCanvas.freeDrawingBrush.color,
-            });
-            addWbCanvasObj(text);
-            break;
-        case 'stickyNote':
-            createStickyNote();
-            break;
-        case 'line':
-            const line = new fabric.Line([50, 100, 200, 200], {
-                top: 0,
-                left: 0,
-                fill: wbCanvas.freeDrawingBrush.color,
-                strokeWidth: wbCanvas.freeDrawingBrush.width,
-                stroke: wbCanvas.freeDrawingBrush.color,
-            });
-            addWbCanvasObj(line);
-            break;
-        case 'arrow':
-            const arrowColor = wbCanvas.freeDrawingBrush.color;
-            const arrow = new fabric.Group(
-                [
-                    new fabric.Line([0, 30, 180, 30], {
-                        stroke: arrowColor,
-                        strokeWidth: wbCanvas.freeDrawingBrush.width,
-                    }),
-                    new fabric.Triangle({
-                        left: 180,
-                        top: 30,
-                        width: 24,
-                        height: 28,
-                        fill: arrowColor,
-                        originX: 'center',
-                        originY: 'center',
-                        angle: 90,
-                    }),
-                ],
-                { left: 100, top: 100 }
-            );
-            addWbCanvasObj(arrow);
-            break;
-        case 'circle':
-            const circle = new fabric.Circle({
-                radius: 50,
-                fill: 'transparent',
-                stroke: wbCanvas.freeDrawingBrush.color,
-                strokeWidth: wbCanvas.freeDrawingBrush.width,
-            });
-            addWbCanvasObj(circle);
-            break;
-        case 'rect':
-            const rect = new fabric.Rect({
-                top: 0,
-                left: 0,
-                width: 150,
-                height: 100,
-                fill: 'transparent',
-                stroke: wbCanvas.freeDrawingBrush.color,
-                strokeWidth: wbCanvas.freeDrawingBrush.width,
-            });
-            addWbCanvasObj(rect);
-            break;
-        case 'diamond':
-            const diamond = new fabric.Polygon(
-                [
-                    { x: 75, y: 0 },
-                    { x: 150, y: 55 },
-                    { x: 75, y: 110 },
-                    { x: 0, y: 55 },
-                ],
-                {
-                    left: 100,
-                    top: 100,
-                    fill: 'transparent',
-                    stroke: wbCanvas.freeDrawingBrush.color,
-                    strokeWidth: wbCanvas.freeDrawingBrush.width,
-                    strokeUniform: true,
-                }
-            );
-            addWbCanvasObj(diamond);
-            break;
-        case 'triangle':
-            const triangle = new fabric.Triangle({
-                top: 0,
-                left: 0,
-                width: 150,
-                height: 100,
-                fill: 'transparent',
-                stroke: wbCanvas.freeDrawingBrush.color,
-                strokeWidth: wbCanvas.freeDrawingBrush.width,
-            });
-            addWbCanvasObj(triangle);
-            break;
-        case 'frame':
-            const frameColor = wbCanvas.freeDrawingBrush.color;
-            const frame = new fabric.Group(
-                [
-                    new fabric.Rect({
-                        width: 360,
-                        height: 220,
-                        fill: 'transparent',
-                        stroke: frameColor,
-                        strokeWidth: 2,
-                        strokeDashArray: [10, 6],
-                        strokeUniform: true,
-                    }),
-                    new fabric.Textbox(window.i18n?.t('Frame title', 'labels') || 'Frame title', {
-                        left: 12,
-                        top: 10,
-                        width: 320,
-                        fontSize: 20,
-                        fontFamily: 'Montserrat',
-                        fill: frameColor,
-                    }),
-                ],
-                { left: 100, top: 100 }
-            );
-            addWbCanvasObj(frame);
-            break;
-        default:
-            break;
-    }
-}
-
-function whiteboardDeleteObject() {
-    const obj = wbCanvas?.getActiveObject?.();
-    if (!obj) return;
-    const tag = document.activeElement?.tagName;
-    if ((tag === 'INPUT' || tag === 'TEXTAREA') && !obj.isEditing) return;
-    if (obj.isEditing && obj.exitEditing) obj.exitEditing();
-    whiteboardEraseObject();
-    return;
-}
-
-function whiteboardEraseObject() {
-    if (wbCanvas && typeof wbCanvas.getActiveObjects === 'function') {
-        const activeObjects = wbCanvas.getActiveObjects();
-        if (activeObjects && activeObjects.length > 0) {
-            // Remove all selected objects
-            activeObjects.forEach((obj) => {
-                wbCanvas.remove(obj);
-            });
-            wbCanvas.discardActiveObject();
-            wbCanvas.requestRenderAll();
-        }
-    }
-}
-
-function whiteboardCloneObject() {
-    if (wbCanvas && typeof wbCanvas.getActiveObjects === 'function') {
-        const activeObjects = wbCanvas.getActiveObjects();
-        if (activeObjects && activeObjects.length > 0) {
-            activeObjects.forEach((obj, idx) => {
-                obj.clone((cloned) => {
-                    // Offset each clone for visibility
-                    cloned.set({
-                        left: obj.left + 30 + idx * 10,
-                        top: obj.top + 30 + idx * 10,
-                        evented: true,
-                    });
-                    wbCanvas.add(cloned);
-                    wbCanvas.setActiveObject(cloned);
-                });
-            });
-            wbCanvas.requestRenderAll();
-        }
-    }
-}
-
-function whiteboardGroupSelection() {
-    const selection = wbCanvas?.getActiveObject?.();
-    if (!selection || selection.type !== 'activeSelection' || selection.size() < 2) {
-        return userLog('info', 'Select two or more objects to group.', 'top-end');
-    }
-    const group = selection.toGroup();
-    wbCanvas.setActiveObject(group);
-    wbCanvas.requestRenderAll();
-}
-
-function whiteboardUngroupSelection() {
-    const group = wbCanvas?.getActiveObject?.();
-    if (!group || group.type !== 'group') {
-        return userLog('info', 'Select a grouped object to ungroup.', 'top-end');
-    }
-    group.toActiveSelection();
-    wbCanvas.requestRenderAll();
-}
-
-function wbHandleVanishingObjects() {
-    if (wbIsVanishing && wbCanvas._objects.length > 0) {
-        const obj = wbCanvas._objects[wbCanvas._objects.length - 1];
-        if (obj && obj.type === 'path') {
-            wbVanishingObjects.push(obj);
-            const fadeDuration = 1000,
-                vanishTimeout = 5000;
-            setTimeout(() => {
-                const start = performance.now();
-                function fade(ts) {
-                    const p = Math.min((ts - start) / fadeDuration, 1);
-                    obj.set('opacity', 1 - p);
-                    wbCanvas.requestRenderAll();
-                    if (p < 1) requestAnimationFrame(fade);
-                }
-                requestAnimationFrame(fade);
-            }, vanishTimeout - fadeDuration);
-            setTimeout(() => {
-                wbCanvas.remove(obj);
-                wbCanvas.renderAll();
-                wbVanishingObjects.splice(wbVanishingObjects.indexOf(obj), 1);
-            }, vanishTimeout);
-        }
-    }
-}
-
-function createStickyNote() {
-    Swal.fire({
-        background: swalBackground,
-        title: 'Create Sticky Note',
-        html: renderRoomTemplate('popupStickyNoteTemplate'),
-        showCancelButton: true,
-        confirmButtonText: 'Create',
-        cancelButtonText: 'Cancel',
-        showClass: { popup: 'animate__animated animate__fadeInDown' },
-        hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-        preConfirm: () => {
-            return {
-                text: getId('stickyNoteText').value,
-                color: getId('stickyNoteColor').value,
-                textColor: getId('stickyNoteTextColor').value,
-            };
-        },
-        didOpen: () => {
-            // Focus textarea for quick typing
-            setTimeout(() => {
-                getId('stickyNoteText').focus();
-            }, 100);
-        },
-    }).then((result) => {
-        if (result.isConfirmed) {
-            const noteData = result.value;
-
-            // Create sticky note background (rectangle)
-            const noteRect = new fabric.Rect({
-                left: 100,
-                top: 100,
-                width: 220,
-                height: 160,
-                fill: noteData.color,
-                shadow: 'rgba(0,0,0,0.18) 0px 4px 12px',
-                rx: 14,
-                ry: 14,
-            });
-
-            // Create text for sticky note
-            const noteText = new fabric.Textbox(noteData.text, {
-                left: 110,
-                top: 110,
-                width: 200,
-                fontSize: 18,
-                fontFamily: 'Segoe UI, Arial, sans-serif',
-                fill: noteData.textColor,
-                textAlign: 'left',
-                editable: true,
-                fontWeight: 'bold',
-                shadow: new fabric.Shadow({
-                    color: 'rgba(255,255,255,0.18)',
-                    blur: 2,
-                    offsetX: 1,
-                    offsetY: 1,
-                }),
-                padding: 8,
-                cornerSize: 8,
-            });
-
-            // Group rectangle and text together
-            const stickyNoteGroup = new fabric.Group([noteRect, noteText], {
-                left: 100,
-                top: 100,
-                selectable: true,
-                hasControls: true,
-                hoverCursor: 'pointer',
-            });
-
-            // Make the text editable by handling double-click events
-            stickyNoteGroup.on('mousedblclick', function () {
-                noteText.enterEditing();
-                noteText.hiddenTextarea && noteText.hiddenTextarea.focus();
-            });
-
-            // Exit editing when clicking outside the noteText
-            wbCanvas.on('mouse:down', function (e) {
-                if (noteText.isEditing && e.target !== noteText) {
-                    noteText.exitEditing();
-                }
-            });
-
-            addWbCanvasObj(stickyNoteGroup);
-        }
-    });
-}
-
-function setupFileSelection(title, accept, renderToCanvas) {
-    Swal.fire({
-        allowOutsideClick: false,
-        background: swalBackground,
-        position: 'center',
-        title: title,
-        input: 'file',
-        html: renderRoomTemplate('popupFileDropTemplate'),
-        inputAttributes: {
-            accept: accept,
-            'aria-label': title,
-        },
-        didOpen: () => {
-            const dropArea = document.getElementById('dropArea');
-            dropArea.addEventListener('dragenter', handleDragEnter);
-            dropArea.addEventListener('dragover', handleDragOver);
-            dropArea.addEventListener('dragleave', handleDragLeave);
-            dropArea.addEventListener('drop', handleDrop);
-        },
-        showDenyButton: true,
-        confirmButtonText: `OK`,
-        denyButtonText: `Cancel`,
-        showClass: { popup: 'animate__animated animate__fadeInDown' },
-        hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-    }).then((result) => {
-        if (result.isConfirmed) {
-            renderToCanvas(result.value);
-        }
-    });
-
-    function handleDragEnter(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        e.target.style.background = 'var(--body-bg)';
-    }
-
-    function handleDragOver(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        e.dataTransfer.dropEffect = 'copy';
-    }
-
-    function handleDragLeave(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        e.target.style.background = '';
-    }
-
-    function handleDrop(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        const dt = e.dataTransfer;
-        const files = dt.files;
-        handleFiles(files);
-        e.target.style.background = '';
-    }
-
-    function handleFiles(files) {
-        if (files.length > 0) {
-            const file = files[0];
-            console.log('Selected file:', file);
-            Swal.close();
-            renderToCanvas(file);
-        }
-    }
-}
-
-function renderImageToCanvas(wbCanvasImg) {
-    if (wbCanvasImg && wbCanvasImg.size > 0) {
-        let reader = new FileReader();
-        reader.onload = function (event) {
-            let imgObj = new Image();
-            imgObj.src = event.target.result;
-            imgObj.onload = function () {
-                let image = new fabric.Image(imgObj);
-                image.set({ top: 0, left: 0 }).scale(0.3);
-                addWbCanvasObj(image);
-            };
-        };
-        reader.readAsDataURL(wbCanvasImg);
-    }
-}
-
-async function renderPdfToCanvas(wbCanvasPdf) {
-    if (wbCanvasPdf && wbCanvasPdf.size > 0) {
-        let reader = new FileReader();
-        reader.onload = async function (event) {
-            wbCanvas.requestRenderAll();
-            await pdfToImage(event.target.result, wbCanvas);
-            whiteboardResetAllMode();
-            whiteboardIsObjectMode(true);
-        };
-        reader.readAsDataURL(wbCanvasPdf);
-    }
-}
-
-function readBlob(blob) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.addEventListener('load', () => resolve(reader.result));
-        reader.addEventListener('error', reject);
-        reader.readAsDataURL(blob);
-    });
-}
-
-async function loadPDF(pdfData, pages) {
-    const pdfjsLib = window['pdfjs-dist/build/pdf'];
-    pdfData = pdfData instanceof Blob ? await readBlob(pdfData) : pdfData;
-    const data = atob(pdfData.startsWith(Base64Prefix) ? pdfData.substring(Base64Prefix.length) : pdfData);
-    try {
-        const pdf = await pdfjsLib.getDocument({ data }).promise;
-        const numPages = pdf.numPages;
-        const canvases = await Promise.all(
-            Array.from({ length: numPages }, (_, i) => {
-                const pageNumber = i + 1;
-                if (pages && pages.indexOf(pageNumber) === -1) return null;
-                return pdf.getPage(pageNumber).then(async (page) => {
-                    const viewport = page.getViewport({ scale: window.devicePixelRatio });
-                    const canvas = document.createElement('canvas');
-                    const context = canvas.getContext('2d');
-                    canvas.height = viewport.height;
-                    canvas.width = viewport.width;
-                    const renderContext = {
-                        canvasContext: context,
-                        viewport: viewport,
-                    };
-                    await page.render(renderContext).promise;
-                    return canvas;
-                });
-            })
-        );
-        return canvases.filter((canvas) => canvas !== null);
-    } catch (error) {
-        console.error('Error loading PDF', error.message);
-        throw error.message;
-    }
-}
-
-async function pdfToImage(pdfData, canvas) {
-    const scale = 1 / window.devicePixelRatio;
-    try {
-        const canvases = await loadPDF(pdfData);
-        canvases.forEach(async (c) => {
-            canvas.add(
-                new fabric.Image(await c, {
-                    scaleX: scale,
-                    scaleY: scale,
-                })
-            );
-        });
-    } catch (error) {
-        console.error('Error converting PDF to images', error.message);
-        throw error.message;
-    }
-}
-
-function addWbCanvasObj(obj) {
-    if (obj) {
-        wbCanvas.add(obj).setActiveObject(obj);
-        whiteboardResetAllMode();
-        whiteboardIsObjectMode(true);
-    } else {
-        console.error('Invalid input. Expected an obj of canvas elements');
-    }
-}
-
-function setupWhiteboardLocalListeners() {
-    let lastTapTarget = null;
-    let lastTapAt = 0;
-
-    wbCanvas.on('mouse:down', function (e) {
-        mouseDown(e);
-
-        if (isMobileDevice) {
-            const tappedAt = Date.now();
-            const isDoubleTap = e.target && e.target === lastTapTarget && tappedAt - lastTapAt < 500;
-
-            lastTapTarget = e.target;
-            lastTapAt = tappedAt;
-
-            if (isDoubleTap) {
-                lastTapTarget = null;
-                lastTapAt = 0;
-                editWhiteboardGroupedText(e);
-            }
-        }
-    });
-    wbCanvas.on('mouse:dblclick', function (e) {
-        if (!isMobileDevice) editWhiteboardGroupedText(e);
-    });
-    wbCanvas.on('mouse:up', function (event) {
-        mouseUp(event);
-    });
-    wbCanvas.on('mouse:move', function (event) {
-        mouseMove(event);
-    });
-    wbCanvas.on('object:added', function (event) {
-        objectAdded(event.target);
-    });
-    wbCanvas.on('object:modified', function (event) {
-        wbEmitObjectUpsert(event.target);
-    });
-    wbCanvas.on('object:removed', function (event) {
-        wbEmitObjectRemove(event.target);
-    });
-    wbCanvas.on('text:changed', function (event) {
-        wbScheduleTextSync(event.target);
-    });
-    wbCanvas.on('mouse:over', function (event) {
-        wbShowAuthorLabel(event.target);
-    });
-    wbCanvas.on('mouse:out', function () {
-        if (!wbCanvas.getActiveObject()) wbHideAuthorLabel();
-    });
-    wbCanvas.on('selection:created', function (event) {
-        wbShowAuthorLabel(event.selected?.[0]);
-    });
-    wbCanvas.on('selection:updated', function (event) {
-        wbShowAuthorLabel(event.selected?.[0]);
-    });
-    wbCanvas.on('selection:cleared', wbHideAuthorLabel);
-    wbCanvas.on('object:moving', function (event) {
-        wbShowAuthorLabel(event.target);
-    });
-    wbCanvas.on('object:scaling', function (event) {
-        wbShowAuthorLabel(event.target);
-    });
-    wbCanvas.on('object:rotating', function (event) {
-        wbShowAuthorLabel(event.target);
-    });
-}
-
-async function editWhiteboardGroupedText(e) {
-    const group = e.target;
-    if (!group || group.type !== 'group' || typeof group.getObjects !== 'function') return;
-
-    const objects = group.getObjects();
-    const frameBorder = objects.find((obj) => obj.type === 'rect' && obj.strokeDashArray?.length);
-    const frameTitle = objects.find((obj) => obj.type === 'textbox');
-    if (!frameBorder || !frameTitle) return;
-
-    const result = await Swal.fire({
-        background: swalBackground,
-        title: 'Edit frame title',
-        input: 'text',
-        inputValue: frameTitle.text,
-        inputAttributes: { maxlength: 120 },
-        showCancelButton: true,
-        confirmButtonText: 'Save',
-        inputValidator: (value) =>
-            !value.trim() ? window.i18n?.t('Enter a frame title', 'dialogs') || 'Enter a frame title' : undefined,
-    });
-    if (!result.isConfirmed) return;
-
-    frameTitle.set('text', result.value.trim());
-    group.addWithUpdate();
-    group.setCoords();
-    wbCanvas.requestRenderAll();
-    wbEmitObjectUpsert(group);
-}
-
-function mouseDown(e) {
-    wbIsDrawing = true;
-    wbSyncParticipantPointer(e, true);
-    if (wbIsEraser && e.target) {
-        if (!wbVanishingObjects.includes(e.target)) {
-            wbPop.push(e.target); // To allow redo
-        }
-        wbCanvas.remove(e.target);
-        return;
-    }
-}
-
-function mouseUp(e) {
-    wbSyncParticipantPointer(e, false, true);
-    wbIsDrawing = false;
-}
-
-function mouseMove(e) {
-    if (wbIsEraser) {
-        wbCanvas.hoverCursor = 'not-allowed';
-    } else {
-        wbCanvas.hoverCursor = 'move';
-    }
-    if (!wbIsDrawing) return;
-    wbSyncParticipantPointer(e, true);
-}
-
-function objectAdded(obj) {
-    if (wbIsApplyingRemote) return;
-    if (!wbIsRedoing) wbPop = [];
-    wbIsRedoing = false;
-    wbHandleVanishingObjects();
-    const duplicateId =
-        obj?.wbId && wbCanvas.getObjects().some((candidate) => candidate !== obj && candidate.wbId === obj.wbId);
-    if (duplicateId) obj.set({ wbId: null, wbAuthor: null, wbAuthorId: null });
-    wbEmitObjectUpsert(obj);
-}
-
-function wbGetObjectId(obj) {
-    if (!obj) return null;
-    if (!obj.wbId) {
-        const randomId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${++wbObjectIdCounter}`;
-        obj.set('wbId', `${rc.peer_id}-${randomId}`);
-    }
-    return obj.wbId;
-}
-
-function wbCanSyncObjects() {
-    return !wbIsApplyingRemote && (!wbIsLock || isPresenter) && rc.thereAreParticipants();
-}
-
-function wbGetEventPointer(event) {
-    const pointer = event?.absolutePointer || event?.pointer;
-    if (!pointer || !Number.isFinite(pointer.x) || !Number.isFinite(pointer.y)) return null;
-    return {
-        x: Math.max(0, Math.min(wbReferenceWidth, pointer.x)),
-        y: Math.max(0, Math.min(wbReferenceHeight, pointer.y)),
-    };
-}
-
-function wbSyncParticipantPointer(event, active, force = false) {
-    const pointer = wbGetEventPointer(event);
-    if (!pointer || !wbShowParticipantNames || wbIsApplyingRemote || (wbIsLock && !isPresenter)) return;
-
-    const now = Date.now();
-    if (!force && now - wbLastPointerEmitAt < 50) return;
-    wbLastPointerEmitAt = now;
-
-    const data = {
-        peer_id: rc.peer_id,
-        peer_name,
-        x: pointer.x,
-        y: pointer.y,
-        active,
-    };
-    wbUpdateParticipantLabel(data);
-    if (rc.thereAreParticipants()) rc.socket.emit('whiteboardPointer', data);
-}
-
-function wbUpdateParticipantLabel(data) {
-    const labelsContainer = getId('whiteboardParticipantLabels');
-    if (
-        !wbShowParticipantNames ||
-        !labelsContainer ||
-        !data?.peer_id ||
-        !Number.isFinite(data.x) ||
-        !Number.isFinite(data.y)
-    )
-        return;
-
-    let entry = wbParticipantLabels.get(data.peer_id);
-    if (!entry) {
-        const element = document.createElement('div');
-        element.className = 'whiteboard-participant-label';
-        labelsContainer.appendChild(element);
-        entry = { element, x: data.x, y: data.y, hideTimer: null, fadeTimer: null };
-        wbParticipantLabels.set(data.peer_id, entry);
-    }
-
-    clearTimeout(entry.hideTimer);
-    clearTimeout(entry.fadeTimer);
-    entry.x = data.x;
-    entry.y = data.y;
-    entry.element.textContent = String(data.peer_name || 'Participant')
-        .trim()
-        .slice(0, 40);
-    entry.element.classList.remove('hidden', 'is-hiding');
-    entry.element.classList.toggle('is-active', Boolean(data.active));
-    wbPositionParticipantLabel(entry);
-
-    if (!data.active) {
-        entry.hideTimer = setTimeout(() => {
-            entry.element.classList.add('is-hiding');
-            entry.fadeTimer = setTimeout(() => entry.element.classList.add('hidden'), 180);
-        }, 2000);
-    }
-}
-
-function wbPositionParticipantLabel(entry) {
-    if (!entry?.element || !wbCanvas?.upperCanvasEl) return;
-    const labelsContainer = getId('whiteboardParticipantLabels');
-    const canvasRect = wbCanvas.upperCanvasEl.getBoundingClientRect();
-    const containerRect = labelsContainer.getBoundingClientRect();
-    const left = canvasRect.left - containerRect.left + (entry.x / wbReferenceWidth) * canvasRect.width;
-    const top = canvasRect.top - containerRect.top + (entry.y / wbReferenceHeight) * canvasRect.height;
-
-    entry.element.style.left = `${Math.max(12, Math.min(labelsContainer.clientWidth - 12, left))}px`;
-    entry.element.style.top = `${Math.max(24, Math.min(labelsContainer.clientHeight, top))}px`;
-}
-
-function wbRepositionParticipantLabels() {
-    wbParticipantLabels.forEach(wbPositionParticipantLabel);
-}
-
-function wbUpdateParticipantLabelFromObject(obj) {
-    if (!obj?.wbAuthorId || !obj.wbAuthor) return;
-    const bounds = obj.getBoundingRect(true, true);
-    wbUpdateParticipantLabel({
-        peer_id: obj.wbAuthorId,
-        peer_name: obj.wbAuthor,
-        x: bounds.left + bounds.width / 2,
-        y: bounds.top + bounds.height,
-        active: false,
-    });
-}
-
-function wbClearParticipantLabels() {
-    wbParticipantLabels.forEach(({ element, hideTimer, fadeTimer }) => {
-        clearTimeout(hideTimer);
-        clearTimeout(fadeTimer);
-        element.remove();
-    });
-    wbParticipantLabels.clear();
-    wbHideAuthorLabel();
-}
-
-function setWhiteboardParticipantNames(status) {
-    wbShowParticipantNames = Boolean(status);
-    const toggle = getId('whiteboardParticipantNamesSwitch');
-    if (toggle) {
-        toggle.checked = wbShowParticipantNames;
-        toggle.setAttribute('aria-checked', String(wbShowParticipantNames));
-    }
-    if (!wbShowParticipantNames) wbClearParticipantLabels();
-}
-
-function handleWhiteboardPointer(data) {
-    if (!data || !wbCanvas) return;
-    if (!wbIsOpen) toggleWhiteboard();
-    wbUpdateParticipantLabel(data);
-}
-
-function wbShowAuthorLabel(obj) {
-    const label = getId('whiteboardAuthorLabel');
-    if (!wbShowParticipantNames || !label || !obj?.wbAuthor || obj.type === 'activeSelection')
-        return wbHideAuthorLabel();
-
-    const canvasArea = label.parentElement;
-    const canvasRect = wbCanvas.upperCanvasEl.getBoundingClientRect();
-    const areaRect = canvasArea.getBoundingClientRect();
-    const bounds = obj.getBoundingRect(true, true);
-    const left = canvasRect.left - areaRect.left + bounds.left + bounds.width / 2;
-    const top = canvasRect.top - areaRect.top + bounds.top;
-
-    label.textContent = String(obj.wbAuthor).trim().slice(0, 40);
-    label.style.left = `${Math.max(12, Math.min(canvasRect.width - 12, left))}px`;
-    label.style.top = `${Math.max(24, top)}px`;
-    label.classList.remove('hidden');
-}
-
-function wbHideAuthorLabel() {
-    getId('whiteboardAuthorLabel')?.classList.add('hidden');
-}
-
-function wbEmitObjectUpsert(obj) {
-    if (!obj || !wbCanSyncObjects()) return;
-    obj.set({ wbAuthor: peer_name, wbAuthorId: rc.peer_id });
-    wbUpdateParticipantLabelFromObject(obj);
-    rc.socket.emit('whiteboardObject', {
-        action: 'upsert',
-        object_id: wbGetObjectId(obj),
-        object: obj.toObject(['wbId', 'wbAuthor', 'wbAuthorId']),
-    });
-}
-
-function wbEmitObjectRemove(obj) {
-    if (!obj || !wbCanSyncObjects()) return;
-    rc.socket.emit('whiteboardObject', {
-        action: 'remove',
-        object_id: wbGetObjectId(obj),
-    });
-}
-
-function wbScheduleTextSync(obj) {
-    if (!obj || wbIsApplyingRemote) return;
-    const objectId = wbGetObjectId(obj);
-    clearTimeout(wbTextSyncTimers.get(objectId));
-    wbTextSyncTimers.set(
-        objectId,
-        setTimeout(() => {
-            wbTextSyncTimers.delete(objectId);
-            wbEmitObjectUpsert(obj);
-        }, 100)
-    );
-}
-
-function handleWhiteboardObject(data) {
-    if (!data || !wbCanvas) return;
-    if (!wbIsOpen) toggleWhiteboard();
-
-    if (data.action === 'remove') {
-        const existing = wbCanvas.getObjects().find((obj) => obj.wbId === data.object_id);
-        wbIsApplyingRemote = true;
-        if (existing) wbCanvas.remove(existing);
-        wbCanvas.requestRenderAll();
-        wbIsApplyingRemote = false;
-        return;
-    }
-
-    if (data.action !== 'upsert' || !data.object) {
-        return;
-    }
-
-    fabric.util.enlivenObjects([data.object], (objects) => {
-        const updated = objects[0];
-        if (updated) {
-            const existing = wbCanvas.getObjects().find((obj) => obj.wbId === data.object_id);
-            wbIsApplyingRemote = true;
-            updated.set({
-                wbId: data.object_id,
-                wbAuthor: data.object.wbAuthor,
-                wbAuthorId: data.object.wbAuthorId,
-            });
-            if (existing) {
-                const index = wbCanvas.getObjects().indexOf(existing);
-                wbCanvas.remove(existing);
-                wbCanvas.insertAt(updated, index, false);
-            } else {
-                wbCanvas.add(updated);
-            }
-            wbCanvas.requestRenderAll();
-            wbIsApplyingRemote = false;
-            wbUpdateParticipantLabelFromObject(updated);
-        }
-    });
-}
-
-function wbCanvasBackgroundColor(color) {
-    document.documentElement.style.setProperty('--wb-bg', color);
-    wbBackgroundColorEl.value = color;
-    wbCanvas.setBackgroundColor(color);
-    wbCanvas.renderAll();
-}
-
-function wbCanvasUndo() {
-    if (wbCanvas._objects.length > 0) {
-        const obj = wbCanvas._objects.pop();
-        if (!wbVanishingObjects.includes(obj)) {
-            wbPop.push(obj);
-        }
-        wbCanvas.renderAll();
-    }
-}
-
-function wbCanvasRedo() {
-    if (wbPop.length > 0) {
-        wbIsRedoing = true;
-        wbCanvas.add(wbPop.pop());
-    }
-}
-
-function wbCanvasClear() {
-    wbCanvas.clear();
-    wbClearParticipantLabels();
-    wbCanvas.renderAll();
-}
-
-function wbCanvasSaveImg() {
-    const dataURL = wbCanvas.toDataURL({
-        width: wbCanvas.getWidth(),
-        height: wbCanvas.getHeight(),
-        left: 0,
-        top: 0,
-        format: 'png',
-    });
-    const dataNow = getDataTimeString();
-    const fileName = `whiteboard-${dataNow}.png`;
-    saveDataToFile(dataURL, fileName);
-}
-
-function wbUpdate() {
-    if (wbIsOpen && (!isRulesActive || isPresenter)) {
-        console.log('IsPresenter: update whiteboard canvas to the participants in the room');
-        wbCanvasToJson();
-        whiteboardAction(getWhiteboardAction(wbIsLock ? 'lock' : 'unlock'));
-        whiteboardAction({ ...getWhiteboardAction('participantNames'), status: wbShowParticipantNames });
-    }
-}
-
-function wbCanvasToJson() {
-    console.log('wbCanvasToJson called');
-    if (!isPresenter && wbIsLock) {
-        console.log('Not presenter and whiteboard is locked. Exiting');
-        return;
-    }
-    if (!rc.thereAreParticipants()) {
-        console.log('No participants. Exiting');
-        return;
-    }
-    wbCanvas.getObjects().forEach((obj) => {
-        wbGetObjectId(obj);
-        if (!obj.wbAuthor) obj.set('wbAuthor', peer_name);
-        if (!obj.wbAuthorId) obj.set('wbAuthorId', rc.peer_id);
-    });
-    let wbCanvasJson = JSON.stringify(wbCanvas.toJSON(['wbId', 'wbAuthor', 'wbAuthorId']));
-    console.log('Emitting wbCanvasToJson');
-    rc.socket.emit('wbCanvasToJson', wbCanvasJson);
-}
-
-function JsonToWbCanvas(json) {
-    if (!wbIsOpen) toggleWhiteboard();
-    wbIsRedoing = true;
-    wbIsApplyingRemote = true;
-    wbCanvas.loadFromJSON(json, function () {
-        setupWhiteboardCanvasSize();
-        wbIsRedoing = false;
-        wbIsApplyingRemote = false;
-    });
-    if (!isPresenter && !wbCanvas.isDrawingMode && wbIsLock) {
-        wbDrawing(false);
-    }
-}
-
-function getWhiteboardAction(action) {
-    return {
-        peer_name: peer_name,
-        action: action,
-    };
-}
-
-function confirmClearBoard() {
-    Swal.fire({
-        background: swalBackground,
-        imageUrl: image.delete,
-        position: 'top',
-        title: 'Clean the board',
-        text: 'Are you sure you want to clean the board?',
-        showDenyButton: true,
-        confirmButtonText: `Yes`,
-        denyButtonText: `No`,
-        showClass: { popup: 'animate__animated animate__fadeInDown' },
-        hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-    }).then((result) => {
-        if (result.isConfirmed) {
-            whiteboardAction(getWhiteboardAction('clear'));
-            sound('delete');
-        }
-    });
-}
-
-function showWhiteboardShortcuts() {
-    const whiteboardShortcutsContent = getId('whiteboardShortcutsContent');
-    if (!whiteboardShortcutsContent) {
-        console.error('Whiteboard shortcuts content not found');
-        return;
-    }
-    Swal.fire({
-        background: swalBackground,
-        position: 'center',
-        title: 'Whiteboard Shortcuts',
-        html: whiteboardShortcutsContent.innerHTML,
-        confirmButtonText: 'Got it!',
-        showClass: { popup: 'animate__animated animate__fadeInDown' },
-        hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-    });
-}
-
-function toggleLockUnlockWhiteboard() {
-    wbIsLock = !wbIsLock;
-
-    const btnToShow = wbIsLock ? whiteboardLockBtn : whiteboardUnlockBtn;
-    const btnToHide = wbIsLock ? whiteboardUnlockBtn : whiteboardLockBtn;
-    const btnColor = wbIsLock ? 'red' : 'white';
-    const action = wbIsLock ? 'lock' : 'unlock';
-
-    show(btnToShow);
-    hide(btnToHide);
-    setColor(whiteboardLockBtn, btnColor);
-
-    whiteboardAction(getWhiteboardAction(action));
-
-    if (wbIsLock) {
-        userLog('info', 'The whiteboard is locked. \n The participants cannot interact with it.', 'top-right');
-        sound('locked');
-    }
-}
-
-function whiteboardAction(data, emit = true) {
-    if (emit) {
-        if (rc.thereAreParticipants()) {
-            rc.socket.emit('whiteboardAction', data);
-        }
-    } else {
-        // Security: peer_name is attacker-controllable in upstream payloads and the
-        // Swal toast renders the title as HTML. Escape angle brackets / quotes so a
-        // crafted name like `<img src=//attacker/track>` can't trigger outbound
-        // requests in every recipient's browser.
-        const safePeerName = String(data.peer_name || '')
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-        const safeAction = String(data.action || '')
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
-        if (data.action !== 'participantNames') {
-            userLog(
-                'info',
-                `${safePeerName} <i class="fas fa-chalkboard-teacher"></i> whiteboard action: ${safeAction}`,
-                'top-end'
-            );
-        }
-    }
-
-    switch (data.action) {
-        case 'bgcolor':
-            wbCanvasBackgroundColor(data.color);
-            break;
-        case 'undo':
-            wbCanvasUndo();
-            break;
-        case 'redo':
-            wbCanvasRedo();
-            break;
-        case 'clear':
-            wbCanvasClear();
-            removeCanvasGrid();
-            break;
-        case 'participantNames':
-            setWhiteboardParticipantNames(data.status);
-            break;
-        case 'lock':
-            if (!isPresenter) {
-                elemDisplay('whiteboardTitle', false);
-                elemDisplay('whiteboardOptions', false);
-                elemDisplay('whiteboardButton', false);
-                wbDrawing(false);
-                wbIsLock = true;
-            }
-            break;
-        case 'unlock':
-            if (!isPresenter) {
-                elemDisplay('whiteboardTitle', true, 'flex');
-                elemDisplay('whiteboardOptions', true, 'flex');
-                elemDisplay('whiteboardButton', true);
-                wbDrawing(true);
-                wbIsLock = false;
-            }
-            break;
-        case 'close':
-            if (wbIsOpen) toggleWhiteboard();
-            if (wbIsBgTransparent) setTheme();
-            break;
-        default:
-            break;
-        //...
-    }
-}
-
-function wbDrawing(status) {
-    wbCanvas.isDrawingMode = status; // Disable free drawing
-    wbCanvas.selection = status; // Disable object selection
-    wbCanvas.forEachObject(function (obj) {
-        obj.selectable = status; // Make all objects unselectable
-    });
-}
-
-// ####################################################
-// HANDLE WHITEBOARD DRAG AND DROP
-// ####################################################
-
-function setupWhiteboardDragAndDrop() {
-    if (!wbCanvas) return;
-
-    // Prevent default drag behaviors
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach((eventName) => {
-        wbCanvas.upperCanvasEl.addEventListener(eventName, preventDefaults, false);
-    });
-
-    function preventDefaults(e) {
-        e.preventDefault();
-        e.stopPropagation();
-    }
-
-    // Highlight drop area
-    ['dragenter', 'dragover'].forEach((eventName) => {
-        wbCanvas.upperCanvasEl.addEventListener(
-            eventName,
-            () => {
-                wbCanvas.upperCanvasEl.style.border = '1px dashed #fff';
-            },
-            false
-        );
-    });
-
-    ['dragleave', 'drop'].forEach((eventName) => {
-        wbCanvas.upperCanvasEl.addEventListener(
-            eventName,
-            () => {
-                wbCanvas.upperCanvasEl.style.border = '';
-            },
-            false
-        );
-    });
-
-    // Handle dropped files
-    wbCanvas.upperCanvasEl.addEventListener('drop', handleWhiteboardDrop, false);
-}
-
-function handleWhiteboardDrop(e) {
-    const dt = e.dataTransfer;
-    const files = dt.files;
-
-    if (files.length === 0) return;
-
-    const file = files[0];
-    const fileType = file.type;
-
-    switch (true) {
-        case fileType.startsWith('image/'):
-            renderImageToCanvas(file);
-            break;
-        case fileType === 'application/pdf':
-            renderPdfToCanvas(file);
-            break;
-        default:
-            userLog('warning', `Unsupported file type: ${fileType}. Please drop an image or PDF file.`, 'top-end');
-            break;
-    }
-}
-
-// ####################################################
-// HANDLE WHITEBOARD SHORTCUTS
-// ####################################################
-
-function setupWhiteboardShortcuts() {
-    document.addEventListener('keydown', (event) => {
-        if (!wbIsOpen) return;
-
-        // Whiteboard clone shortcut: Cmd+C/Ctrl+C
-        if ((event.key === 'c' || event.key === 'C') && (event.ctrlKey || event.metaKey)) {
-            whiteboardCloneObject();
-            event.preventDefault();
-            return;
-        }
-        // Whiteboard erase shortcut: Cmd+X/Ctrl+X
-        if ((event.key === 'x' || event.key === 'X') && (event.ctrlKey || event.metaKey)) {
-            whiteboardEraseObject();
-            event.preventDefault();
-            return;
-        }
-
-        // Whiteboard undo shortcuts: Cmd+Z/Ctrl+Z
-        if ((event.key === 'z' || event.key === 'Z') && (event.ctrlKey || event.metaKey) && !event.shiftKey) {
-            whiteboardAction(getWhiteboardAction('undo'));
-            event.preventDefault();
-            return;
-        }
-        // Whiteboard Redo shortcuts: Cmd+Shift+Z/Ctrl+Shift+Z or Cmd+Y/Ctrl+Y
-        if (
-            ((event.key === 'z' || event.key === 'Z') && (event.ctrlKey || event.metaKey) && event.shiftKey) ||
-            ((event.key === 'y' || event.key === 'Y') && (event.ctrlKey || event.metaKey))
-        ) {
-            whiteboardAction(getWhiteboardAction('redo'));
-            event.preventDefault();
-            return;
-        }
-        // Whiteboard delete shortcut: Delete / Backspace
-        if (event.key === 'Delete' || event.key === 'Backspace') {
-            whiteboardDeleteObject();
-            event.preventDefault();
-            return;
-        }
-
-        // Use event.code and check for Alt+Meta (Mac) or Alt+Ctrl (Windows/Linux)
-        if (event.code && event.altKey && (event.ctrlKey || event.metaKey) && !event.shiftKey) {
-            switch (event.code) {
-                case 'KeyT': // Text
-                    whiteboardAddObj('text');
-                    event.preventDefault();
-                    break;
-                case 'KeyL': // Line
-                    whiteboardAddObj('line');
-                    event.preventDefault();
-                    break;
-                case 'KeyA': // Arrow
-                    whiteboardAddObj('arrow');
-                    event.preventDefault();
-                    break;
-                case 'KeyC': // Circle
-                    whiteboardAddObj('circle');
-                    event.preventDefault();
-                    break;
-                case 'KeyR': // Rectangle
-                    whiteboardAddObj('rect');
-                    event.preventDefault();
-                    break;
-                case 'KeyG': // Triangle (G for Geometry)
-                    whiteboardAddObj('triangle');
-                    event.preventDefault();
-                    break;
-                case 'KeyD': // Diamond
-                    whiteboardAddObj('diamond');
-                    event.preventDefault();
-                    break;
-                case 'KeyF': // Frame
-                    whiteboardAddObj('frame');
-                    event.preventDefault();
-                    break;
-                case 'KeyN': // Sticky Note
-                    whiteboardAddObj('stickyNote');
-                    event.preventDefault();
-                    break;
-                case 'KeyU': // Image (from URL)
-                    whiteboardAddObj('imgUrl');
-                    event.preventDefault();
-                    break;
-                case 'KeyV': // Vanishing Pen
-                    whiteboardResetAllMode();
-                    whiteboardIsVanishingMode(!wbIsVanishing);
-                    event.preventDefault();
-                    break;
-                case 'KeyI': // Image (from file)
-                    whiteboardAddObj('imgFile');
-                    event.preventDefault();
-                    break;
-                case 'KeyP': // PDF (from file)
-                    whiteboardAddObj('pdfFile');
-                    event.preventDefault();
-                    break;
-                case 'KeyQ': // Clear Board
-                    confirmClearBoard();
-                    event.preventDefault();
-                    break;
-                default:
-                    break;
-            }
-        }
-    });
-}
-
-// ####################################################
 // HANDLE PARTICIPANTS
 // ####################################################
 
@@ -8124,7 +6145,7 @@ let themeMap = {
         '--select-focus-color': 'rgba(102, 190, 255, 0.5)',
         '--tab-btn-active': '#1e1e28',
         '--settings-bg': 'linear-gradient(135deg, #0e0e14, #1e1e28)',
-        '--wb-bg': 'linear-gradient(135deg, #0e0e14, #1e1e28)',
+
         '--btns-bg-color': 'rgba(10, 10, 16, 0.8)',
         '--dd-color': '#E8E8EC',
         '--room-switch-accent': '#4678F9',
@@ -8140,7 +6161,7 @@ let themeMap = {
         '--select-focus-color': 'rgba(154, 186, 255, 0.42)',
         '--tab-btn-active': '#181820',
         '--settings-bg': 'linear-gradient(135deg, #0d0d12, #181820)',
-        '--wb-bg': 'linear-gradient(135deg, #0d0d12, #181820)',
+
         '--btns-bg-color': 'rgba(10, 10, 16, 0.85)',
         '--dd-color': '#E0E0E6',
         '--room-switch-accent': '#4678F9',
@@ -8156,7 +6177,7 @@ let themeMap = {
         '--select-focus-color': 'rgba(196, 204, 224, 0.38)',
         '--tab-btn-active': '#3a3a46',
         '--settings-bg': 'linear-gradient(135deg, #1c1c24, #3a3a46)',
-        '--wb-bg': 'linear-gradient(135deg, #1c1c24, #3a3a46)',
+
         '--btns-bg-color': 'rgba(22, 22, 30, 0.75)',
         '--dd-color': '#E4E4EA',
         '--room-switch-accent': '#4678F9',
@@ -8172,7 +6193,7 @@ let themeMap = {
         '--select-focus-color': 'rgba(111, 207, 151, 0.42)',
         '--tab-btn-active': '#1a3830',
         '--settings-bg': 'linear-gradient(135deg, #0f1d1a, #1a3830)',
-        '--wb-bg': 'linear-gradient(135deg, #0f1d1a, #1a3830)',
+
         '--btns-bg-color': 'rgba(12, 24, 20, 0.75)',
         '--dd-color': '#6FCF97',
     },
@@ -8186,7 +6207,7 @@ let themeMap = {
         '--select-focus-color': 'rgba(107, 163, 214, 0.45)',
         '--tab-btn-active': '#1e3050',
         '--settings-bg': 'linear-gradient(135deg, #111827, #1e3050)',
-        '--wb-bg': 'linear-gradient(135deg, #111827, #1e3050)',
+
         '--btns-bg-color': 'rgba(14, 20, 34, 0.75)',
         '--dd-color': '#6BA3D6',
     },
@@ -8200,7 +6221,7 @@ let themeMap = {
         '--select-focus-color': 'rgba(224, 112, 112, 0.42)',
         '--tab-btn-active': '#332028',
         '--settings-bg': 'linear-gradient(135deg, #1c1015, #332028)',
-        '--wb-bg': 'linear-gradient(135deg, #1c1015, #332028)',
+
         '--btns-bg-color': 'rgba(22, 12, 16, 0.75)',
         '--dd-color': '#E07070',
     },
@@ -8214,7 +6235,7 @@ let themeMap = {
         '--select-focus-color': 'rgba(176, 124, 200, 0.42)',
         '--tab-btn-active': '#2e2045',
         '--settings-bg': 'linear-gradient(135deg, #18102a, #2e2045)',
-        '--wb-bg': 'linear-gradient(135deg, #18102a, #2e2045)',
+
         '--btns-bg-color': 'rgba(18, 12, 34, 0.75)',
         '--dd-color': '#B07CC8',
     },
@@ -8228,7 +6249,7 @@ let themeMap = {
         '--select-focus-color': 'rgba(232, 165, 96, 0.45)',
         '--tab-btn-active': '#3a2a1a',
         '--settings-bg': 'linear-gradient(135deg, #1c1510, #3a2a1a)',
-        '--wb-bg': 'linear-gradient(135deg, #1c1510, #3a2a1a)',
+
         '--btns-bg-color': 'rgba(22, 16, 12, 0.75)',
         '--dd-color': '#E8A560',
     },
@@ -8242,7 +6263,7 @@ let themeMap = {
         '--select-focus-color': 'rgba(216, 139, 160, 0.42)',
         '--tab-btn-active': '#382030',
         '--settings-bg': 'linear-gradient(135deg, #1c1018, #382030)',
-        '--wb-bg': 'linear-gradient(135deg, #1c1018, #382030)',
+
         '--btns-bg-color': 'rgba(22, 12, 18, 0.75)',
         '--dd-color': '#D88BA0',
     },
@@ -8256,7 +6277,7 @@ let themeMap = {
         '--select-focus-color': 'rgba(212, 184, 92, 0.44)',
         '--tab-btn-active': '#36321a',
         '--settings-bg': 'linear-gradient(135deg, #1a1810, #36321a)',
-        '--wb-bg': 'linear-gradient(135deg, #1a1810, #36321a)',
+
         '--btns-bg-color': 'rgba(20, 18, 12, 0.75)',
         '--dd-color': '#D4B85C',
     },
@@ -8286,7 +6307,7 @@ function setCustomTheme() {
         '--select-focus-color': `color-mix(in srgb, ${color} 58%, white)`,
         '--tab-btn-active': color,
         '--settings-bg': grad,
-        '--wb-bg': grad,
+
         '--btns-bg-color': 'rgba(0, 0, 0, 0.7)',
         '--dd-color': '#FFFFFF',
         '--room-switch-accent': `color-mix(in srgb, ${color} 45%, white)`,
@@ -8308,7 +6329,6 @@ function setTheme() {
         selectTheme.selectedIndex = themeIndex;
     }
 
-    wbIsBgTransparent = false;
     if (rc) rc.isChatBgTransparent = false;
     updateThemeCardsActive();
 }

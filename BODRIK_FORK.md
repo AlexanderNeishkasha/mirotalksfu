@@ -12,6 +12,12 @@ Changes include room-bound admission, short-lived TURN credentials, a native
 mediasoup music participant, room/slug branding, two maintained languages,
 profile and chat UI changes, and in-place network/media recovery. These are
 ordinary source changes, not runtime patches applied to an upstream download.
+
+The Bodrik meeting no longer offers whiteboard, collaborative/private editor,
+polls, or room-wide emoji reactions. Their controls, initialization, room state,
+and signaling handlers are removed; stale room-reaction commands are not relayed.
+Quill and PDF.js are no longer loaded. Chat emoji and chat-message reactions remain.
+Video drawing is also retired, so Fabric.js is no longer loaded.
 The service-specific backend, TURN server, deployment configuration, environment
 variables, credentials, and user-uploaded data are not stored in this repository.
 

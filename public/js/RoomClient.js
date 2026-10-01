@@ -49,7 +49,7 @@ const html = {
     hideALL: 'fas fa-eye',
     hideFromGrid: 'fas fa-eye-slash',
     mirror: 'fas fa-arrow-right-arrow-left',
-    draw: 'fas fa-pencil-alt',
+
     close: 'fas fa-times',
     stop: 'fas fa-circle-stop',
     share: 'fas fa-share-alt',
@@ -79,7 +79,7 @@ const icons = {
     theme: '<i class="fas fa-fill-drip"></i>',
     recSync: '<i class="fa-solid fa-cloud-arrow-up"></i>',
     refresh: '<i class="fas fa-rotate"></i>',
-    editor: '<i class="fas fa-pen-to-square"></i>',
+
     up: '<i class="fas fa-chevron-up"></i>',
     down: '<i class="fas fa-chevron-down"></i>',
     infoBrowser: '<i class="fa-solid fa-globe"></i>',
@@ -308,7 +308,6 @@ class RoomClient {
             chat_cant_chatgpt: false,
             chat_cant_deep_seek: false,
             media_cant_sharing: false,
-            polls_cant_create: false,
         };
 
         // Chat messages
@@ -356,15 +355,7 @@ class RoomClient {
         this.isZoomCenterMode = false;
         this.isChatOpen = false;
         this.isChatEmojiOpen = false;
-        this.isPollOpen = false;
-        this.isPollPinned = false;
-        this.isPollMaximized = false;
-        this.isEditorOpen = false;
-        this.isEditorLocked = false;
-        this.isEditorPinned = false;
-        this.isEditorPrivate = false;
-        this.collabEditorDelta = null;
-        this._privatePersistTimer = null;
+
         this.isBreakoutPinned = false;
         this.isBreakoutMaximized = false;
         this.isSpeechSynthesisSupported = isSpeechSynthesisSupported;
@@ -381,17 +372,11 @@ class RoomClient {
         this.isChatMaximized = false;
         this.isToggleUnreadMsg = false;
         this.isToggleRaiseHand = false;
-        this.roomEmojiBurstState = {
-            startedAt: 0,
-            anchorX: 0,
-            anchorY: 0,
-            count: 0,
-        };
+
         this.pinnedVideoPlayerId = null;
         this.camVideo = false;
         this.videoQualitySelectedIndex = 0;
 
-        this.pollSelectedOptions = {};
         this.chatGPTContext = [];
         this.deepSeekContext = [];
         this.chatGPTEnabled = false;
@@ -760,7 +745,6 @@ class RoomClient {
         redirect = room.redirect;
 
         participantsCount = this.peers.size;
-        setWhiteboardParticipantNames(room.config?.whiteboardParticipantNames === true);
 
         // ME
         for (let peer of Array.from(this.peers.keys()).filter((id) => id == this.peer_id)) {
@@ -874,10 +858,6 @@ class RoomClient {
                 if (!fromFile && !fromUrl && !fromStream) {
                     elemDisplay('tabRTMPStreamingBtn', false);
                 }
-            }
-            // There is polls
-            if (room.thereIsPolls) {
-                this.socket.emit('updatePoll');
             }
 
             // Share Media Data on Join
@@ -1320,11 +1300,7 @@ class RoomClient {
         this.socket.on('shareVideoAction', this.handleShareVideoAction);
         this.socket.on('fileAbort', this.handleFileAbortData);
         this.socket.on('receiveFileAbort', this.handleReceiveFileAbortData);
-        this.socket.on('wbCanvasToJson', this.handleWbCanvasToJson);
-        this.socket.on('whiteboardObject', this.handleWhiteboardObject);
-        this.socket.on('whiteboardPointer', this.handleWhiteboardPointer);
-        this.socket.on('whiteboardAction', this.handleWhiteboardAction);
-        this.socket.on('videoDrawing', this.handleVideoDrawingData);
+
         this.socket.on('audioVolume', this.handleAudioVolumeData);
         this.socket.on('dominantSpeaker', this.handleDominantSpeakerData);
         this.socket.on('updateRoomModerator', this.handleUpdateRoomModeratorData);
@@ -1334,10 +1310,7 @@ class RoomClient {
         this.socket.on('errorRTMP', this.handleErrorRTMP);
         this.socket.on('endRTMPfromURL', this.handleEndRTMPfromURL);
         this.socket.on('errorRTMPfromURL', this.handleErrorRTMPfromURL);
-        this.socket.on('updatePolls', this.handleUpdatePolls);
-        this.socket.on('editorChange', this.handleEditorChange);
-        this.socket.on('editorActions', this.handleEditorActions);
-        this.socket.on('editorUpdate', this.handleEditorUpdate);
+
         this.socket.on('breakoutRoom', this.handleBreakoutRoom);
         this.socket.on('breakoutRoomCountsChanged', this.handleBreakoutRoomCountsChanged);
         this.socket.on('breakoutRoomMessage', this.handleBreakoutRoomMessage);
@@ -1451,8 +1424,6 @@ class RoomClient {
         participantsCount = data.peer_counts;
         if (isBroadcastingEnabled) {
             if (isParticipantsListOpen) getRoomParticipants();
-            wbUpdate();
-            this.editorUpdate();
         } else {
             adaptAspectRatio(participantsCount);
         }
@@ -1599,28 +1570,6 @@ class RoomClient {
         this.handleReceiveFileAbort(data);
     };
 
-    handleWbCanvasToJson = (data) => {
-        console.log('SocketOn Received whiteboard canvas JSON');
-        JsonToWbCanvas(data);
-    };
-
-    handleWhiteboardObject = (data) => {
-        handleWhiteboardObject(data);
-    };
-
-    handleWhiteboardPointer = (data) => {
-        handleWhiteboardPointer(data);
-    };
-
-    handleWhiteboardAction = (data) => {
-        console.log('Whiteboard action', data);
-        whiteboardAction(data, false);
-    };
-
-    handleVideoDrawingData = (data) => {
-        this.handleVideoDrawing(data);
-    };
-
     handleAudioVolumeData = (data) => {
         this.handleAudioVolume(data);
     };
@@ -1658,22 +1607,6 @@ class RoomClient {
 
     handleErrorRTMPfromURL = (data) => {
         this.errorRTMPfromURL(data);
-    };
-
-    handleUpdatePolls = (data) => {
-        this.pollsUpdate(data);
-    };
-
-    handleEditorChange = (data) => {
-        this.handleEditorData(data);
-    };
-
-    handleEditorActions = (data) => {
-        this.handleEditorActionsData(data);
-    };
-
-    handleEditorUpdate = (data) => {
-        this.handleEditorUpdateData(data);
     };
 
     handleBreakoutRoom = (data) => {
@@ -3283,7 +3216,7 @@ class RoomClient {
     }
 
     async handleProducer(id, type, stream) {
-        let elem, vb, vp, ts, d, p, i, au, pip, ha, fs, pm, pb, pn, mv, st, dw, ri;
+        let elem, vb, vp, ts, d, p, i, au, pip, ha, fs, pm, pb, pn, mv, st, ri;
         switch (type) {
             case mediaType.video:
             case mediaType.screen:
@@ -3318,7 +3251,7 @@ class RoomClient {
                 fs = this.createButton(id + '__fullScreen', html.fullScreen);
                 ts = this.createButton(id + '__snapshot', html.snapshot);
                 mv = this.createButton(id + '__mirror', html.mirror);
-                dw = this.createButton(id + '__draw', html.draw);
+
                 pn = this.createButton(id + '__pin', html.pin);
                 st = this.createElement(
                     id + '__sessionTime',
@@ -3383,9 +3316,7 @@ class RoomClient {
                 BUTTONS.producerVideo.videoPrivacyButton &&
                     !isScreen &&
                     myDropdownContent.appendChild(this.createResponsiveDropdownItem(vp, 'Video Privacy'));
-                BUTTONS.producerVideo.drawingButton &&
-                    isScreen &&
-                    myDropdownContent.appendChild(this.createResponsiveDropdownItem(dw, 'Draw'));
+
                 BUTTONS.producerVideo.videoMirrorButton &&
                     myDropdownContent.appendChild(this.createDropdownItem(mv, 'Mirror', myDropdownContent));
                 BUTTONS.producerVideo.fullScreenButton &&
@@ -3404,7 +3335,7 @@ class RoomClient {
                 BUTTONS.producerVideo.videoPictureInPicture &&
                     this.isVideoPictureInPictureSupported &&
                     vb.appendChild(pip);
-                BUTTONS.producerVideo.drawingButton && isScreen && vb.appendChild(dw);
+
                 BUTTONS.producerVideo.focusVideoButton && vb.appendChild(ha);
                 if (BUTTONS.producerVideo.pinVideoButton && !this.isMobileDevice) vb.appendChild(pn);
 
@@ -3446,7 +3377,7 @@ class RoomClient {
                 this.handleTS(elem.id, ts.id);
                 this.handleMV(elem.id, mv.id);
                 this.handleHA(ha.id, d.id);
-                BUTTONS.producerVideo.drawingButton && isScreen && this.handleDW(dw.id, d.id);
+
                 this.handlePN(elem.id, pn.id, d.id, isScreen);
                 this.handleZV(elem.id, d.id, this.peer_id);
                 if (!isScreen) this.handleVP(elem.id, vp.id);
@@ -3461,9 +3392,7 @@ class RoomClient {
                     this.setTippy(ha.id, 'Toggle Focus mode', 'bottom');
                     this.setTippy(pip.id, 'Toggle picture in picture', 'bottom');
                     this.setTippy(ts.id, 'Snapshot', 'bottom');
-                    BUTTONS.producerVideo.drawingButton &&
-                        isScreen &&
-                        this.setTippy(dw.id, 'Enable screen drawing', 'bottom');
+
                     this.setTippy(vp.id, 'Toggle video privacy', 'bottom');
                     this.setTippy(au.id, 'Audio status', 'bottom');
                 }
@@ -3684,9 +3613,6 @@ class RoomClient {
         const vb = this.getId(video.id + '__vb');
 
         // Destroy drawing overlay if present
-        if (d && typeof VideoDrawingOverlay !== 'undefined') {
-            VideoDrawingOverlay.destroyById(d.id);
-        }
 
         // Clean up dropdown menus appended to body
         if (vb) {
@@ -3771,10 +3697,6 @@ class RoomClient {
             if (kind === 'video' && isParticipantsListOpen) {
                 await getRoomParticipants();
             }
-
-            wbUpdate();
-
-            this.editorUpdate();
 
             consumer.on('trackended', () => {
                 console.log('Consumer track end', { id: consumer.id, type });
@@ -4039,7 +3961,7 @@ class RoomClient {
     }
 
     async handleConsumer(id, type, stream, peer_name, peer_info) {
-        let elem, vb, d, p, i, cm, au, pip, fs, ts, sf, sm, sv, gl, ban, ko, pb, pm, pv, pn, ha, hg, mv, dw, role;
+        let elem, vb, d, p, i, cm, au, pip, fs, ts, sf, sm, sv, gl, ban, ko, pb, pm, pv, pn, ha, hg, mv, role;
 
         let eDiv, eBtn, eVc; // expand buttons
 
@@ -4099,7 +4021,7 @@ class RoomClient {
                 mv = this.createButton(id + '__videoMirror', html.mirror);
                 fs = this.createButton(id + '__fullScreen', html.fullScreen);
                 ts = this.createButton(id + '__snapshot', html.snapshot);
-                dw = this.createButton(id + '__draw', html.draw);
+
                 pn = this.createButton(id + '__pin', html.pin);
                 ha = this.createButton(id + '__hideALL', html.hideALL + ' focusMode');
                 hg = this.createButton(id + '___' + remotePeerId + '___hideFromGrid', html.hideFromGrid);
@@ -4155,9 +4077,7 @@ class RoomClient {
                     eVc.appendChild(this.createResponsiveDropdownItem(pip, 'Picture in Picture'));
                 BUTTONS.consumerVideo.snapShotButton &&
                     eVc.appendChild(this.createResponsiveDropdownItem(ts, 'Take Snapshot'));
-                BUTTONS.consumerVideo.drawingButton &&
-                    remoteIsScreen &&
-                    eVc.appendChild(this.createResponsiveDropdownItem(dw, 'Draw'));
+
                 BUTTONS.consumerVideo.audioVolumeInput &&
                     eVc.appendChild(this.createResponsiveDropdownRangeItem(pv, 'Volume', 'fa-volume-high'));
                 BUTTONS.consumerVideo.presenterRoleButton &&
@@ -4198,7 +4118,7 @@ class RoomClient {
                 BUTTONS.consumerVideo.videoPictureInPicture &&
                     this.isVideoPictureInPictureSupported &&
                     vb.appendChild(pip);
-                BUTTONS.consumerVideo.drawingButton && remoteIsScreen && vb.appendChild(dw);
+
                 BUTTONS.consumerVideo.focusVideoButton && vb.appendChild(ha);
 
                 if (BUTTONS.consumerVideo.pinVideoButton && !this.isMobileDevice) vb.appendChild(pn);
@@ -4228,7 +4148,7 @@ class RoomClient {
                 this.handleDD(elem.id, remotePeerId);
                 this.handleTS(elem.id, ts.id);
                 this.handleMV(elem.id, mv.id);
-                BUTTONS.consumerVideo.drawingButton && remoteIsScreen && this.handleDW(dw.id, d.id);
+
                 this.handleSF(sf.id, peer_name, remotePeerId);
                 this.handleHA(ha.id, d.id);
                 this.handleHFG(hg.id, remotePeerId);
@@ -4269,9 +4189,7 @@ class RoomClient {
                     this.setTippy(ha.id, 'Toggle Focus mode', 'bottom');
                     this.setTippy(pip.id, 'Toggle picture in picture', 'bottom');
                     this.setTippy(ts.id, 'Snapshot', 'bottom');
-                    BUTTONS.consumerVideo.drawingButton &&
-                        remoteIsScreen &&
-                        this.setTippy(dw.id, 'Enable screen drawing', 'bottom');
+
                     this.setTippy(cm.id, 'Hide', 'bottom');
                     this.setTippy(au.id, 'Mute', 'bottom');
                     this.setTippy(pv.id, '🔊 Volume', 'bottom');
@@ -4347,9 +4265,6 @@ class RoomClient {
 
             if (d) {
                 // Destroy drawing overlay if present
-                if (typeof VideoDrawingOverlay !== 'undefined') {
-                    VideoDrawingOverlay.destroyById(d.id);
-                }
 
                 // Clean up dropdown menus appended to body
                 const dropdownBtns = vb ? vb.querySelectorAll('[id$="_expandBtn"], [id$="__dropdownBtn"]') : [];
@@ -4600,10 +4515,6 @@ class RoomClient {
 
         console.log('[setVideoOff] Video-element-count', this.videoMediaContainer.childElementCount);
 
-        wbUpdate();
-
-        this.editorUpdate();
-
         this.handleHideMe();
     }
 
@@ -4708,9 +4619,7 @@ class RoomClient {
                 this.socket.off('shareVideoAction');
                 this.socket.off('fileAbort');
                 this.socket.off('receiveFileAbort');
-                this.socket.off('wbCanvasToJson');
-                this.socket.off('whiteboardAction');
-                this.socket.off('videoDrawing');
+
                 this.socket.off('audioVolume');
                 this.socket.off('dominantSpeaker');
                 this.socket.off('updateRoomModerator');
@@ -4720,10 +4629,7 @@ class RoomClient {
                 this.socket.off('errorRTMP');
                 this.socket.off('endRTMPfromURL');
                 this.socket.off('errorRTMPfromURL');
-                this.socket.off('updatePolls');
-                this.socket.off('editorChange');
-                this.socket.off('editorActions');
-                this.socket.off('editorUpdate');
+
                 this.socket.off('breakoutRoom');
                 this.socket.io.off('reconnect_attempt');
                 this.socket.io.off('reconnect_failed');
@@ -5846,8 +5752,8 @@ class RoomClient {
     }
 
     getPinnedSidePanelWidth() {
-        if (this.isEditorPinned || this.isBreakoutPinned) return 30;
-        if (this.isChatPinned || (this.isPollPinned && !this.isPollMaximized)) return 25;
+        if (this.isBreakoutPinned) return 30;
+        if (this.isChatPinned) return 25;
         return 0;
     }
 
@@ -6082,11 +5988,8 @@ class RoomClient {
     }
 
     resizeVideoMenuBar() {
-        const isPollDocked = this.isPollPinned && !this.isPollMaximized;
-        const somethingPinned =
-            this.isVideoPinned || this.isChatPinned || this.isEditorPinned || isPollDocked || this.isBreakoutPinned;
-        const menuBarWidth =
-            this.isVideoPinned || this.isChatPinned || isPollDocked || this.isBreakoutPinned ? '75%' : '70%';
+        const somethingPinned = this.isVideoPinned || this.isChatPinned || this.isBreakoutPinned;
+        const menuBarWidth = somethingPinned ? '75%' : '70%';
         const videoMenuBar = rc.getEcN('videoMenuBar');
         for (let i = 0; i < videoMenuBar.length; i++) {
             const menuBar = videoMenuBar[i];
@@ -6106,12 +6009,7 @@ class RoomClient {
         if (this.isChatPinned) {
             this.chatPin();
         }
-        if (this.isPollPinned) {
-            this.pollPin();
-        }
-        if (this.isEditorPinned) {
-            this.editorPin();
-        }
+
         if (this.isBreakoutPinned) {
             this.breakoutPin();
         }
@@ -6171,79 +6069,6 @@ class RoomClient {
     // ####################################################
     // HANDLE VIDEO DRAWING OVERLAY
     // ####################################################
-
-    handleVideoDrawing(data) {
-        if (typeof VideoDrawingOverlay === 'undefined') return;
-        if (!data || !data.producerId || !data.paths) return;
-        // Translate the canonical producerId to our local camera div ID.
-        // If we are the producer, the div is {producerId}__video.
-        // If we are a consumer of that producer, the div is {consumerId}__video.
-        let cameraId = data.producerId + '__video';
-        if (!document.getElementById(cameraId)) {
-            const consumerId = this.getConsumerIdByProducerId(data.producerId);
-            if (consumerId) {
-                cameraId = consumerId + '__video';
-            }
-        }
-        VideoDrawingOverlay.receiveRemoteDrawing({
-            cameraId,
-            paths: data.paths,
-            drawerId: data.drawerId,
-            peerName: data.peer_name,
-        });
-    }
-
-    handleDW(dwBtnId, camDivId) {
-        const btnDw = this.getId(dwBtnId);
-        const camDiv = this.getId(camDivId);
-        if (!btnDw || !camDiv) return;
-        // Wire up the global emit callback (once) so VideoDrawingOverlay
-        // can send batched strokes through the signaling server.
-        // Translates the local cameraId to a canonical producerId so remote
-        // peers can resolve it to their own consumer div.
-        if (typeof VideoDrawingOverlay !== 'undefined' && !VideoDrawingOverlay.onEmitDrawing) {
-            VideoDrawingOverlay.getLocalDrawerId = () => this.socket.id;
-            VideoDrawingOverlay.resolveDrawerName = (drawerId) =>
-                drawerId === this.socket.id ? this.peer_name : 'Participant';
-            VideoDrawingOverlay.onEmitDrawing = (data) => {
-                // if not peers, don't send
-                if (!this.thereAreParticipants()) return;
-
-                // cameraId format: "{id}__video" — extract the base ID
-                const baseId = data.cameraId.replace('__video', '');
-
-                // Determine the canonical producer ID:
-                // - If baseId is a producer we own, it's already the producer ID.
-                // - If baseId is a consumer ID, look up the producer ID.
-                let producerId = baseId;
-                const mappedProducerId = this.getProducerIdByConsumerId(baseId);
-                if (mappedProducerId) {
-                    producerId = mappedProducerId;
-                }
-
-                this.socket.emit('videoDrawing', {
-                    producerId: producerId,
-                    paths: data.paths,
-                });
-            };
-        }
-
-        btnDw.addEventListener('click', () => {
-            if (typeof VideoDrawingOverlay === 'undefined') {
-                return console.warn('[handleDW] VideoDrawingOverlay not loaded');
-            }
-            // Privacy mode check
-            const video = camDiv.querySelector('video');
-            if (video && video.classList.contains('videoCircle')) {
-                return this.userLog('info', 'Drawing not allowed in privacy mode', 'top-end');
-            }
-            const overlay = VideoDrawingOverlay.getOrCreate(camDiv);
-            const isActive = overlay.toggle();
-
-            // Visual feedback on the button
-            btnDw.style.color = isActive ? 'lime' : '#fff';
-        });
-    }
 
     // ####################################################
     // HANDLE VIDEO MIRROR
@@ -6511,12 +6336,6 @@ class RoomClient {
     }
 
     toggleChatPin() {
-        if (this.isPollPinned) {
-            return userLog('info', 'Please unpin the poll that appears to be currently pinned', 'top-end');
-        }
-        if (this.isEditorPinned) {
-            return userLog('info', 'Please unpin the editor that appears to be currently pinned', 'top-end');
-        }
         if (this.isBreakoutPinned) {
             return userLog('info', 'Please unpin the breakout rooms that appears to be currently pinned', 'top-end');
         }
@@ -7744,130 +7563,6 @@ class RoomClient {
     // POOLS
     // ##############################################
 
-    togglePoll() {
-        pollRoom.classList.toggle('show');
-        if (!this.isPollOpen) {
-            this.isPollMaximized = false;
-            pollRoom.classList.remove('is-maximized');
-            pollRoom.style.maxWidth = '600px';
-            pollRoom.style.maxHeight = '700px';
-            hide(pollMinButton);
-            if (!this.isMobileDevice) {
-                BUTTONS.poll.pollMaxButton && show(pollMaxButton);
-            }
-            this.pollCenter();
-            this.sound('open');
-        }
-        this.isPollOpen = !this.isPollOpen;
-
-        if (this.isPollPinned) this.pollUnpin();
-
-        if (!this.isMobileDevice && this.isPollOpen && this.canBePinned()) {
-            this.togglePollPin();
-        }
-    }
-
-    togglePollPin() {
-        if (this.isChatPinned) {
-            return userLog('info', 'Please unpin the chat that appears to be currently pinned', 'top-end');
-        }
-        if (this.isEditorPinned) {
-            return userLog('info', 'Please unpin the editor that appears to be currently pinned', 'top-end');
-        }
-        if (this.isBreakoutPinned) {
-            return userLog('info', 'Please unpin the breakout rooms that appears to be currently pinned', 'top-end');
-        }
-        this.isPollPinned ? this.pollUnpin() : this.pollPin();
-        this.sound('click');
-    }
-
-    setPollControlState(button, isActive) {
-        button.classList.toggle('is-active', isActive);
-        button.setAttribute('aria-pressed', String(isActive));
-    }
-
-    pollPin() {
-        if (!this.isVideoPinned) {
-            this.videoMediaContainerPin();
-        }
-        this.isPollMaximized = false;
-        pollRoom.classList.remove('is-maximized');
-        hide(pollMinButton);
-        BUTTONS.poll.pollMaxButton && show(pollMaxButton);
-        this.pollPinned();
-        this.isPollPinned = true;
-        this.refreshVideoPinLayout();
-        this.setPollControlState(pollTogglePin, true);
-        this.resizeVideoMenuBar();
-        resizeVideoMedia();
-        pollRoom.style.resize = 'none';
-        if (!this.isMobileDevice) this.makeUnDraggable(pollRoom, pollHeader);
-    }
-
-    pollUnpin() {
-        if (!this.isVideoPinned) {
-            this.videoMediaContainerUnpin();
-        }
-        this.isPollMaximized = false;
-        pollRoom.classList.remove('is-maximized');
-        pollRoom.classList.remove('panel-slide-in');
-        pollRoom.style.maxWidth = '600px';
-        pollRoom.style.maxHeight = '700px';
-        this.pollCenter();
-        this.isPollPinned = false;
-        this.refreshVideoPinLayout();
-        this.setPollControlState(pollTogglePin, false);
-        this.resizeVideoMenuBar();
-        resizeVideoMedia();
-        if (!this.isMobileDevice) this.makeDraggable(pollRoom, pollHeader);
-    }
-
-    pollPinned() {
-        pollRoom.style.position = 'absolute';
-        pollRoom.style.top = 0;
-        pollRoom.style.right = 0;
-        pollRoom.style.left = null;
-        pollRoom.style.transform = null;
-        pollRoom.style.maxWidth = '25%';
-        pollRoom.style.maxHeight = '100%';
-        pollRoom.classList.remove('panel-slide-in');
-        void pollRoom.offsetWidth;
-        pollRoom.classList.add('panel-slide-in');
-    }
-
-    pollCenter() {
-        pollRoom.style.position = 'fixed';
-        pollRoom.style.transform = 'translate(-50%, -50%)';
-        pollRoom.style.top = '50%';
-        pollRoom.style.left = '50%';
-    }
-
-    pollMaximize() {
-        this.isPollMaximized = true;
-        pollRoom.classList.remove('panel-slide-in');
-        pollRoom.classList.add('is-maximized');
-        pollRoom.style.maxHeight = '100vh';
-        pollRoom.style.maxWidth = '100vw';
-        this.pollCenter();
-        this.isVideoPinned ? this.refreshVideoPinLayout() : this.videoMediaContainerUnpin();
-        hide(pollMaxButton);
-        BUTTONS.poll.pollMaxButton && show(pollMinButton);
-    }
-
-    pollMinimize() {
-        this.isPollMaximized = false;
-        pollRoom.classList.remove('is-maximized');
-        this.pollCenter();
-        hide(pollMinButton);
-        BUTTONS.poll.pollMaxButton && show(pollMaxButton);
-        if (this.isPollPinned) {
-            this.pollPin();
-        } else {
-            pollRoom.style.maxWidth = '600px';
-            pollRoom.style.maxHeight = '700px';
-        }
-    }
-
     // ####################################################
     // BREAKOUT ROOMS PIN
     // ####################################################
@@ -7876,12 +7571,7 @@ class RoomClient {
         if (this.isChatPinned) {
             return userLog('info', 'Please unpin the chat that appears to be currently pinned', 'top-end');
         }
-        if (this.isPollPinned) {
-            return userLog('info', 'Please unpin the poll that appears to be currently pinned', 'top-end');
-        }
-        if (this.isEditorPinned) {
-            return userLog('info', 'Please unpin the editor that appears to be currently pinned', 'top-end');
-        }
+
         this.isBreakoutPinned ? this.breakoutUnpin() : this.breakoutPin();
         this.sound('click');
     }
@@ -8084,690 +7774,6 @@ class RoomClient {
             participantsList.style.overflowY = '';
             participantsList.style.scrollbarGutter = '';
         }
-    }
-
-    pollsUpdate(polls) {
-        if (!this.isPollOpen) this.togglePoll();
-
-        pollsContainer.innerHTML = '';
-        polls.forEach((poll, index) => {
-            const pollDiv = document.createElement('div');
-            pollDiv.className = 'poll';
-
-            const question = document.createElement('p');
-            question.className = 'poll-question';
-            question.textContent = poll.question;
-            pollDiv.appendChild(question);
-
-            const options = document.createElement('div');
-            options.className = 'options';
-
-            poll.options.forEach((option, optionIndex) => {
-                const optionDiv = document.createElement('div');
-                optionDiv.className = 'poll-option-row';
-                const input = document.createElement('input');
-                input.type = 'radio';
-                input.name = `poll${index}`;
-                input.value = option;
-                input.id = `poll-${index}-option-${optionIndex}`;
-                if (this.pollSelectedOptions[index] === option) {
-                    input.checked = true;
-                }
-
-                input.addEventListener('change', () => {
-                    this.pollSelectedOptions[index] = option;
-                    this.socket.emit('vote', { pollIndex: index, option });
-                });
-
-                const label = document.createElement('label');
-                label.textContent = option;
-                label.htmlFor = input.id;
-
-                optionDiv.appendChild(input);
-                optionDiv.appendChild(label);
-                options.appendChild(optionDiv);
-            });
-            pollDiv.appendChild(options);
-
-            // Only the presenters
-            // if (isPresenter) {
-            const pollButtonsDiv = document.createElement('div');
-            pollButtonsDiv.className = 'poll-card-actions';
-
-            // Toggle voters button
-            const toggleButton = document.createElement('button');
-            const toggleButtonIcon = document.createElement('i');
-            toggleButtonIcon.className = 'fas fa-users';
-            // Append the icon to the button
-            toggleButton.insertBefore(toggleButtonIcon, toggleButton.firstChild);
-            toggleButton.addEventListener('click', () => {
-                votersList.style.display === 'none'
-                    ? (votersList.style.display = 'block')
-                    : (votersList.style.display = 'none');
-            });
-            toggleButton.type = 'button';
-            toggleButton.id = `toggleVoters-${index}`;
-            toggleButton.className = 'poll-card-action';
-            toggleButton.setAttribute('aria-label', 'Toggle voters');
-            pollButtonsDiv.appendChild(toggleButton);
-
-            // Edit poll button using swal
-            const editPollButton = document.createElement('button');
-            const editPollButtonIcon = document.createElement('i');
-            editPollButtonIcon.className = 'fas fa-pen-to-square';
-            editPollButton.type = 'button';
-            editPollButton.id = `editPoll-${index}`;
-            editPollButton.className = 'poll-card-action';
-            editPollButton.setAttribute('aria-label', 'Edit poll');
-            editPollButton.insertBefore(editPollButtonIcon, editPollButton.firstChild);
-            editPollButton.addEventListener('click', () => {
-                Swal.fire({
-                    allowOutsideClick: false,
-                    allowEscapeKey: false,
-                    background: swalBackground,
-                    title: 'Edit Poll',
-                    html: this.createPollInputs(poll),
-                    focusConfirm: false,
-                    showCancelButton: true,
-                    confirmButtonText: 'Save',
-                    cancelButtonText: 'Cancel',
-                    cancelButtonColor: '#dc3545',
-                    preConfirm: () => {
-                        const newQuestion = document.getElementById('swal-input-question').value;
-                        const newOptions = this.getPollOptions(poll.options.length);
-                        this.socket.emit('editPoll', {
-                            index,
-                            question: newQuestion,
-                            options: newOptions,
-                            peer_name: this.peer_name,
-                            peer_uuid: this.peer_uuid,
-                        });
-                    },
-                    showClass: { popup: 'animate__animated animate__fadeInDown' },
-                    hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-                });
-            });
-            pollButtonsDiv.appendChild(editPollButton);
-
-            // Delete poll button
-            const deletePollButton = document.createElement('button');
-            const deletePollButtonIcon = document.createElement('i');
-            deletePollButtonIcon.className = 'fas fa-trash';
-            deletePollButton.type = 'button';
-            deletePollButton.id = `delPoll-${index}`;
-            deletePollButton.className = 'poll-card-action poll-card-action-danger';
-            deletePollButton.setAttribute('aria-label', 'Delete poll');
-            deletePollButton.insertBefore(deletePollButtonIcon, deletePollButton.firstChild);
-            deletePollButton.addEventListener('click', () => {
-                // confirm before delete poll
-                Swal.fire({
-                    background: swalBackground,
-                    position: 'top',
-                    title: 'Delete this poll?',
-                    imageUrl: image.delete,
-                    showDenyButton: true,
-                    confirmButtonText: `Yes`,
-                    denyButtonText: `No`,
-                    showClass: { popup: 'animate__animated animate__fadeInDown' },
-                    hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        this.socket.emit('deletePoll', { index, peer_name: this.peer_name, peer_uuid: this.peer_uuid });
-                    }
-                });
-            });
-            pollButtonsDiv.appendChild(deletePollButton);
-
-            const pollFooter = document.createElement('div');
-            pollFooter.className = 'poll-card-footer';
-
-            // Add thematic break
-            const hr = document.createElement('hr');
-            pollFooter.appendChild(hr);
-
-            // Append buttons to poll
-            pollFooter.appendChild(pollButtonsDiv);
-            pollDiv.appendChild(pollFooter);
-
-            // Create voter lists
-            const votersList = document.createElement('ul');
-            votersList.className = 'poll-voters-list';
-            votersList.style.display = 'none';
-            for (const [user, vote] of Object.entries(poll.voters)) {
-                const voter = document.createElement('li');
-                voter.textContent = `${user}: ${vote}`;
-                votersList.appendChild(voter);
-            }
-            pollDiv.appendChild(votersList);
-            // }
-
-            pollsContainer.appendChild(pollDiv);
-
-            if (!this.isMobileDevice) {
-                setTippy(toggleButton.id, 'Toggle voters', 'top');
-                setTippy(deletePollButton.id, 'Delete poll', 'top');
-                setTippy(editPollButton.id, 'Edit poll', 'top');
-            }
-        });
-    }
-
-    pollCreateNewForm(e) {
-        e.preventDefault();
-
-        if (this._moderator.polls_cant_create && !isPresenter) {
-            return userLog(
-                'warning',
-                'The moderator does not allow non-presenters to create or edit polls',
-                'top-end',
-                6000
-            );
-        }
-
-        const question = e.target.question.value;
-        const optionInputs = document.querySelectorAll('.option-input');
-        const options = Array.from(optionInputs).map((input) => input.value.trim());
-
-        this.socket.emit('createPoll', { question, options });
-
-        e.target.reset();
-        optionsContainer.innerHTML = '';
-        optionsContainer.appendChild(this.createPollOptionInput(1));
-        optionsContainer.appendChild(this.createPollOptionInput(2));
-    }
-
-    pollAddOptions() {
-        const optionIndex = document.querySelectorAll('.option-input').length + 1;
-        optionsContainer.appendChild(this.createPollOptionInput(optionIndex));
-    }
-
-    createPollOptionInput(optionIndex) {
-        const optionInput = document.createElement('input');
-        optionInput.type = 'text';
-        optionInput.name = 'option';
-        optionInput.className = 'option-input';
-        optionInput.placeholder = `Option ${optionIndex}`;
-        optionInput.required = true;
-        return optionInput;
-    }
-
-    pollDeleteOptions() {
-        const optionInputs = document.querySelectorAll('.option-input');
-        if (optionInputs.length > 2) {
-            optionsContainer.removeChild(optionInputs[optionInputs.length - 1]);
-        }
-    }
-
-    createPollInputs(poll) {
-        const safeQuestion = this.sanitizeHtml(String(poll.question ?? ''));
-        const questionInput = `<input id="swal-input-question" class="swal2-input" value="${safeQuestion}">`;
-        const optionsInputs = poll.options
-            .map((option, i) => {
-                const safeOption = this.sanitizeHtml(String(option ?? ''));
-                return `<input id="swal-input-option${i}" class="swal2-input" value="${safeOption}">`;
-            })
-            .join('');
-        return questionInput + optionsInputs;
-    }
-
-    getPollOptions(optionCount) {
-        const options = [];
-        for (let i = 0; i < optionCount; i++) {
-            options.push(document.getElementById(`swal-input-option${i}`).value);
-        }
-        return options;
-    }
-
-    pollSaveResults() {
-        const polls = document.querySelectorAll('.poll');
-        const results = [];
-
-        polls.forEach((poll, index) => {
-            const question = poll.querySelector('.poll-question').textContent;
-            const options = poll.querySelectorAll('.options div label');
-
-            const optionsText = Array.from(options).reduce((acc, option, index) => {
-                acc[index + 1] = option.textContent.trim();
-                return acc;
-            }, {});
-
-            const votersList = poll.querySelector('ul');
-            const voters = Array.from(votersList.querySelectorAll('li')).reduce((acc, li) => {
-                const [name, vote] = li.textContent.split(':').map((item) => item.trim());
-                acc[name] = vote;
-                return acc;
-            }, {});
-
-            results.push({
-                Poll: `${index + 1}`,
-                question: question,
-                options: optionsText,
-                voters: voters,
-            });
-        });
-
-        results.length > 0
-            ? saveObjToJsonFile(results, 'Poll')
-            : this.userLog('info', 'No polling data available to save', 'top-end');
-    }
-
-    getPollFileName() {
-        const dateTime = getDataTimeStringFormat();
-        const roomName = this.room_id.trim();
-        return `Poll_${roomName}_${dateTime}.txt`;
-    }
-
-    // ####################################################
-    // EDITOR
-    // ####################################################
-
-    toggleEditor() {
-        editorRoom.classList.toggle('show');
-        if (!this.isEditorOpen) {
-            this.editorCenter();
-            this.sound('open');
-        }
-        this.isEditorOpen = !this.isEditorOpen;
-
-        if (this.isEditorPinned) this.editorUnpin();
-
-        if (!this.isMobileDevice && this.isEditorOpen && this.canBePinned()) {
-            this.toggleEditorPin();
-        }
-    }
-
-    toggleLockUnlockEditor() {
-        this.isEditorLocked = !this.isEditorLocked;
-
-        const btnToShow = this.isEditorLocked ? editorLockBtn : editorUnlockBtn;
-        const btnToHide = this.isEditorLocked ? editorUnlockBtn : editorLockBtn;
-        const action = this.isEditorLocked ? 'lock' : 'unlock';
-
-        show(btnToShow);
-        hide(btnToHide);
-        this.setEditorControlState(editorLockBtn, this.isEditorLocked);
-
-        this.editorSendAction(action);
-
-        if (this.isEditorLocked) {
-            userLog('info', 'The Editor is locked. \n The participants cannot interact with it.', 'top-right');
-            sound('locked');
-        }
-    }
-
-    editorCenter() {
-        editorRoom.style.position = 'fixed';
-        editorRoom.style.transform = 'translate(-50%, -50%)';
-        editorRoom.style.top = '50%';
-        editorRoom.style.left = '50%';
-    }
-
-    setEditorControlState(button, isActive) {
-        button.classList.toggle('is-active', isActive);
-        button.setAttribute('aria-pressed', String(isActive));
-    }
-
-    toggleEditorPin() {
-        if (this.isPollPinned) {
-            return userLog('info', 'Please unpin the poll that appears to be currently pinned', 'top-end');
-        }
-        if (this.isChatPinned) {
-            return userLog('info', 'Please unpin the chat that appears to be currently pinned', 'top-end');
-        }
-        if (this.isBreakoutPinned) {
-            return userLog('info', 'Please unpin the breakout rooms that appears to be currently pinned', 'top-end');
-        }
-        this.isEditorPinned ? this.editorUnpin() : this.editorPin();
-        this.sound('click');
-    }
-
-    editorPin() {
-        if (!this.isVideoPinned) {
-            this.videoMediaContainer.style.top = 0;
-            this.videoMediaContainer.style.width = '70%';
-            this.videoMediaContainer.style.height = '100%';
-        }
-        this.editorPinned();
-        this.isEditorPinned = true;
-        this.refreshVideoPinLayout();
-        this.setEditorControlState(editorTogglePin, true);
-        this.resizeVideoMenuBar();
-        resizeVideoMedia();
-        document.documentElement.style.setProperty('--editor-height', '80vh');
-        //if (!this.isMobileDevice) this.makeUnDraggable(editorRoom, editorHeader);
-    }
-
-    editorUnpin() {
-        if (!this.isVideoPinned) {
-            this.videoMediaContainerUnpin();
-        }
-        editorRoom.style.maxWidth = '100%';
-        editorRoom.style.maxHeight = '100%';
-        this.pollCenter();
-        this.isEditorPinned = false;
-        this.refreshVideoPinLayout();
-        editorRoom.classList.remove('panel-slide-in');
-        this.setEditorControlState(editorTogglePin, false);
-        this.resizeVideoMenuBar();
-        resizeVideoMedia();
-        document.documentElement.style.setProperty('--editor-height', '85vh');
-        //if (!this.isMobileDevice) this.makeDraggable(editorRoom, editorHeader);
-    }
-
-    editorPinned() {
-        editorRoom.style.position = 'absolute';
-        editorRoom.style.top = 0;
-        editorRoom.style.right = 0;
-        editorRoom.style.left = null;
-        editorRoom.style.transform = null;
-        editorRoom.style.maxWidth = '30%';
-        editorRoom.style.maxHeight = '100%';
-        editorRoom.classList.remove('panel-slide-in');
-        void editorRoom.offsetWidth;
-        editorRoom.classList.add('panel-slide-in');
-    }
-
-    editorUpdate() {
-        if (this.isEditorPrivate) return;
-        if (this.isEditorOpen && (!isRulesActive || isPresenter)) {
-            console.log('IsPresenter: update editor content to the participants in the room');
-            const content = quill.getContents(); // Get content in Delta format
-            this.socket.emit('editorUpdate', content);
-            const action = this.isEditorLocked ? 'lock' : 'unlock';
-            this.editorSendAction(action);
-        }
-    }
-
-    handleEditorUpdateData(data) {
-        if (this.isEditorPrivate) {
-            // In private mode: keep collab buffer up to date but do NOT touch the visible editor
-            this.collabEditorDelta = data;
-            return;
-        }
-        this.editorOpen();
-        quill.setContents(data);
-    }
-
-    handleEditorData(data) {
-        if (this.isEditorPrivate) {
-            // In private mode: compose incoming delta into the cached collab buffer
-            try {
-                const Delta = Quill.import('delta');
-                const base = new Delta(this.collabEditorDelta || { ops: [] });
-                this.collabEditorDelta = base.compose(new Delta(data));
-            } catch (e) {
-                console.warn('handleEditorData (private) compose failed', e);
-            }
-            return;
-        }
-        this.editorOpen();
-        quill.updateContents(data);
-    }
-
-    editorOpen() {
-        if (!this.isEditorOpen) {
-            this.sound('open');
-            this.toggleEditor();
-        }
-    }
-
-    handleEditorActionsData(data) {
-        const { peer_name, action } = data;
-        switch (action) {
-            case 'open':
-                if (this.isEditorOpen) return;
-                this.toggleEditor();
-                this.userLog('info', `${icons.editor} ${peer_name} open editor`, 'top-end', 6000);
-                break;
-            case 'close':
-                if (!this.isEditorOpen) return;
-                this.toggleEditor();
-                this.userLog('info', `${icons.editor} ${peer_name} close editor`, 'top-end', 6000);
-                break;
-            case 'clean':
-                if (this.isEditorPrivate) {
-                    // Don't wipe private notes when others clean the collaborative editor
-                    this.collabEditorDelta = null;
-                    this.userLog('info', `${icons.editor} ${peer_name} cleared editor`, 'top-end', 6000);
-                    break;
-                }
-                quill.setText('');
-                this.userLog('info', `${icons.editor} ${peer_name} cleared editor`, 'top-end', 6000);
-                break;
-            case 'lock':
-                if (this.isEditorPrivate) {
-                    this.isEditorLocked = true;
-                    this.userLog('info', `${icons.editor} ${peer_name} locked the editor`, 'top-end', 6000);
-                    break;
-                }
-                this.isEditorLocked = true;
-                quill.enable(false);
-                this.userLog('info', `${icons.editor} ${peer_name} locked the editor`, 'top-end', 6000);
-                break;
-            case 'unlock':
-                if (this.isEditorPrivate) {
-                    this.isEditorLocked = false;
-                    this.userLog('info', `${icons.editor} ${peer_name} unlocked the editor`, 'top-end', 6000);
-                    break;
-                }
-                this.isEditorLocked = false;
-                quill.enable(true);
-                this.userLog('info', `${icons.editor} ${peer_name} unlocked the editor`, 'top-end', 6000);
-                break;
-            default:
-                break;
-        }
-    }
-
-    editorIsLocked() {
-        return this.isEditorLocked;
-    }
-
-    // ####################################################
-    // EDITOR PRIVATE NOTE MODE (local-only, never broadcasted, never persisted)
-    // Notes live only in memory for the current session. The user is
-    // prompted to Save or Discard when switching back to collaborative mode.
-    // ####################################################
-
-    // No-op kept for backward compatibility with existing callers (e.g. quill 'text-change').
-    persistPrivateEditor() {
-        /* intentionally empty: private notes are not persisted */
-    }
-
-    async toggleEditorPrivate() {
-        if (this.isEditorPrivate) {
-            await this._promptExitEditorPrivateMode();
-            return;
-        }
-
-        // Entering private mode -> cache collab buffer, start with an empty private buffer
-        this.collabEditorDelta = quill.getContents();
-        this.isEditorPrivate = true;
-        quill.setContents({ ops: [] });
-        quill.enable(true); // always editable in private mode
-        show(editorPrivateBtn);
-        hide(editorCollabBtn);
-        editorRoom.classList.add('editor-private-mode');
-        this.setEditorControlState(editorCollabBtn, false);
-        this.setEditorControlState(editorPrivateBtn, true);
-        this.userLog(
-            'info',
-            `${icons.editor} Private Note mode: your edits are NOT shared and NOT saved`,
-            'top-end',
-            6000
-        );
-        this.sound('click');
-    }
-
-    async _promptExitEditorPrivateMode() {
-        // If the buffer is empty there is nothing to lose, exit silently.
-        if (quill.getText().trim().length === 0) {
-            this._exitEditorPrivateMode();
-            return;
-        }
-
-        const result = await Swal.fire({
-            background: swalBackground,
-            position: 'center',
-            imageUrl: image.editor || image.delete,
-            title: 'Exit Private Note mode?',
-            text: 'Your private note will be lost unless you save it to a file.',
-            showDenyButton: true,
-            showCancelButton: true,
-            confirmButtonText: 'Save as Text',
-            denyButtonText: 'Save as HTML',
-            cancelButtonText: 'Discard',
-            reverseButtons: true,
-            allowOutsideClick: false,
-            showClass: { popup: 'animate__animated animate__fadeInDown' },
-            hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-        });
-
-        if (result.isConfirmed) {
-            this.saveEditorAsText();
-            this._exitEditorPrivateMode();
-        } else if (result.isDenied) {
-            this.saveEditorAsHtml();
-            this._exitEditorPrivateMode();
-        } else if (result.dismiss === Swal.DismissReason.cancel) {
-            // User chose Discard
-            this._exitEditorPrivateMode();
-        }
-        // Any other dismissal: stay in private mode (no-op)
-    }
-
-    _exitEditorPrivateMode() {
-        this.isEditorPrivate = false;
-        quill.setContents(this.collabEditorDelta || { ops: [] });
-        // Re-apply presenter lock state if any
-        if (!isPresenter && this.isEditorLocked) {
-            quill.enable(false);
-        } else {
-            quill.enable(true);
-        }
-        show(editorCollabBtn);
-        hide(editorPrivateBtn);
-        editorRoom.classList.remove('editor-private-mode');
-        this.setEditorControlState(editorCollabBtn, false);
-        this.setEditorControlState(editorPrivateBtn, false);
-        this.userLog('info', `${icons.editor} Collaborative editor restored`, 'top-end', 4000);
-        this.sound('click');
-    }
-
-    editorUndo() {
-        quill.history.undo();
-    }
-
-    editorRedo() {
-        quill.history.redo();
-    }
-
-    editorCopy() {
-        const content = quill.getText();
-        if (content.trim().length === 0) {
-            return this.userLog('info', 'Nothing to copy', 'top-end');
-        }
-        copyToClipboard(content, false);
-    }
-
-    editorClean() {
-        if (!isPresenter && this.editorIsLocked() && !this.isEditorPrivate) {
-            userLog('info', 'The Editor is locked. \n You cannot interact with it.', 'top-right');
-            return;
-        }
-        const content = quill.getText();
-        if (content.trim().length === 0) {
-            return this.userLog('info', 'Nothing to clear', 'top-end');
-        }
-        Swal.fire({
-            background: swalBackground,
-            position: 'center',
-            title: this.isEditorPrivate ? 'Clear your private note?' : 'Clear the editor content?',
-            imageUrl: image.delete,
-            showDenyButton: true,
-            confirmButtonText: `Yes`,
-            denyButtonText: `No`,
-            showClass: { popup: 'animate__animated animate__fadeInDown' },
-            hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-        }).then((result) => {
-            if (result.isConfirmed) {
-                quill.setText('');
-                if (!this.isEditorPrivate) {
-                    this.editorSendAction('clean');
-                }
-                this.sound('delete');
-            }
-        });
-    }
-
-    editorSave() {
-        Swal.fire({
-            background: swalBackground,
-            position: 'top',
-            imageUrl: image.save,
-            title: 'Editor save options',
-            showDenyButton: true,
-            showCancelButton: true,
-            cancelButtonColor: 'red',
-            denyButtonColor: 'green',
-            confirmButtonText: `Text`,
-            denyButtonText: `Html`,
-            cancelButtonText: `Cancel`,
-            showClass: { popup: 'animate__animated animate__fadeInDown' },
-            hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-        }).then((result) => {
-            this.handleEditorSaveResult(result);
-        });
-    }
-
-    handleEditorSaveResult(result) {
-        if (result.isConfirmed) {
-            this.saveEditorAsText();
-        } else if (result.isDenied) {
-            this.saveEditorAsHtml();
-        }
-    }
-
-    saveEditorAsText() {
-        const content = quill.getText().trim();
-        if (content.length === 0) {
-            return this.userLog('info', 'No data to save!', 'top-end');
-        }
-        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-        const fileName = this.generateFileName('editor.txt');
-        this.saveBlobToFile(blob, fileName);
-        this.sound('download');
-    }
-
-    saveEditorAsHtml() {
-        const content = quill.root.innerHTML.trim();
-        if (content === '<p><br></p>') {
-            return this.userLog('info', 'No data to save!', 'top-end');
-        }
-        const fileName = this.generateFileName('editor.html');
-        this.saveAsHtml(content, fileName);
-        this.sound('download');
-    }
-
-    generateFileName(extension) {
-        return `Room_${this.room_id}_${getDataTimeString()}_${extension}`;
-    }
-
-    saveAsHtml(content, file) {
-        const blob = new Blob([content], { type: 'text/html' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = file;
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => {
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
-        }, 100);
-    }
-
-    editorSendAction(action) {
-        this.socket.emit('editorActions', { peer_name: this.peer_name, action: action });
     }
 
     // ####################################################
@@ -10554,13 +9560,7 @@ class RoomClient {
             case 'media_cant_sharing':
                 this.userLog('info', `${icons.moderator} Moderator: everyone can't share media ${status}`, 'top-end');
                 break;
-            case 'polls_cant_create':
-                this.userLog(
-                    'info',
-                    `${icons.moderator} Moderator: only presenter can create/edit/delete polls ${status}`,
-                    'top-end'
-                );
-                break;
+
             case 'disconnect_all_on_leave':
                 this.userLog('info', `${icons.moderator} Moderator: disconnect all on leave room ${status}`, 'top-end');
                 break;
@@ -11818,9 +10818,7 @@ class RoomClient {
             case 'privacy':
                 this.setVideoPrivacyStatus(cmd.peer_id, cmd.active);
                 break;
-            case 'roomEmoji':
-                this.handleRoomEmoji(cmd);
-                break;
+
             case 'geoLocation':
             case 'geoLocationOK':
             case 'geoLocationKO':
@@ -11851,142 +10849,6 @@ class RoomClient {
             leaveRoom(false);
         } else {
             this.exit();
-        }
-    }
-
-    getRoomEmojiPlacement() {
-        const viewportWidth = Math.max(window.innerWidth || 0, 320);
-        const viewportHeight = Math.max(window.innerHeight || 0, 320);
-        const isCompactViewport = viewportWidth < 640;
-        const now = Date.now();
-        const burstWindow = 900;
-        const maxBurstSize = isCompactViewport ? 4 : 6;
-        const marginX = isCompactViewport ? 18 : 34;
-        const marginY = isCompactViewport ? 96 : 124;
-        const minAnchorX = viewportWidth * 0.2;
-        const maxAnchorX = viewportWidth * 0.8;
-        const minAnchorY = viewportHeight * 0.42;
-        const maxAnchorY = viewportHeight * 0.76;
-
-        if (now - this.roomEmojiBurstState.startedAt > burstWindow || this.roomEmojiBurstState.count >= maxBurstSize) {
-            this.roomEmojiBurstState.startedAt = now;
-            this.roomEmojiBurstState.count = 0;
-            this.roomEmojiBurstState.anchorX = minAnchorX + Math.random() * Math.max(1, maxAnchorX - minAnchorX);
-            this.roomEmojiBurstState.anchorY = minAnchorY + Math.random() * Math.max(1, maxAnchorY - minAnchorY);
-        }
-
-        const burstIndex = this.roomEmojiBurstState.count;
-        this.roomEmojiBurstState.count += 1;
-
-        const baseAngle = -90 + (burstIndex - (maxBurstSize - 1) / 2) * (isCompactViewport ? 24 : 18);
-        const jitterAngle = Math.random() * 12 - 6;
-        const angle = ((baseAngle + jitterAngle) * Math.PI) / 180;
-        const radius = (isCompactViewport ? 18 : 24) + burstIndex * (isCompactViewport ? 14 : 18) + Math.random() * 14;
-        const left = Math.min(
-            viewportWidth - marginX,
-            Math.max(marginX, this.roomEmojiBurstState.anchorX + Math.cos(angle) * radius)
-        );
-        const top = Math.min(
-            viewportHeight - marginY,
-            Math.max(marginY, this.roomEmojiBurstState.anchorY + Math.sin(angle) * radius * 0.6)
-        );
-        const drift = `${(Math.cos(angle) * (radius * 0.95) + (Math.random() * 18 - 9)).toFixed(0)}px`;
-        const rise = `-${(Math.abs(Math.sin(angle)) * 70 + Math.random() * 70 + (isCompactViewport ? 120 : 165)).toFixed(0)}px`;
-        const rotation = `${(Math.random() * 16 - 8).toFixed(1)}deg`;
-
-        return {
-            left,
-            top,
-            drift,
-            rise,
-            rotation,
-        };
-    }
-
-    handleRoomEmoji(cmd, duration = 5000) {
-        const userEmoji = document.getElementById(`userEmoji`);
-        if (userEmoji) {
-            const emojiDisplay = document.createElement('div');
-            const placement = this.getRoomEmojiPlacement();
-            const label = cmd.peer_name || 'Guest';
-            const emojiIcon = document.createElement('span');
-            const emojiName = document.createElement('span');
-
-            emojiDisplay.className = 'user-emoji-burst';
-            emojiDisplay.style.left = `${placement.left}px`;
-            emojiDisplay.style.top = `${placement.top}px`;
-            emojiDisplay.style.setProperty('--emoji-drift', placement.drift);
-            emojiDisplay.style.setProperty('--emoji-rise', placement.rise);
-            emojiDisplay.style.setProperty('--emoji-rotation', placement.rotation);
-
-            emojiIcon.className = 'user-emoji-burst__icon';
-            emojiIcon.textContent = cmd.emoji;
-            emojiName.className = 'user-emoji-burst__name';
-            emojiName.textContent = label;
-
-            emojiDisplay.appendChild(emojiIcon);
-            emojiDisplay.appendChild(emojiName);
-            userEmoji.appendChild(emojiDisplay);
-
-            setTimeout(() => {
-                emojiDisplay.remove();
-            }, duration);
-
-            this.handleEmojiSound(cmd);
-        }
-    }
-
-    handleEmojiSound(cmd) {
-        const path = '../sounds/emoji/';
-        const ext = '.mp3';
-        const force = true; // force sound play even if sound effects are disabled
-
-        switch (cmd.shortcodes) {
-            case ':+1:':
-            case ':ok_hand:':
-                this.sound('ok', force, path, ext);
-                break;
-            case ':-1:':
-                this.sound('boo', force, path, ext);
-                break;
-            case ':clap:':
-                this.sound('applause', force, path, ext);
-                break;
-            case ':smiley:':
-            case ':grinning:':
-                this.sound('smile', force, path, ext);
-                break;
-            case ':joy:':
-                this.sound('laughs', force, path, ext);
-                break;
-            case ':tada:':
-                this.sound('congrats', force, path, ext);
-                break;
-            case ':open_mouth:':
-                this.sound('woah', force, path, ext);
-                break;
-            case ':trumpet:':
-                this.sound('trombone', force, path, ext);
-                break;
-            case ':kissing_heart:':
-                this.sound('kiss', force, path, ext);
-                break;
-            case ':heart:':
-            case ':hearts:':
-                this.sound('heart', force, path, ext);
-                break;
-            case ':rocket:':
-                this.sound('rocket', force, path, ext);
-                break;
-            case ':sparkles:':
-            case ':star:':
-            case ':star2:':
-            case ':dizzy:':
-                this.sound('tinkerbell', force, path, ext);
-                break;
-            // ...
-            default:
-                break;
         }
     }
 
@@ -12746,10 +11608,7 @@ class RoomClient {
                 this._moderator.media_cant_sharing = data.status;
                 rc.roomMessage('media_cant_sharing', data.status);
                 break;
-            case 'polls_cant_create':
-                this._moderator.polls_cant_create = data.status;
-                rc.roomMessage('polls_cant_create', data.status);
-                break;
+
             default:
                 break;
         }

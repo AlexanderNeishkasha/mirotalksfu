@@ -1353,7 +1353,6 @@ module.exports = {
                 '--select-focus-color': 'rgba(56, 189, 248, 0.5)',
                 '--tab-btn-active': '#163d5e',
                 '--settings-bg': 'linear-gradient(135deg, #0d2137, #061220)',
-                '--wb-bg': 'linear-gradient(135deg, #0d2137, #061220)',
                 '--btns-bg-color': 'rgba(6, 18, 32, 0.75)',
                 '--dd-color': '#38BDF8',
             },
@@ -1382,14 +1381,14 @@ module.exports = {
                 swapCameraButton: process.env.SHOW_SWAP_CAMERA !== 'false',
                 chatButton: process.env.SHOW_CHAT_BUTTON !== 'false',
                 participantsButton: process.env.SHOW_PARTICIPANTS_BUTTON !== 'false',
-                pollButton: process.env.SHOW_POLL_BUTTON !== 'false',
+
                 breakoutRoomButton: process.env.SHOW_BREAKOUT_ROOM_BUTTON !== 'false',
-                editorButton: process.env.SHOW_EDITOR_BUTTON !== 'false',
+
                 raiseHandButton: process.env.SHOW_RAISE_HAND !== 'false',
-                whiteboardButton: process.env.SHOW_WHITEBOARD !== 'false',
+
                 documentPiPButton: process.env.SHOW_DOCUMENT_PIP !== 'false',
                 snapshotRoomButton: process.env.SHOW_SNAPSHOT !== 'false',
-                emojiRoomButton: process.env.SHOW_EMOJI !== 'false',
+
                 settingsButton: process.env.SHOW_SETTINGS !== 'false',
                 aboutButton: process.env.SHOW_ABOUT !== 'false',
                 exitButton: process.env.SHOW_EXIT_BUTTON !== 'false',
@@ -1429,7 +1428,6 @@ module.exports = {
                 muteAudioButton: process.env.SHOW_MUTE_AUDIO !== 'false',
                 videoPrivacyButton: process.env.SHOW_PRIVACY_TOGGLE !== 'false',
                 audioVolumeInput: process.env.SHOW_VOLUME_CONTROL !== 'false',
-                drawingButton: process.env.SHOW_DRAWING_BUTTON !== 'false',
             },
 
             // Video controls for consumer (remote users)
@@ -1451,7 +1449,6 @@ module.exports = {
                 banButton: process.env.SHOW_BAN_BUTTON !== 'false',
                 ejectButton: process.env.SHOW_EJECT_BUTTON !== 'false',
                 presenterRoleButton: process.env.SHOW_PRESENTER_ROLE_BUTTON !== 'false',
-                drawingButton: process.env.SHOW_DRAWING_BUTTON !== 'false',
             },
 
             // Controls when video is off
@@ -1486,13 +1483,6 @@ module.exports = {
                 deepSeek: process.env.ENABLE_DEEP_SEEK !== 'false',
             },
 
-            // Poll interface controls
-            poll: {
-                pollPinButton: process.env.SHOW_POLL_PIN !== 'false',
-                pollMaxButton: process.env.SHOW_POLL_MAXIMIZE !== 'false',
-                pollSaveButton: process.env.SHOW_POLL_SAVE !== 'false',
-            },
-
             // Participants list controls
             participantsList: {
                 sendFileAllButton: process.env.SHOW_SEND_FILE_ALL !== 'false',
@@ -1502,11 +1492,6 @@ module.exports = {
                 banButton: process.env.SHOW_BAN_BUTTON !== 'false',
                 ejectButton: process.env.SHOW_EJECT_BUTTON !== 'false',
                 presenterRoleButton: process.env.SHOW_PRESENTER_ROLE_BUTTON !== 'false',
-            },
-
-            // Whiteboard controls
-            whiteboard: {
-                whiteboardLockButton: process.env.SHOW_WB_LOCK !== 'false',
             },
         },
     },

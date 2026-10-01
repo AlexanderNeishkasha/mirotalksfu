@@ -95,9 +95,6 @@ function resizeVideoMedia() {
     document.documentElement.style.setProperty('--vmi-wh', avatarSize + 'px');
 
     // Resize any active drawing overlays to match new tile dimensions
-    if (typeof VideoDrawingOverlay !== 'undefined') {
-        VideoDrawingOverlay.resizeAll();
-    }
 }
 
 function getVisibleCameraElements() {

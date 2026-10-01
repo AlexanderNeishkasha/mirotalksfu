@@ -28,14 +28,14 @@ let BUTTONS = {
         swapCameraButton: true,
         chatButton: true,
         participantsButton: true,
-        pollButton: true,
+
         breakoutRoomButton: true, // if presenter and if true
-        editorButton: true,
+
         raiseHandButton: true,
-        whiteboardButton: true,
+
         documentPiPButton: true,
         snapshotRoomButton: true,
-        emojiRoomButton: true,
+
         settingsButton: true,
         aboutButton: true, // Please keep me always visible, thank you!
         exitButton: true,
@@ -71,7 +71,6 @@ let BUTTONS = {
         muteAudioButton: true,
         videoPrivacyButton: true,
         audioVolumeInput: true,
-        drawingButton: true,
     },
     consumerVideo: {
         videoPictureInPicture: true,
@@ -91,7 +90,7 @@ let BUTTONS = {
         banButton: true, // presenter
         ejectButton: true, // presenter
         presenterRoleButton: true, // presenter
-        drawingButton: true, // presenter
+        // presenter
     },
     videoOff: {
         pinVideoButton: true,
@@ -119,11 +118,7 @@ let BUTTONS = {
         chatGPT: true,
         deepSeek: true,
     },
-    poll: {
-        pollPinButton: true,
-        pollMaxButton: true,
-        pollSaveButton: true,
-    },
+
     participantsList: {
         sendFileAllButton: true, // presenter
         ejectAllButton: true, // presenter
@@ -133,9 +128,7 @@ let BUTTONS = {
         ejectButton: true, // presenter
         presenterRoleButton: true, // presenter
     },
-    whiteboard: {
-        whiteboardLockButton: true, // presenter
-    },
+
     //...
 };
 
@@ -178,12 +171,9 @@ function handleRules(isPresenter, roomSetup = true) {
         BUTTONS.consumerVideo.ejectButton = false;
         BUTTONS.consumerVideo.presenterRoleButton = false;
         BUTTONS.participantsList.presenterRoleButton = false;
-        // BUTTONS.consumerVideo.drawingButton = false;
-        // BUTTONS.producerVideo.drawingButton = false;
-        BUTTONS.whiteboard.whiteboardLockButton = false;
 
         // Hide presenter-only elements (covers demotion from presenter to guest)
-        hide(editorUnlockBtn);
+
         hide(breakoutRoomButton);
 
         // VideoAI is presenter-only
@@ -211,8 +201,6 @@ function handleRules(isPresenter, roomSetup = true) {
         BUTTONS.settings.lockRoomButton = BUTTONS.settings.lockRoomButton && !isRoomLocked;
         BUTTONS.settings.unlockRoomButton = BUTTONS.settings.lockRoomButton && isRoomLocked;
         BUTTONS.settings.sendEmailInvitation = true;
-
-        show(editorUnlockBtn);
 
         BUTTONS.main.breakoutRoomButton && show(breakoutRoomButton);
         //...
@@ -282,8 +270,7 @@ function handleRules(isPresenter, roomSetup = true) {
         show(roomRecordingOptions);
         hide(roomHostOnlyRecording);
     }
-    BUTTONS.whiteboard.whiteboardLockButton ? show(whiteboardUnlockBtn) : hide(whiteboardUnlockBtn);
-    isPresenter ? show(whiteboardParticipantNamesControl, 'flex') : hide(whiteboardParticipantNamesControl);
+
     refreshExitButtonTooltip();
     //...
 }
@@ -305,7 +292,7 @@ function loadModeratorData() {
     switchEveryoneCantChatPrivately.checked = localStorageSettings.moderator_chat_cant_privately;
     switchEveryoneCantChatPublicly.checked = localStorageSettings.moderator_chat_cant_publicly;
     switchEveryoneCantMediaSharing.checked = localStorageSettings.moderator_media_cant_sharing;
-    switchEveryoneCantPolls.checked = localStorageSettings.moderator_polls_cant_create;
+
     switchDisconnectAllOnLeave.checked = localStorageSettings.moderator_disconnect_all_on_leave;
 }
 
@@ -326,7 +313,6 @@ function loadModeratorDataFromRoom() {
     switchEveryoneCantChatPrivately.checked = !!moderator.chat_cant_privately;
     switchEveryoneCantChatPublicly.checked = !!moderator.chat_cant_publicly;
     switchEveryoneCantMediaSharing.checked = !!moderator.media_cant_sharing;
-    switchEveryoneCantPolls.checked = !!moderator.polls_cant_create;
 }
 
 // Reflect a single moderator rule change on its switch, keeping every presenter's panel
@@ -343,7 +329,6 @@ function updateModeratorSwitchUI(type, status) {
         chat_cant_privately: switchEveryoneCantChatPrivately,
         chat_cant_publicly: switchEveryoneCantChatPublicly,
         media_cant_sharing: switchEveryoneCantMediaSharing,
-        polls_cant_create: switchEveryoneCantPolls,
     };
     const switchEl = switchByType[type];
     if (switchEl) switchEl.checked = !!status;
@@ -362,7 +347,6 @@ function getModeratorData() {
         chat_cant_chatgpt: localStorageSettings.moderator_chat_cant_chatgpt,
         chat_cant_deep_seek: localStorageSettings.moderator_chat_cant_deep_seek,
         media_cant_sharing: switchEveryoneCantMediaSharing.checked,
-        polls_cant_create: switchEveryoneCantPolls.checked,
     };
 }
 
@@ -375,11 +359,10 @@ function handleRulesBroadcasting() {
     BUTTONS.main.startScreenButton = false;
     BUTTONS.main.swapCameraButton = false;
     //BUTTONS.main.raiseHandButton = false;
-    BUTTONS.main.whiteboardButton = false;
+
     BUTTONS.main.documentPiPButton = false;
     //BUTTONS.main.snapshotRoomButton = false;
-    //BUTTONS.main.emojiRoomButton = false,
-    //BUTTONS.main.pollButton = false;
+
     BUTTONS.main.breakoutRoomButton = false;
     BUTTONS.main.settingsButton = false;
     BUTTONS.settings.lockRoomButton = false;
@@ -400,7 +383,7 @@ function handleRulesBroadcasting() {
     BUTTONS.consumerVideo.ejectButton = false;
     BUTTONS.consumerVideo.muteAudioButton = false;
     BUTTONS.consumerVideo.muteVideoButton = false;
-    BUTTONS.whiteboard.whiteboardLockButton = false;
+
     //...
     elemDisplay('shareButton', false);
     elemDisplay('hideMeButton', false);
@@ -412,13 +395,12 @@ function handleRulesBroadcasting() {
     elemDisplay('stopScreenButton', false);
     elemDisplay('swapCameraButton', false);
     //elemDisplay('raiseHandButton', false);
-    elemDisplay('whiteboardButton', false);
+
     elemDisplay('documentPiPButton', false);
     //elemDisplay('snapshotRoomButton', false);
-    //elemDisplay('emojiRoomButton', false);
-    //elemDisplay('pollButton', false);
+
     //elemDisplay('breakoutRoomButton', false);
-    //elemDisplay('editorButton', false);
+
     elemDisplay('lockRoomButton', false);
     elemDisplay('unlockRoomButton', false);
     elemDisplay('lobbyButton', false);

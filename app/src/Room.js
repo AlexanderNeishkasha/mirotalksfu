@@ -36,10 +36,7 @@ module.exports = class Room {
         this._isJoinLocked = false;
         this._roomPassword = null;
         this._hostOnlyRecording = false;
-        // Server-side whiteboard lock state. Authoritative — does not depend on the client
-        // clicking the lock button. Used to drop non-presenter whiteboard writes when set.
-        this._wbIsLock = false;
-        this._wbShowParticipantNames = false;
+
         // ##########################
         this.recording = {
             recSyncServerToS3: (config?.integrations?.s3?.enabled && config?.media?.recording?.uploadToS3) || false,
@@ -69,7 +66,6 @@ module.exports = class Room {
             chat_cant_chatgpt: false,
             chat_cant_deep_seek: false,
             media_cant_sharing: false,
-            polls_cant_create: false,
         };
         this._followMe = null;
         this.survey = config?.features?.survey;
@@ -86,9 +82,6 @@ module.exports = class Room {
 
         // RTMP configuration
         this.rtmpStreaming = new RtmpStreaming(this);
-
-        // Polls
-        this.polls = [];
 
         this.isHostProtected = config?.security?.host?.protected || false;
 
@@ -114,7 +107,6 @@ module.exports = class Room {
                 isLobbyEnabled: this._isLobbyEnabled,
                 isJoinLocked: this._isJoinLocked,
                 hostOnlyRecording: this._hostOnlyRecording,
-                whiteboardParticipantNames: this._wbShowParticipantNames,
             },
             rtmp: {
                 enabled: this.rtmpStreaming.rtmp && this.rtmpStreaming.rtmp.enabled,
@@ -131,7 +123,7 @@ module.exports = class Room {
             videoAIEnabled: this.videoAIEnabled,
             videoAISessionTimeLimit: this.videoAISessionTimeLimit,
             chatGPTEnabled: config?.integrations?.chatGPT?.enabled || false,
-            thereIsPolls: this.thereIsPolls(),
+
             shareMediaData: this.shareMediaData,
             dominantSpeaker: this.activeSpeakerObserverEnabled,
             peers: JSON.stringify([...this.peers]),
@@ -155,23 +147,8 @@ module.exports = class Room {
     }
 
     // ##############################################
-    // POLLS
+
     // ##############################################
-
-    thereIsPolls() {
-        return this.polls.length > 0;
-    }
-
-    getPolls() {
-        return this.polls;
-    }
-
-    convertPolls(polls) {
-        return polls.map((poll) => {
-            const voters = poll.voters ? Object.fromEntries(poll.voters.entries()) : {};
-            return { ...poll, voters };
-        });
-    }
 
     // ##############################################
     // RTMP (delegated to RtmpStreaming)
@@ -478,9 +455,7 @@ module.exports = class Room {
             case 'media_cant_sharing':
                 this._moderator.media_cant_sharing = data.status;
                 break;
-            case 'polls_cant_create':
-                this._moderator.polls_cant_create = data.status;
-                break;
+
             default:
                 break;
         }
@@ -1205,18 +1180,6 @@ module.exports = class Room {
     }
     setHostOnlyRecording(status) {
         this._hostOnlyRecording = status;
-    }
-    getWhiteboardLock() {
-        return this._wbIsLock;
-    }
-    setWhiteboardLock(status) {
-        this._wbIsLock = Boolean(status);
-    }
-    getWhiteboardParticipantNames() {
-        return this._wbShowParticipantNames;
-    }
-    setWhiteboardParticipantNames(status) {
-        this._wbShowParticipantNames = Boolean(status);
     }
 
     // ####################################################
