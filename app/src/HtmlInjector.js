@@ -57,6 +57,8 @@ class HtmlInjector {
         this.watcher = chokidar.watch(filePaths, {
             persistent: true,
             ignoreInitial: true, // Ignore initial 'add' events
+            // Compose sync writes HTML in chunks; cache only after the write settles.
+            awaitWriteFinish: { stabilityThreshold: 500, pollInterval: 100 },
         });
 
         this.watcher

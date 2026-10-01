@@ -1,0 +1,24 @@
+/* Follow the live Studio palette, including dialogs with inline SweetAlert colors. */
+.swal2-popup .swal2-actions button.swal2-confirm,
+.swal2-popup .swal2-actions button.swal2-deny {
+    background-color: var(--room-switch-accent) !important;
+    color: var(--room-switch-ink, var(--body-bg)) !important;
+}
+
+.swal2-popup .swal2-actions button.swal2-cancel {
+    background-color: var(--btns-bg-color) !important;
+    color: var(--dd-color) !important;
+    border: 1px solid var(--room-switch-accent);
+}
+
+.swal2-popup .swal2-actions button:focus-visible {
+    outline: 2px solid var(--room-switch-accent);
+    outline-offset: 3px;
+    box-shadow: none !important;
+}
+
+/* Native range controls retain keyboard/touch behavior and browser progress rendering. */
+body input[type='range'],
+body .navbar-dropdown-control input[type='range'] {
+    accent-color: var(--room-switch-accent);
+}
