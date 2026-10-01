@@ -24,6 +24,7 @@
     height: 100% !important;
 }
 
+.chat-device-fullscreen .chat-layout-tools,
 .chat-device-fullscreen #chatTogglePin,
 .chat-device-fullscreen #chatMaxButton,
 .chat-device-fullscreen #chatMinButton {

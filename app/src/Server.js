@@ -71,6 +71,7 @@ const express = require('express');
 const { auth, requiresAuth } = require('express-openid-connect');
 const { withFileLock } = require('./MutexManager');
 const { admittedPeer } = require('./BodrikJoinDiagnostics');
+const { DiagnosticStore, registerClientDiagnostics } = require('./ClientDiagnostics');
 const { PassThrough } = require('stream');
 const { S3Client } = require('@aws-sdk/client-s3');
 const { Upload } = require('@aws-sdk/lib-storage');
@@ -495,6 +496,8 @@ const authHost = new Host(); // Authenticated IP by Login
 
 const roomList = new Map(); // All Rooms
 const recoveryGrace = createRecoveryGrace(io, roomList, log);
+const clientDiagnosticsEnabled = process.env.CLIENT_DIAGNOSTICS_ENABLED === 'true';
+const clientDiagnostics = clientDiagnosticsEnabled ? new DiagnosticStore() : null;
 
 const presenters = {}; // Collect presenters grp by roomId
 
@@ -2178,6 +2181,7 @@ function startServer() {
 
     io.on('connection', (socket) => {
         recoveryGrace.cancel(socket.id);
+        if (clientDiagnostics) registerClientDiagnostics(socket, roomList, clientDiagnostics, getIpSocket(socket));
         log.info('[Recovery] socket connected', {
             socket_id: socket.id,
             recovered: socket.recovered,
@@ -2190,6 +2194,7 @@ function startServer() {
                 room_id: socket.room_id,
                 socket_id: socket.id,
             });
+            if (clientDiagnosticsEnabled) socket.emit('bodrikDiagnosticsReady');
         }
         socket.on('clientError', (error) => {
             try {
@@ -2497,11 +2502,13 @@ function startServer() {
                 roomJson.recUploadToken = createRecUploadToken(room.id);
             }
 
+            roomJson.clientDiagnosticsEnabled = clientDiagnosticsEnabled;
             cb(roomJson);
             log.info(
                 '[Join] admitted peer',
                 admittedPeer(room.id, peer.peer_info, data.diagnostics, socket.handshake.headers['user-agent'])
             );
+            if (clientDiagnosticsEnabled) socket.emit('bodrikDiagnosticsReady');
         });
 
         socket.on('getRouterRtpCapabilities', (_, callback) => {
@@ -4585,7 +4592,7 @@ async function gracefulShutdown(signal) {
 
         // 7. Cleanup HTML injector
         log.debug('Cleaning up HTML injector...');
-        await htmlInjector.cleanup();
+        await Promise.all([htmlInjector.cleanup(), clientDiagnostics?.close()]);
 
         // 8. Close ngrok if active
         if (config?.integrations?.ngrok?.enabled) {

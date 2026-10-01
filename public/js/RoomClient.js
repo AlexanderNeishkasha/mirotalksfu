@@ -249,6 +249,7 @@ class RoomClient {
 
         // Handle Socket
         this.socket = socket;
+        window.BodrikClientDiagnostics.attach(socket);
         this.reconnectAlert = null;
         this.reconnectBanner = null;
         this.reconnectBannerHideTimer = null;
@@ -598,6 +599,7 @@ class RoomClient {
                 }
                 if (room === 'isBanned') return this.isBanned();
 
+                window.BodrikClientDiagnostics.setEnabled(room.clientDiagnosticsEnabled === true);
                 this.peers = new Map(JSON.parse(room.peers));
                 if (room.recUploadToken) this.recUploadToken = room.recUploadToken;
                 if (room.sessionId) this.sessionId = room.sessionId;
@@ -938,6 +940,7 @@ class RoomClient {
         const transport = this.producerTransport;
         transport.on('connectionstatechange', async (state) => {
             console.log(`Producer Transport state changed to: ${state}`, { id: transport.id });
+            window.BodrikClientDiagnostics.report('transport_state', { transport: 'producer', state });
 
             switch (state) {
                 case 'connecting':
@@ -953,12 +956,17 @@ class RoomClient {
                         console.info('Deferring producer ICE restart until signaling reconnects');
                         break;
                     }
+                    window.BodrikClientDiagnostics.report('transport_restart', {
+                        transport: 'producer',
+                        phase: 'start',
+                    });
                     if (!(await this.restartTransportWithRetry(transport, 'Producer'))) {
                         this.readmitAfterTransportFailure(transport);
                     }
                     break;
                 case 'failed':
                     console.warn('❌ Producer Transport failed', { id: transport.id });
+                    window.BodrikClientDiagnostics.report('transport_failure', { transport: 'producer', state });
                     this.readmitAfterTransportFailure(transport);
                     break;
                 default:
@@ -971,6 +979,7 @@ class RoomClient {
         });
 
         this.producerTransport.on('icegatheringstatechange', (state) => {
+            window.BodrikClientDiagnostics.report('ice_gathering_state', { transport: 'producer', state });
             const normalStates = new Set(['new', 'gathering', 'complete']);
             normalStates.has(state)
                 ? console.log('Producer ICE gathering state', { state, id: this.producerTransport.id })
@@ -978,6 +987,10 @@ class RoomClient {
         });
 
         this.producerTransport.on('icecandidateerror', (error) => {
+            window.BodrikClientDiagnostics.report('ice_candidate_error', {
+                transport: 'producer',
+                ...window.BodrikClientDiagnostics.errorDetails(error),
+            });
             console.error('❌ Producer ICE candidate error', {
                 error: error,
                 id: this.producerTransport.id,
@@ -1020,6 +1033,7 @@ class RoomClient {
         const transport = this.consumerTransport;
         transport.on('connectionstatechange', async (state) => {
             console.log(`Consumer Transport state changed to: ${state}`, { id: transport.id });
+            window.BodrikClientDiagnostics.report('transport_state', { transport: 'consumer', state });
 
             switch (state) {
                 case 'connecting':
@@ -1035,12 +1049,17 @@ class RoomClient {
                         console.info('Deferring consumer ICE restart until signaling reconnects');
                         break;
                     }
+                    window.BodrikClientDiagnostics.report('transport_restart', {
+                        transport: 'consumer',
+                        phase: 'start',
+                    });
                     if (!(await this.restartTransportWithRetry(transport, 'Consumer'))) {
                         this.readmitAfterTransportFailure(transport);
                     }
                     break;
                 case 'failed':
                     console.warn('❌ Consumer Transport failed', { id: transport.id });
+                    window.BodrikClientDiagnostics.report('transport_failure', { transport: 'consumer', state });
                     this.readmitAfterTransportFailure(transport);
                     break;
                 default:
@@ -1053,6 +1072,7 @@ class RoomClient {
         });
 
         this.consumerTransport.on('icegatheringstatechange', (state) => {
+            window.BodrikClientDiagnostics.report('ice_gathering_state', { transport: 'consumer', state });
             const normalStates = new Set(['new', 'gathering', 'complete']);
             normalStates.has(state)
                 ? console.log('Consumer ICE gathering state', { state, id: this.consumerTransport.id })
@@ -1060,6 +1080,10 @@ class RoomClient {
         });
 
         this.consumerTransport.on('icecandidateerror', (error) => {
+            window.BodrikClientDiagnostics.report('ice_candidate_error', {
+                transport: 'consumer',
+                ...window.BodrikClientDiagnostics.errorDetails(error),
+            });
             console.error('❌ Consumer ICE candidate error', {
                 error: error,
                 id: this.consumerTransport.id,
@@ -1207,6 +1231,11 @@ class RoomClient {
 
     handleSocketConnect = () => {
         console.info('[Recovery] signaling connected', { socketId: this.socket.id, recovered: this.socket.recovered });
+        window.BodrikClientDiagnostics.report('signaling_connect', {
+            recovered: Boolean(this.socket.recovered),
+            online: navigator.onLine,
+            visibility: document.visibilityState,
+        });
         // Manager reconnect fires before the namespace socket receives its id and
         // recovery state. Only the Socket connect event can decide how to resume.
         if (this.recoveryDisconnectedAt != null && !this.isLeaving) {
@@ -1223,20 +1252,36 @@ class RoomClient {
         if (this.isLeaving) return;
         this.recoveryDisconnectedAt = Date.now();
         console.warn('[Recovery] signaling disconnected', { socketId: this.socket.id, reason });
+        window.BodrikClientDiagnostics.report('signaling_disconnect', {
+            reason,
+            online: navigator.onLine,
+            visibility: document.visibilityState,
+        });
         this.handleDisconnect(reason);
     };
 
     handleSocketConnectionError = (err) => {
         console.warn('[Recovery] connection error', { message: err.message, type: err.type });
+        window.BodrikClientDiagnostics.report('signaling_error', {
+            ...window.BodrikClientDiagnostics.errorDetails(err),
+            phase: err.type,
+            online: navigator.onLine,
+        });
     };
 
     handleSocketReconnectAttempt = (attempt) => {
         console.info('[Recovery] reconnect attempt', { attempt, elapsedMs: Date.now() - this.recoveryDisconnectedAt });
+        window.BodrikClientDiagnostics.report('signaling_reconnect_attempt', {
+            attempt,
+            elapsed_ms: Date.now() - this.recoveryDisconnectedAt,
+            online: navigator.onLine,
+        });
         this.handleReconnectAttempt(attempt);
     };
 
     handleSocketReconnectFailed = () => {
         console.error('SocketOn Reconnect failed');
+        window.BodrikClientDiagnostics.report('signaling_reconnect_failed', { online: navigator.onLine });
         this.handleReconnectFailed();
     };
     handleBodrikMusicVolume = ({ volume }) => {
@@ -1270,6 +1315,11 @@ class RoomClient {
         if (this.isLeaving || !this.socket.connected || !this._isConnected) return;
         if (transport !== this.producerTransport && transport !== this.consumerTransport) return;
         this.needsReadmission = true;
+        window.BodrikClientDiagnostics.report('transport_failure', {
+            transport: transport === this.producerTransport ? 'producer' : 'consumer',
+            state: transport.connectionState,
+            phase: 'readmission',
+        });
         if (this.rejoinInProgress) return;
         this._isConnected = false;
         this.showReconnectAlert();
@@ -1652,6 +1702,11 @@ class RoomClient {
             recovered: this.socket.recovered,
             elapsedMs: Date.now() - this.recoveryDisconnectedAt,
         });
+        window.BodrikClientDiagnostics.report('recovery_start', {
+            recovered: Boolean(this.socket.recovered),
+            elapsed_ms: Date.now() - this.recoveryDisconnectedAt,
+            retry: Boolean(this.needsReadmission),
+        });
         try {
             if (!this.socket.recovered || this.needsReadmission) {
                 await window.BodrikNetworkRecovery.rejoin(this);
@@ -1674,9 +1729,17 @@ class RoomClient {
             startRoomSession();
             this.closeReconnectAlert(true);
             console.info('Recovered meeting without reloading the page');
+            window.BodrikClientDiagnostics.report('recovery_success', {
+                recovered: Boolean(this.socket.recovered),
+                elapsed_ms: Date.now() - this.recoveryDisconnectedAt,
+            });
         } catch (error) {
             if (this.isLeaving || !this.socket.connected || this.socket.id !== reconnectId) return;
             console.error('In-place meeting recovery failed', error);
+            window.BodrikClientDiagnostics.report('recovery_failure', {
+                ...window.BodrikClientDiagnostics.errorDetails(error),
+                elapsed_ms: Date.now() - this.recoveryDisconnectedAt,
+            });
             this.needsReadmission = true;
             this._isConnected = false;
             this.showMaxAttemptsAlert();
@@ -2985,12 +3048,15 @@ class RoomClient {
                     this.isVideoFullScreenSupported &&
                     myDropdownContent.appendChild(this.createDropdownItem(fs, 'Full Screen', myDropdownContent));
 
-                myDropdownDiv.appendChild(myDropdownBtn);
-                document.body.appendChild(myDropdownContent);
-                myDropdownBtn._dropdownContent = myDropdownContent;
-                this.handleDropdownEvents(myDropdownDiv, myDropdownBtn, myDropdownContent);
-
-                vb.appendChild(myDropdownDiv);
+                if (myDropdownContent.childElementCount > 0) {
+                    myDropdownDiv.appendChild(myDropdownBtn);
+                    document.body.appendChild(myDropdownContent);
+                    myDropdownBtn._dropdownContent = myDropdownContent;
+                    this.handleDropdownEvents(myDropdownDiv, myDropdownBtn, myDropdownContent);
+                    vb.appendChild(myDropdownDiv);
+                } else {
+                    myDropdownContent.remove();
+                }
                 BUTTONS.producerVideo.muteAudioButton && vb.appendChild(au);
                 BUTTONS.producerVideo.videoPrivacyButton && !isScreen && vb.appendChild(vp);
 

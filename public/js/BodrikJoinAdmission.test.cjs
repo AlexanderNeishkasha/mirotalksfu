@@ -17,6 +17,7 @@ function admission(result, failure = false) {
         console: { log() {}, warn() {}, error() {} },
         endRoomSession: () => events.push('end session'),
         popupHtmlMessage: (...args) => finish({ popup: args }),
+        window: { BodrikClientDiagnostics: { setEnabled: (enabled) => events.push({ diagnostics: enabled }) } },
     };
     vm.runInNewContext(`${source}; globalThis.Client = RoomClient`, context);
     const client = {
@@ -48,6 +49,7 @@ test(
     { timeout: 1000 },
     async () => {
         const room = {
+            clientDiagnosticsEnabled: true,
             peers: JSON.stringify([['peer-id', { peer_info: { peer_name: 'Participant' } }]]),
             recUploadToken: 'test-recording-token',
             sessionId: 'test-session',
@@ -57,6 +59,7 @@ test(
         await method.call(client, data);
         const outcome = await completed;
         assert.deepEqual(events[0], { event: 'join', data });
+        assert.deepEqual(events[1], { diagnostics: true });
         assert.equal(outcome.room, room);
         assert.equal(client.peers.size, 1);
         assert.equal(client.peers.get('peer-id').peer_info.peer_name, 'Participant');

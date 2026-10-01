@@ -16,7 +16,7 @@ COPY --chown=node:node app ./app
 COPY --chown=node:node public ./public
 RUN cp app/src/config.template.js app/src/config.js \
     && rm -f app/src/*.test.js public/js/*.test.cjs \
-    && mkdir -p public/uploads/avatars public/uploads/chat \
-    && chown -R node:node public/uploads
+    && mkdir -p public/uploads/avatars public/uploads/chat logs/client-diagnostics \
+    && chown -R node:node public/uploads logs
 USER node
 CMD ["npm", "start"]
