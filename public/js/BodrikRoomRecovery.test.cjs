@@ -12,7 +12,10 @@ function recoveryMethods(rejoin) {
     const context = {
         console: { info() {}, error() {}, warn() {} },
         VideoAI: { active: false },
-        window: { BodrikNetworkRecovery: { rejoin }, BodrikClientDiagnostics: { report() {}, errorDetails: (error) => ({ message: error.message }) } },
+        window: {
+            BodrikNetworkRecovery: { rejoin },
+            BodrikClientDiagnostics: { report() {}, errorDetails: (error) => ({ message: error.message }) },
+        },
         startRoomSession() {
             events.push('session resumed');
         },
