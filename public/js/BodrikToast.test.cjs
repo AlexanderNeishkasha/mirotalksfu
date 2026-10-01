@@ -76,7 +76,7 @@ test('RoomClient notifications translate without a window.RoomClient property', 
 
 test('both notification paths load and use the shared translator', () => {
     const page = readFileSync(join(__dirname, '../views/Room.html'), 'utf8');
-    assert.match(page, /BodrikToast\.js\?v=2/);
+    assert.match(page, /BodrikToast\.js/);
     assert.match(
         readFileSync(join(__dirname, 'RoomClient.js'), 'utf8'),
         /window\.BodrikToast\.show\(icon, message, position, timer\)/

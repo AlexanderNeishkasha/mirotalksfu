@@ -64,7 +64,7 @@ test('About has explanatory translated sections and accessible external links', 
     ]) {
         assert.ok(ru.dialogs[key] && ru.dialogs[key] !== key);
     }
-    assert.match(page, /MeetingAbout\.css\?v=1/);
+    assert.match(page, /MeetingAbout\.css/);
 });
 
 test('snapshots are retired and recording belongs to Tools', () => {

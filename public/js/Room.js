@@ -1712,7 +1712,7 @@ function roomIsReady() {
         hide(chatMaxButton);
         hide(chatMinButton);
     } else {
-        rc.makeDraggable(chatRoom, chatHeader);
+        if (!isFullscreenChatDevice(rc)) rc.makeDraggable(chatRoom, chatHeader);
 
         rc.makeDraggable(mySettings, mySettingsHeader);
 

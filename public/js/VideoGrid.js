@@ -138,7 +138,7 @@ const CUSTOM_BREAKPOINT = 680;
 // ####################################################
 
 function resizeChatRoom() {
-    if (!rc || rc.isMobileDevice || !rc.isChatOpen || rc.isChatPinned) return;
+    if (!rc || isFullscreenChatDevice(rc) || !rc.isChatOpen || rc.isChatPinned) return;
 
     const windowWidth = window.innerWidth;
     const windowHeight = window.innerHeight;

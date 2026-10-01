@@ -20,5 +20,5 @@ test('volume ranges use the live accent, including the dropdown override', () =>
     assert.match(css, /body input\[type='range'\]/);
     assert.match(css, /body \.navbar-dropdown-control input\[type='range'\]/);
     assert.match(css, /accent-color: var\(--room-switch-accent\)/);
-    assert.match(page, /ThemeControls\.css\?v=bodrik-1/);
+    assert.match(page, /ThemeControls\.css/);
 });

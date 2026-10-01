@@ -45,5 +45,5 @@ test('Document PiP is removed while ordinary video PiP remains', () => {
     assert.doesNotMatch(page, /documentPiPButton|Toggle document PIP/);
     assert.equal(existsSync(join(__dirname, '../css/DocumentPiP.css')), false);
     assert.match(page, /cameraAccessNotice/);
-    assert.match(page, /BodrikCameraAccess\.js\?v=3/);
+    assert.match(page, /BodrikCameraAccess\.js/);
 });

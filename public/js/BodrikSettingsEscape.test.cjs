@@ -51,5 +51,5 @@ for (const {
 
 test('room loads settings Escape handler', () => {
     const page = readFileSync(join(__dirname, '../views/Room.html'), 'utf8');
-    assert.match(page, /BodrikSettingsEscape\.js\?v=2/);
+    assert.match(page, /BodrikSettingsEscape\.js/);
 });

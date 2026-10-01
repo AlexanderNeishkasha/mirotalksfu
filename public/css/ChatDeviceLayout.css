@@ -1,0 +1,31 @@
+/* Phones and tablets use a single full-viewport pane in either orientation. */
+#chatRoom.chat-device-fullscreen {
+    position: fixed !important;
+    inset: 0 !important;
+    transform: none !important;
+    width: 100% !important;
+    box-sizing: border-box;
+    min-width: 0 !important;
+    max-width: none !important;
+    height: 100dvh !important;
+    min-height: 0 !important;
+    max-height: 100dvh !important;
+    margin: 0 !important;
+    border-radius: 0;
+    resize: none !important;
+}
+
+.chat-device-fullscreen .chat-app {
+    border-radius: 0;
+}
+
+.chat-device-fullscreen #plist {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+.chat-device-fullscreen #chatTogglePin,
+.chat-device-fullscreen #chatMaxButton,
+.chat-device-fullscreen #chatMinButton {
+    display: none !important;
+}

@@ -32,6 +32,11 @@ permission retry that releases its temporary stream without publishing video.
 The service-specific backend, TURN server, deployment configuration, environment
 variables, credentials, and user-uploaded data are not stored in this repository.
 
+Local JS/CSS URLs are versioned automatically by the HTML injector. Production
+uses `MIROTALK_SOURCE_REVISION`; development uses cached file-content hashes
+invalidated by a polling watcher. Generated backend scripts and CDN URLs are
+left untouched. Do not add manual `?v=` values to templates or pin them in tests.
+
 To build from the checked-out `main` source, run `docker build -t mirotalk-sfu-bodrik .`.
 Runtime settings depend on the deployment; refer to `.env.template` for upstream
 configuration names. Never commit real `.env` files, certificates or tokens.

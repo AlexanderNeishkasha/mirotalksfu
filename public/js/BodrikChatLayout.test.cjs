@@ -19,8 +19,8 @@ test('narrow conversation header gives Invite, actions, and Close separate grid 
     assert.match(css, /\.chat-action-icon-btns\s*\{[^}]*grid-row: 2;/);
     assert.match(css, /\.chat-list-actions > #chatHideParticipantsList\s*\{[^}]*grid-row: 1;/);
     assert.match(css, /@media screen and \(max-width: 600px\) \{\s*@container chat-panel \(min-width: 420px\)/);
-    assert.match(page, /ChatListActions\.css\?v=bodrik-2/);
-    assert.match(page, /RoomClient\.js\?v=bodrik-35/);
+    assert.match(page, /ChatListActions\.css/);
+    assert.match(page, /RoomClient\.js/);
 });
 
 test('participants export control and its obsolete settings are absent', () => {
@@ -28,8 +28,8 @@ test('participants export control and its obsolete settings are absent', () => {
     assert.doesNotMatch(room, /participantsSaveBtn|saveRoomPeers/);
     assert.doesNotMatch(rules, /participantsSaveBtn|saveInfoButton/);
     assert.doesNotMatch(config, /saveInfoButton|SHOW_SAVE_INFO/);
-    assert.match(page, /Rules\.js\?v=bodrik-12/);
-    assert.match(page, /Room\.js\?v=bodrik-37/);
+    assert.match(page, /Rules\.js/);
+    assert.match(page, /Room\.js/);
 });
 
 test('conversation list covers the chat header on narrow screens, but not on desktop', () => {
@@ -37,12 +37,16 @@ test('conversation list covers the chat header on narrow screens, but not on des
         .split('    toggleShowParticipants(fromUser = false) {')[1]
         .split('    async toggleParticipants() {')[0];
     const displayed = new Map();
+    const fullscreen = new Function(
+        `${readFileSync(join(__dirname, 'BodrikChatPanels.js'), 'utf8')}; return isFullscreenChatDevice;`
+    )();
     const toggle = new Function(
         'BUTTONS',
         'elemDisplay',
         'window',
+        'isFullscreenChatDevice',
         `return ({ toggleShowParticipants(fromUser = false) {${method} }).toggleShowParticipants;`
-    )({ main: { chatButton: true } }, (id, visible) => displayed.set(id, visible), { innerWidth: 390 });
+    )({ main: { chatButton: true } }, (id, visible) => displayed.set(id, visible), { innerWidth: 390 }, fullscreen);
     const hidden = new Set(['hidden']);
     const plist = {
         classList: {
@@ -79,8 +83,9 @@ test('conversation list covers the chat header on narrow screens, but not on des
         'BUTTONS',
         'elemDisplay',
         'window',
+        'isFullscreenChatDevice',
         `return ({ toggleShowParticipants(fromUser = false) {${method} }).toggleShowParticipants;`
-    )({ main: { chatButton: true } }, (id, visible) => displayed.set(id, visible), { innerWidth: 1280 });
+    )({ main: { chatButton: true } }, (id, visible) => displayed.set(id, visible), { innerWidth: 1280 }, fullscreen);
     desktopToggle.call(room);
     assert.equal(displayed.get('chat'), true);
     assert.equal(chat.style.marginLeft, '300px');

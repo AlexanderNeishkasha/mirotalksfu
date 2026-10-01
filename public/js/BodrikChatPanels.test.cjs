@@ -6,7 +6,7 @@ const test = require('node:test');
 const vm = require('node:vm');
 
 /** Exercise actual panel transitions with mobile DOM visibility and desktop pinning captured. */
-function panels(mobile) {
+function panels(mobile, tablet = false) {
     const node = (id, initial = []) => {
         const classes = new Set(initial);
         return {
@@ -16,14 +16,18 @@ function panels(mobile) {
                 contains: (key) => classes.has(key),
                 add: (key) => classes.add(key),
                 remove: (key) => classes.delete(key),
-                toggle: (key) => (classes.has(key) ? classes.delete(key) : classes.add(key)),
+                toggle: (key, force) => {
+                    if (force === true) return classes.add(key);
+                    if (force === false) return classes.delete(key);
+                    return classes.has(key) ? classes.delete(key) : classes.add(key);
+                },
             },
         };
     };
     const nodes = { chatRoom: node('chatRoom'), plist: node('plist', ['hidden']), chat: node('chat') };
     const context = {
         window: { innerWidth: mobile ? 390 : 1262, innerHeight: 624 },
-        isDesktopDevice: !mobile,
+        isDesktopDevice: !mobile && !tablet,
         isParticipantsListOpen: false,
         isChatPinEnabled: true,
         BUTTONS: { main: { chatButton: true }, chat: { chatMaxButton: true } },
@@ -43,6 +47,7 @@ function panels(mobile) {
     const client = Object.create(context.Client.prototype);
     Object.assign(client, {
         isMobileDevice: mobile,
+        peer_info: { is_tablet_device: tablet },
         isChatOpen: false,
         isParticipantsOpen: false,
         isChatPinned: false,
@@ -62,7 +67,7 @@ function panels(mobile) {
             this.isChatPinned = false;
         },
     });
-    return { client, nodes };
+    return { client, nodes, context };
 }
 
 test('Android sequence participants → close → chat → close → participants restores a visible list', async () => {
@@ -82,6 +87,27 @@ test('Android sequence participants → close → chat → close → participant
     client.toggleShowParticipants(true);
     assert.equal(client.isChatOpen, false);
 });
+
+for (const [orientation, width, height] of [
+    ['portrait', 800, 1280],
+    ['landscape', 1280, 800],
+]) {
+    test(`tablet panels are fullscreen rather than pinned in ${orientation}`, async () => {
+        const { client, nodes, context } = panels(false, true);
+        context.window.innerWidth = width;
+        context.window.innerHeight = height;
+        await client.toggleChat();
+        assert.equal(client.isChatPinned, false);
+        assert.equal(nodes.chatRoom.classList.contains('chat-device-fullscreen'), true);
+        await client.toggleChat();
+        await client.toggleParticipants();
+        assert.equal(nodes.plist.style.width, '100%');
+        assert.equal(nodes.chat.style.display, 'none');
+        assert.equal(nodes.plist.classList.contains('hidden'), false);
+        client.toggleShowParticipants(true);
+        assert.equal(client.isChatOpen, false);
+    });
+}
 
 for (const participants of [false, true]) {
     test(`desktop opening uses the standard pinned state, including short viewports; participants=${participants}`, async () => {

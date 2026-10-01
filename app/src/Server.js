@@ -489,7 +489,7 @@ const filesPath = [
     views.customizeRoom,
 ];
 
-const htmlInjector = new HtmlInjector(filesPath, config.ui.brand);
+const htmlInjector = new HtmlInjector(filesPath, config.ui.brand, dir.public);
 
 const authHost = new Host(); // Authenticated IP by Login
 
@@ -4585,7 +4585,7 @@ async function gracefulShutdown(signal) {
 
         // 7. Cleanup HTML injector
         log.debug('Cleaning up HTML injector...');
-        htmlInjector.cleanup();
+        await htmlInjector.cleanup();
 
         // 8. Close ngrok if active
         if (config?.integrations?.ngrok?.enabled) {

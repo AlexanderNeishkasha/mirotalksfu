@@ -5675,7 +5675,7 @@ class RoomClient {
             await getRoomParticipants();
             hide(chatMinButton);
 
-            if (!this.isMobileDevice) {
+            if (!isFullscreenChatDevice(this)) {
                 BUTTONS.chat.chatMaxButton && show(chatMaxButton);
             }
             this.chatCenter();
@@ -5695,7 +5695,7 @@ class RoomClient {
 
         if (this.isChatPinned) this.chatUnpin();
 
-        if (!this.isMobileDevice && this.isChatOpen && isChatPinEnabled) {
+        if (!isFullscreenChatDevice(this) && this.isChatOpen && isChatPinEnabled) {
             this.toggleChatPin();
         }
 
@@ -5706,7 +5706,10 @@ class RoomClient {
         const chatFooter = document.querySelector('.chat-message');
         const peopleList = document.querySelector('#plist') || document.querySelector('.people-list');
         if (!chatFooter || !peopleList) return;
-        const isFullWidth = window.innerWidth <= 600 && peopleList.offsetWidth >= window.innerWidth * 0.98;
+        const isFullWidth =
+            this.isPlistOpen() &&
+            (isFullscreenChatDevice(this) ||
+                (window.innerWidth <= 600 && peopleList.offsetWidth >= window.innerWidth * 0.98));
         elemDisplay(chatFooter, !isFullWidth);
     }
 
@@ -5731,19 +5734,19 @@ class RoomClient {
             } else if (!isParticipantsListHidden) {
                 // Opening participants: show plist full-width
                 plist.style.width = '100%';
-                plist.style.position = this.isMobileDevice ? 'fixed' : 'absolute';
+                plist.style.position = isFullscreenChatDevice(this) ? 'fixed' : 'absolute';
             }
             this.updateChatFooterVisibility();
             return;
         }
 
-        const sideBySide = !this.isChatPinned && !this.isMobileDevice && window.innerWidth > 600;
+        const sideBySide = !this.isChatPinned && !isFullscreenChatDevice(this) && window.innerWidth > 600;
         chat.style.marginLeft = sideBySide && !isParticipantsListHidden ? '300px' : 0;
         chat.style.borderLeft = sideBySide && !isParticipantsListHidden ? '1px solid rgba(255,255,255,.08)' : 'none';
         elemDisplay(chat.id, isParticipantsListHidden || sideBySide, 'flex');
         this.toggleChatHistorySize(isParticipantsListHidden && (this.isChatPinned || this.isChatMaximized));
         plist.style.width = sideBySide ? '300px' : '100%';
-        plist.style.position = this.isMobileDevice ? 'fixed' : 'absolute';
+        plist.style.position = isFullscreenChatDevice(this) ? 'fixed' : 'absolute';
         this.updateChatFooterVisibility();
     }
 
