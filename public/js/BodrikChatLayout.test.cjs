@@ -20,7 +20,7 @@ test('narrow conversation header gives Invite, actions, and Close separate grid 
     assert.match(css, /\.chat-list-actions > #chatHideParticipantsList\s*\{[^}]*grid-row: 1;/);
     assert.match(css, /@media screen and \(max-width: 600px\) \{\s*@container chat-panel \(min-width: 420px\)/);
     assert.match(page, /ChatListActions\.css\?v=bodrik-2/);
-    assert.match(page, /RoomClient\.js\?v=bodrik-34/);
+    assert.match(page, /RoomClient\.js\?v=bodrik-35/);
 });
 
 test('participants export control and its obsolete settings are absent', () => {

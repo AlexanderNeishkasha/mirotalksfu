@@ -5665,11 +5665,13 @@ class RoomClient {
         return !plist.classList.contains('hidden');
     }
 
+    /** Toggle the shared panel, resetting its inner view and applying the standard auto-pin preference on open. */
     async toggleChat(fromParticipants = false) {
         if (!fromParticipants && !BUTTONS.main.chatButton) return;
         const chatRoom = this.getId('chatRoom');
         chatRoom.classList.toggle('show');
         if (!this.isChatOpen) {
+            resetChatPanelView(this);
             await getRoomParticipants();
             hide(chatMinButton);
 
@@ -5686,22 +5688,14 @@ class RoomClient {
         if (!this.isChatOpen) {
             this.isParticipantsOpen = false;
             this.isChatOpenedByParticipantsBtn = false;
-            // Reset participants-list layout so the chat opens full size next time (mobile)
-            if (this.isMobileDevice) {
-                const chat = this.getId('chat');
-                const plist = this.getId('plist');
-                chat.style.marginLeft = 0;
-                chat.style.borderLeft = 'none';
-                plist.classList.add('hidden');
-                this.updateChatFooterVisibility();
-            }
+            resetChatPanelView(this);
         }
         this.syncChatToolbarButtons();
         this.updateUnreadCountBadge(this.chatPeerId || 'all');
 
         if (this.isChatPinned) this.chatUnpin();
 
-        if (!this.isMobileDevice && this.isChatOpen && this.canBePinned() && isChatPinEnabled) {
+        if (!this.isMobileDevice && this.isChatOpen && isChatPinEnabled) {
             this.toggleChatPin();
         }
 
@@ -5837,12 +5831,6 @@ class RoomClient {
             void chatRoom.offsetWidth; // force reflow so the animation always restarts
             chatRoom.classList.add('chat-minimize-in');
         }
-    }
-
-    canBePinned() {
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
-        return viewportWidth >= 1024 && viewportHeight >= 768;
     }
 
     chatPin() {

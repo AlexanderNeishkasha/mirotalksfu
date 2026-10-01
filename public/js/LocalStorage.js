@@ -156,10 +156,11 @@ class LocalStorage {
         const migrations = [
             ['BODRIK_NOISE_DEFAULT_OFF_V1', 'mic_noise_suppression'],
             ['BODRIK_CHAT_AUTO_OPEN_OFF_V1', 'show_chat_on_msg'],
+            ['BODRIK_CHAT_AUTO_PIN_ON_V1', 'chat_pin', true],
         ];
-        for (const [key, setting] of migrations) {
+        for (const [key, setting, value = false] of migrations) {
             if (localStorage.getItem(key)) continue;
-            settings[setting] = false;
+            settings[setting] = value;
             this.setSettings(settings);
             localStorage.setItem(key, '1');
         }

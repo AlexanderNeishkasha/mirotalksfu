@@ -22,18 +22,27 @@ test('new visitors keep chat closed on join and on incoming messages', () => {
     const { Store } = storage();
     const store = new Store();
     assert.equal(store.SFU_SETTINGS.show_chat_on_msg, false);
+    assert.equal(store.SFU_SETTINGS.chat_pin, true);
     assert.equal(store.getLocalStorageSettings(), null);
 });
 
 test('existing visitors reset auto-open once without losing other settings', () => {
-    const { Store, values } = storage({ show_chat_on_msg: true, mic_noise_suppression: true, theme: 7 });
+    const { Store, values } = storage({
+        show_chat_on_msg: true,
+        chat_pin: false,
+        mic_noise_suppression: true,
+        theme: 7,
+    });
     const store = new Store();
     const migrated = store.getLocalStorageSettings();
     assert.equal(migrated.show_chat_on_msg, false);
     assert.equal(migrated.mic_noise_suppression, false);
     assert.equal(migrated.theme, 7);
+    assert.equal(migrated.chat_pin, true);
     assert.equal(values.get('BODRIK_CHAT_AUTO_OPEN_OFF_V1'), '1');
     migrated.show_chat_on_msg = true;
+    migrated.chat_pin = false;
     store.setSettings(migrated);
     assert.equal(new Store().getLocalStorageSettings().show_chat_on_msg, true);
+    assert.equal(new Store().getLocalStorageSettings().chat_pin, false);
 });
