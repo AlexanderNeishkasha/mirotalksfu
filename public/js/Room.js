@@ -486,9 +486,13 @@ function setMicProcessingHelpTippy() {
         ],
     ];
     for (const [id, sections] of definitions) {
-        setTippy(id, micHelpHtml(sections), 'right', true);
+        setTippy(id, micHelpHtml(sections), isMobileDevice ? 'bottom' : 'right', true);
         const instance = getId(id)?._tippy;
-        instance?.setProps({ trigger: 'mouseenter focus click', hideOnClick: true, maxWidth: 340 });
+        instance?.setProps({
+            trigger: 'mouseenter focus click',
+            hideOnClick: true,
+            maxWidth: Math.min(340, window.innerWidth - 32),
+        });
     }
 }
 

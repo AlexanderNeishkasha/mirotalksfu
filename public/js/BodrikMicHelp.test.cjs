@@ -49,6 +49,8 @@ test('noise mode select is wide and keeps neutral mutually exclusive labels', ()
         css,
         /#micOptionsButton select\.mic-noise-mode-select\s*\{[\s\S]*width: 190px !important[\s\S]*margin: 0 !important[\s\S]*align-self: center/
     );
+    assert.match(css, /#micOptionsButton #noiseSuppressionButton\s*\{[\s\S]*grid-template-columns: minmax\(0, 1fr\)/);
+    assert.match(css, /#micOptionsButton select\.mic-noise-mode-select\s*\{[\s\S]*width: 100% !important/);
     assert.match(css, /#micOptionsButton \.settingsTable td\s*\{[\s\S]*vertical-align: middle/);
     assert.match(css, /#micOptionsButton \.settingsTable td:first-child \.title\s*\{[\s\S]*width: auto/);
     assert.match(css, /\.mic-setting-label\s*\{[\s\S]*justify-content: flex-start[\s\S]*white-space: nowrap/);
@@ -75,5 +77,6 @@ for (const key of [
 
 test('help supports hover, keyboard focus, and mobile tap', () => {
     assert.match(room, /trigger: 'mouseenter focus click'/);
-    assert.match(room, /setTippy\(id, micHelpHtml\(sections\), 'right', true\)/);
+    assert.match(room, /setTippy\(id, micHelpHtml\(sections\), isMobileDevice \? 'bottom' : 'right', true\)/);
+    assert.match(room, /maxWidth: Math\.min\(340, window\.innerWidth - 32\)/);
 });
