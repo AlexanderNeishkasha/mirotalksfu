@@ -75,6 +75,13 @@ for (const key of [
     });
 }
 
+test('help initialization is outside the desktop-only tooltip block', () => {
+    assert.match(
+        room,
+        /setTippy\('participantsHiddenBtn',[\s\S]*?\n    \}\n\n    setMicProcessingHelpTippy\(\);\n    initEnumerateDevices\(\);/
+    );
+});
+
 test('help supports desktop hover/focus and an explicit mobile/tablet tap toggle', () => {
     assert.match(room, /const touchHelp = isMobileDevice \|\| isTabletDevice \|\| isIPadDevice/);
     assert.match(room, /trigger: touchHelp \? 'manual' : 'mouseenter focus'/);

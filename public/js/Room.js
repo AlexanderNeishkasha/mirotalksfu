@@ -333,7 +333,6 @@ async function initClient() {
             'If Active, When a participant speaks, their video will be focused and enlarged',
             'right'
         );
-        setMicProcessingHelpTippy();
         setTippy(
             'switchPushToTalk',
             'If Active, When SpaceBar keydown the microphone will be resumed, on keyup will be paused, like a walkie-talkie',
@@ -390,6 +389,7 @@ async function initClient() {
         setTippy('participantsHiddenBtn', 'Hidden participants', 'bottom');
     }
 
+    setMicProcessingHelpTippy();
     initEnumerateDevices();
     setupInitButtons();
 }
