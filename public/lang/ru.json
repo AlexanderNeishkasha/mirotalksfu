@@ -389,6 +389,9 @@
         "Request camera access": "Запросить доступ к камере"
     },
     "labels": {
+        "Pin Video": "Закрепить видео",
+        "Focus Mode": "Режим фокусировки",
+        "Full Screen": "Полный экран",
         "Off": "Выключено",
         "About noise suppression": "О шумоподавлении",
         "About echo cancellation": "Об эхоподавлении",

@@ -33,6 +33,20 @@ for (const label of [
     });
 }
 
+for (const [label, translated] of [
+    ['Pin Video', 'Закрепить видео'],
+    ['Focus Mode', 'Режим фокусировки'],
+    ['Full Screen', 'Полный экран'],
+]) {
+    test(`camera and screen dropdown label is localized: ${label}`, () => {
+        const ru = JSON.parse(source('lang/ru.json'));
+        const en = JSON.parse(source('lang/en.json'));
+        assert.equal(ru.labels[label], translated);
+        assert.equal(en.labels[label], label);
+        assert.ok(source('js/RoomClient.js').includes(`'${label}'`));
+    });
+}
+
 test('participant-view tooltip uses the requested wording', () => {
     assert.equal(
         JSON.parse(source('lang/ru.json')).tooltips['Change participant view'],

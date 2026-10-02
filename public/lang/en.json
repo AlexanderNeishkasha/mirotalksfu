@@ -389,6 +389,9 @@
         "Request camera access": "Request camera access"
     },
     "labels": {
+        "Pin Video": "Pin Video",
+        "Focus Mode": "Focus Mode",
+        "Full Screen": "Full Screen",
         "Off": "Off",
         "About noise suppression": "About noise suppression",
         "About echo cancellation": "About echo cancellation",
