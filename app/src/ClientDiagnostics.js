@@ -7,6 +7,7 @@ const Logger = require('./Logger');
 const log = new Logger('ClientDiagnostics');
 
 const EVENT_TYPES = new Set([
+    'mic_processing',
     'browser_error',
     'unhandled_rejection',
     'signaling_connect',
@@ -43,6 +44,15 @@ const DETAIL_KEYS = new Set([
     'visibility',
     'phase',
     'retry',
+    'noise_mode',
+    'echo_requested',
+    'gain_requested',
+    'noise_actual',
+    'echo_actual',
+    'gain_actual',
+    'sample_rate',
+    'channel_count',
+    'rnnoise_active',
 ]);
 
 /** Convert untrusted diagnostics to bounded, single-line data without URLs, tokens, candidates or SDP. */
@@ -176,6 +186,15 @@ function registerClientDiagnostics(socket, roomList, store, remoteAddress) {
                     remote_ip: isIP(remoteAddress) ? remoteAddress : undefined,
                     browser: cleanString(peer.peer_info?.browser_name, 40),
                     browser_version: cleanString(peer.peer_info?.browser_version, 40),
+                    os: cleanString(peer.peer_info?.os_name, 60),
+                    os_version: cleanString(peer.peer_info?.os_version, 40),
+                    device_type: peer.peer_info?.is_mobile_device
+                        ? 'mobile'
+                        : peer.peer_info?.is_tablet_device || peer.peer_info?.is_ipad_pro_device
+                          ? 'tablet'
+                          : peer.peer_info?.is_desktop_device
+                            ? 'desktop'
+                            : 'unknown',
                     ...event,
                 });
             } catch (error) {

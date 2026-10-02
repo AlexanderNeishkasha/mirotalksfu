@@ -67,5 +67,65 @@
         }
     }
 
-    root.BodrikNetworkRecovery = { rejoin };
+    /** Recover media in place; elapsed_ms measures this attempt, never a historical signaling disconnect. */
+    async function recover(client) {
+        if (client.isLeaving || client.rejoinInProgress) return;
+        client.rejoinInProgress = true;
+        const reconnectId = client.socket.id;
+        const startedAt = performance.now();
+        console.info('[Recovery] meeting recovery started', {
+            socketId: reconnectId,
+            recovered: client.socket.recovered,
+            elapsedMs: 0,
+        });
+        root.BodrikClientDiagnostics.report('recovery_start', {
+            recovered: Boolean(client.socket.recovered),
+            elapsed_ms: 0,
+            retry: Boolean(client.needsReadmission),
+        });
+        try {
+            if (!client.socket.recovered || client.needsReadmission) {
+                await root.BodrikNetworkRecovery.rejoin(client);
+            } else {
+                const iceRecovered = await client.restartIce();
+                if (!iceRecovered || client.needsReadmission) await root.BodrikNetworkRecovery.rejoin(client);
+                else {
+                    client.socket.emit('getProducers');
+                    try {
+                        await client.reconcileConsumers();
+                    } catch (error) {
+                        console.warn('Initial consumer reconciliation after recovery failed', error);
+                    }
+                    client.startConsumerReconcile();
+                }
+            }
+            if (client.isLeaving || !client.socket.connected || client.socket.id !== reconnectId) return;
+            client.needsReadmission = false;
+            client._isConnected = true;
+            client.recoveryDisconnectedAt = null;
+            startRoomSession();
+            client.closeReconnectAlert(true);
+            console.info('Recovered meeting without reloading the page');
+            root.BodrikClientDiagnostics.report('recovery_success', {
+                recovered: Boolean(client.socket.recovered),
+                elapsed_ms: Math.round(performance.now() - startedAt),
+            });
+        } catch (error) {
+            if (client.isLeaving || !client.socket.connected || client.socket.id !== reconnectId) return;
+            console.error('In-place meeting recovery failed', error);
+            root.BodrikClientDiagnostics.report('recovery_failure', {
+                ...root.BodrikClientDiagnostics.errorDetails(error),
+                elapsed_ms: Math.round(performance.now() - startedAt),
+            });
+            client.needsReadmission = true;
+            client._isConnected = false;
+            client.showMaxAttemptsAlert();
+        } finally {
+            client.rejoinInProgress = false;
+            if (!client.isLeaving && client.socket.connected && client.socket.id !== reconnectId)
+                client.handleReconnect();
+        }
+    }
+
+    root.BodrikNetworkRecovery = { rejoin, recover };
 })(window);

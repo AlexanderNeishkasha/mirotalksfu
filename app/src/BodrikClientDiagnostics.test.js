@@ -28,6 +28,30 @@ for (const { name, event, accepted } of [
     test(`diagnostic event validation: ${name}`, () => assert.equal(Boolean(sanitizeEvent(event)), accepted));
 }
 
+test('microphone diagnostics retain allowlisted settings but reject device identifiers', () => {
+    const event = sanitizeEvent({
+        type: 'mic_processing',
+        details: {
+            noise_mode: 'browser',
+            echo_requested: true,
+            gain_requested: true,
+            noise_actual: true,
+            echo_actual: false,
+            gain_actual: true,
+            rnnoise_active: false,
+            sample_rate: 48000,
+            channel_count: 1,
+            deviceId: 'secret',
+            label: 'private microphone',
+        },
+    });
+    assert.equal(event.details.noise_mode, 'browser');
+    assert.equal(event.details.echo_actual, false);
+    assert.equal(event.details.sample_rate, 48000);
+    assert.equal(event.details.deviceId, undefined);
+    assert.equal(event.details.label, undefined);
+});
+
 test('diagnostic sanitization drops unknown fields and redacts URLs, tokens, candidates and controls', () => {
     const event = sanitizeEvent({
         type: 'browser_error',

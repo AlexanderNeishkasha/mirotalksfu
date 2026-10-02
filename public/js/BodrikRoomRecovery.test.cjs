@@ -7,21 +7,59 @@ const source = fs.readFileSync(require.resolve('./RoomClient.js'), 'utf8');
 const view = fs.readFileSync(require.resolve('../views/Room.html'), 'utf8');
 
 /** Load the production client class without opening a browser or a media device. */
-function recoveryMethods(rejoin) {
+function recoveryMethods(rejoin, clock = () => performance.now()) {
     const events = [];
+    const diagnostics = [];
     const context = {
         console: { info() {}, error() {}, warn() {} },
+        performance: { now: clock },
         VideoAI: { active: false },
         window: {
             BodrikNetworkRecovery: { rejoin },
-            BodrikClientDiagnostics: { report() {}, errorDetails: (error) => ({ message: error.message }) },
+            BodrikClientDiagnostics: {
+                report: (type, details) => diagnostics.push({ type, details }),
+                errorDetails: (error) => ({ message: error.message }),
+            },
         },
         startRoomSession() {
             events.push('session resumed');
         },
     };
+    vm.runInNewContext(fs.readFileSync(require.resolve('./BodrikNetworkRecovery.js'), 'utf8'), context);
+    context.window.BodrikNetworkRecovery.rejoin = rejoin;
     vm.runInNewContext(`${source}; globalThis.RecoveryClient = RoomClient`, context);
-    return { methods: context.RecoveryClient.prototype, events };
+    return { methods: context.RecoveryClient.prototype, events, diagnostics };
+}
+
+for (const [name, staleDisconnect, fails] of [
+    ['initial media failure without signaling loss', undefined, false],
+    ['media failure long after an earlier disconnect', 1, false],
+    ['failed attempt with an old signaling timestamp', 1, true],
+]) {
+    test(`recovery duration uses the current monotonic attempt: ${name}`, async () => {
+        let now = 100;
+        const { methods, diagnostics } = recoveryMethods(
+            async () => {
+                now += 250;
+                if (fails) throw new Error('timeout');
+            },
+            () => now
+        );
+        const client = {
+            socket: { id: 'same', connected: true, recovered: false },
+            recoveryDisconnectedAt: staleDisconnect,
+            closeReconnectAlert() {},
+            showMaxAttemptsAlert() {},
+        };
+        await methods.handleReconnect.call(client);
+        assert.equal(diagnostics[0].details.elapsed_ms, 0);
+        assert.equal(diagnostics[1].details.elapsed_ms, 250);
+        assert.equal(diagnostics[1].type, fails ? 'recovery_failure' : 'recovery_success');
+        if (!fails) assert.equal(client.recoveryDisconnectedAt, null);
+        now += 90000;
+        await methods.handleReconnect.call(client);
+        assert.equal(diagnostics[3].details.elapsed_ms, 250, 'each attempt resets its clock');
+    });
 }
 
 /** An unrecovered signaling socket must re-enter in the same tab, not navigate. */

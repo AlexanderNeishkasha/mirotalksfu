@@ -13,6 +13,15 @@
         'visibility',
         'phase',
         'retry',
+        'noise_mode',
+        'echo_requested',
+        'gain_requested',
+        'noise_actual',
+        'echo_actual',
+        'gain_actual',
+        'sample_rate',
+        'channel_count',
+        'rnnoise_active',
     ]);
     const MAX_QUEUE = 100;
     const queue = [];
@@ -36,6 +45,13 @@
 
     /** Convert browser Errors and arbitrary rejection values into bounded diagnostic details. */
     function errorDetails(error) {
+        if (error && (typeof error.errorCode === 'number' || typeof error.errorText === 'string')) {
+            return {
+                name: 'RTCPeerConnectionIceErrorEvent',
+                code: Number.isFinite(error.errorCode) ? String(error.errorCode) : undefined,
+                message: clean(error.errorText),
+            };
+        }
         if (error instanceof Error || error instanceof DOMException) {
             return {
                 name: clean(error.name, 80),
@@ -139,5 +155,35 @@
         { once: true }
     );
 
-    window.BodrikClientDiagnostics = { attach, setEnabled, report, errorDetails };
+    /** Log only speech-processing preferences and supported raw-track settings, never device IDs/labels. */
+    function reportMic(settings, track, phase, rnnoiseActive = false) {
+        if (!enabled) return;
+        const actual = track?.getSettings?.() || {};
+        report('mic_processing', {
+            phase,
+            noise_mode: ['off', 'browser', 'rnnoise'].includes(settings.mic_noise_suppression_mode)
+                ? settings.mic_noise_suppression_mode
+                : 'unknown',
+            echo_requested: settings.mic_echo_cancellation === true,
+            gain_requested: settings.mic_auto_gain_control === true,
+            noise_actual: actual.noiseSuppression,
+            echo_actual: actual.echoCancellation,
+            gain_actual: actual.autoGainControl,
+            sample_rate: actual.sampleRate,
+            channel_count: actual.channelCount,
+            rnnoise_active: rnnoiseActive,
+        });
+    }
+
+    /** Snapshot raw capture rather than synthesized RNNoise output when reporting microphone startup. */
+    function reportCapture(settings, processor, track) {
+        reportMic(
+            settings,
+            processor?.mediaStream?.getAudioTracks()[0] || track,
+            'capture',
+            processor?.isProcessing === true
+        );
+    }
+
+    window.BodrikClientDiagnostics = { attach, setEnabled, report, errorDetails, reportMic, reportCapture };
 })();

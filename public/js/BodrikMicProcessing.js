@@ -12,6 +12,14 @@ async function setBodrikMicPreference({ key, constraint, enabled, input, setting
         }
         settings[key] = enabled;
         storage.setSettings(settings);
+        if (typeof window !== 'undefined') {
+            window.BodrikClientDiagnostics?.reportMic(
+                settings,
+                track,
+                'preference',
+                roomClient?.RNNoiseProcessor?.isProcessing === true
+            );
+        }
     } catch (error) {
         input.checked = settings[key] === true;
         throw error;

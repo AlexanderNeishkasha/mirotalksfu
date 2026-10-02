@@ -1617,60 +1617,9 @@ class RoomClient {
         this.attemptReconnect(attempt);
     }
 
+    /** Recover this meeting in place with a fresh per-attempt diagnostic timer. */
     async handleReconnect() {
-        if (this.isLeaving || this.rejoinInProgress) return;
-        this.rejoinInProgress = true;
-        const reconnectId = this.socket.id;
-        console.info('[Recovery] meeting recovery started', {
-            socketId: reconnectId,
-            recovered: this.socket.recovered,
-            elapsedMs: Date.now() - this.recoveryDisconnectedAt,
-        });
-        window.BodrikClientDiagnostics.report('recovery_start', {
-            recovered: Boolean(this.socket.recovered),
-            elapsed_ms: Date.now() - this.recoveryDisconnectedAt,
-            retry: Boolean(this.needsReadmission),
-        });
-        try {
-            if (!this.socket.recovered || this.needsReadmission) {
-                await window.BodrikNetworkRecovery.rejoin(this);
-            } else {
-                const iceRecovered = await this.restartIce();
-                if (!iceRecovered || this.needsReadmission) await window.BodrikNetworkRecovery.rejoin(this);
-                else {
-                    this.socket.emit('getProducers');
-                    try {
-                        await this.reconcileConsumers();
-                    } catch (error) {
-                        console.warn('Initial consumer reconciliation after recovery failed', error);
-                    }
-                    this.startConsumerReconcile();
-                }
-            }
-            if (this.isLeaving || !this.socket.connected || this.socket.id !== reconnectId) return;
-            this.needsReadmission = false;
-            this._isConnected = true;
-            startRoomSession();
-            this.closeReconnectAlert(true);
-            console.info('Recovered meeting without reloading the page');
-            window.BodrikClientDiagnostics.report('recovery_success', {
-                recovered: Boolean(this.socket.recovered),
-                elapsed_ms: Date.now() - this.recoveryDisconnectedAt,
-            });
-        } catch (error) {
-            if (this.isLeaving || !this.socket.connected || this.socket.id !== reconnectId) return;
-            console.error('In-place meeting recovery failed', error);
-            window.BodrikClientDiagnostics.report('recovery_failure', {
-                ...window.BodrikClientDiagnostics.errorDetails(error),
-                elapsed_ms: Date.now() - this.recoveryDisconnectedAt,
-            });
-            this.needsReadmission = true;
-            this._isConnected = false;
-            this.showMaxAttemptsAlert();
-        } finally {
-            this.rejoinInProgress = false;
-            if (!this.isLeaving && this.socket.connected && this.socket.id !== reconnectId) this.handleReconnect();
-        }
+        await window.BodrikNetworkRecovery.recover(this);
     }
 
     /** Retry signaling or readmit this tab without navigating to a pre-join screen. */
@@ -2005,7 +1954,7 @@ class RoomClient {
                 }
             }
 
-            console.log(`${type} settings ->`, track.getSettings());
+            if (audio) window.BodrikClientDiagnostics.reportCapture(localStorageSettings, this.RNNoiseProcessor, track);
 
             const params = {
                 track,
@@ -2457,6 +2406,7 @@ class RoomClient {
         localStorageSettings.mic_noise_suppression_mode = 'browser';
         lS.setSettings(localStorageSettings);
         if (typeof noiseSuppressionMode !== 'undefined') noiseSuppressionMode.value = 'browser';
+        window.BodrikClientDiagnostics.reportMic(localStorageSettings, null, 'rnnoise_fallback');
         userLog('warning', 'RNNoise is unavailable. Browser noise suppression is enabled.', 'top-end', 6000);
     }
 

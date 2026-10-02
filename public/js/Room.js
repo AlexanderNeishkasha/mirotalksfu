@@ -3040,6 +3040,7 @@ function handleSelects() {
         if (mode === 'rnnoise' && !BUTTONS.settings.customNoiseSuppression) mode = 'browser';
         localStorageSettings.mic_noise_suppression_mode = mode;
         lS.setSettings(localStorageSettings);
+        window.BodrikClientDiagnostics.reportMic(localStorageSettings, null, 'noise_preference');
         noiseSuppressionMode.value = mode;
         if (rc.producerExist(RoomClient.mediaType.audio)) {
             rc.closeThenProduce(RoomClient.mediaType.audio, microphoneSelect.value);

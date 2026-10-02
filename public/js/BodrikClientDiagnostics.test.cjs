@@ -49,6 +49,100 @@ function harness() {
     };
 }
 
+for (const mode of ['off', 'browser', 'rnnoise']) {
+    test(`microphone diagnostic records ${mode} without device identifiers`, () => {
+        const h = harness();
+        h.socketHandlers.get('bodrikDiagnosticsReady')();
+        h.api.reportMic(
+            { mic_noise_suppression_mode: mode, mic_echo_cancellation: true, mic_auto_gain_control: false },
+            {
+                getSettings: () => ({
+                    noiseSuppression: false,
+                    echoCancellation: true,
+                    autoGainControl: false,
+                    sampleRate: 48000,
+                    channelCount: 1,
+                    deviceId: 'private',
+                    groupId: 'private',
+                }),
+            },
+            'capture',
+            mode === 'rnnoise'
+        );
+        h.runTimer();
+        const event = h.emitted[0].payload[0];
+        assert.equal(event.type, 'mic_processing');
+        assert.equal(event.details.noise_mode, mode);
+        assert.equal(event.details.echo_actual, true);
+        assert.equal(event.details.gain_actual, false);
+        assert.equal(event.details.deviceId, undefined);
+        assert.equal(event.details.groupId, undefined);
+        assert.equal(event.details.rnnoise_active, mode === 'rnnoise');
+    });
+}
+
+test('missing track settings remain unknown and disabled collection never reads the track', () => {
+    const h = harness();
+    h.socketHandlers.get('bodrikDiagnosticsReady')();
+    h.api.reportMic({}, null, 'rnnoise_fallback');
+    h.runTimer();
+    assert.equal(h.emitted[0].payload[0].details.echo_actual, undefined);
+    h.api.setEnabled(false);
+    h.api.reportMic(
+        {},
+        {
+            getSettings() {
+                throw new Error('must not read');
+            },
+        },
+        'capture'
+    );
+});
+
+test('RNNoise diagnostics use raw input settings rather than processed output', () => {
+    const h = harness();
+    h.socketHandlers.get('bodrikDiagnosticsReady')();
+    h.api.reportCapture(
+        { mic_noise_suppression_mode: 'rnnoise' },
+        {
+            isProcessing: true,
+            mediaStream: { getAudioTracks: () => [{ getSettings: () => ({ echoCancellation: true }) }] },
+        },
+        { getSettings: () => ({ echoCancellation: false }) }
+    );
+    h.runTimer();
+    assert.equal(h.emitted[0].payload[0].details.echo_actual, true);
+    assert.equal(h.emitted[0].payload[0].details.rnnoise_active, true);
+});
+
+for (const [name, error, code, message] of [
+    ['TURN error', { errorCode: 401, errorText: 'Unauthorized' }, '401', 'Unauthorized'],
+    ['unreachable server', { errorCode: 701, errorText: 'Server unreachable' }, '701', 'Server unreachable'],
+    ['missing code', { errorText: 'Failure' }, undefined, 'Failure'],
+    ['missing text', { errorCode: 701 }, '701', undefined],
+]) {
+    test(`ICE event details preserve meaningful code and text: ${name}`, () => {
+        const h = harness();
+        const details = h.api.errorDetails({ ...error, url: 'turn:private', address: 'private', port: 5349 });
+        assert.equal(details.code, code);
+        assert.equal(details.message, message);
+        assert.equal(details.name, 'RTCPeerConnectionIceErrorEvent');
+        assert.equal(details.url, undefined);
+        assert.equal(details.address, undefined);
+        assert.equal(details.port, undefined);
+    });
+}
+
+test('ICE error text remains bounded and redacted', () => {
+    const details = harness().api.errorDetails({
+        errorCode: 701,
+        errorText: 'https://secret.test token=secret\n' + 'x'.repeat(500),
+    });
+    assert.ok(details.message.length <= 240);
+    assert.equal(details.message.includes('secret'), false);
+    assert.equal(details.message.includes('\n'), false);
+});
+
 test('diagnostics stay disabled until the joined server opts in', () => {
     const h = harness();
     h.api.setEnabled(false);
@@ -125,6 +219,9 @@ test('room loads diagnostics before RoomClient and instruments connection recove
         'recovery_success',
         'recovery_failure',
     ]) {
-        assert.ok(client.includes(`report('${event}'`), event);
+        const implementation = event.startsWith('recovery_')
+            ? readFileSync(join(__dirname, 'BodrikNetworkRecovery.js'), 'utf8')
+            : client;
+        assert.ok(implementation.includes(`report('${event}'`), event);
     }
 });
