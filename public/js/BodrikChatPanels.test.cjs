@@ -29,7 +29,6 @@ function panels(mobile, tablet = false) {
         window: { innerWidth: mobile ? 390 : 1262, innerHeight: 624 },
         isDesktopDevice: !mobile && !tablet,
         isParticipantsListOpen: false,
-        isChatPinEnabled: true,
         BUTTONS: { main: { chatButton: true }, chat: { chatMaxButton: true } },
         chatMinButton: {},
         chatMaxButton: {},

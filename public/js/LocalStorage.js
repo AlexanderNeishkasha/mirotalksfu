@@ -19,7 +19,6 @@ class LocalStorage {
         this.SFU_SETTINGS = {
             share_on_join: true, // popup message on join
             show_chat_on_msg: false, // keep chat closed when a new message arrives
-            speech_in_msg: false, // speech incoming message
             moderator_video_start_privacy: false, // Everyone starts video in privacy mode
             moderator_audio_start_muted: false, // Everyone starts muted in the room
             moderator_video_start_hidden: false, // Everyone starts hidden in the room
@@ -46,7 +45,6 @@ class LocalStorage {
             sounds: true, // room notify sounds
             show_camera_off_participants: true, // show participants with the camera off in the grid
             keep_buttons_visible: true, // Keep buttons always visible
-            chat_pin: true, // Auto pin chat on open
             keyboard_shortcuts: false, // keyboard shortcuts
             host_only_recording: false, // presenter
             video_obj_fit: 2, // cover
@@ -154,7 +152,6 @@ class LocalStorage {
         const migrations = [
             ['BODRIK_NOISE_DEFAULT_OFF_V1', 'mic_noise_suppression'],
             ['BODRIK_CHAT_AUTO_OPEN_OFF_V1', 'show_chat_on_msg'],
-            ['BODRIK_CHAT_AUTO_PIN_ON_V1', 'chat_pin', true],
         ];
         for (const [key, setting, value = false] of migrations) {
             if (localStorage.getItem(key)) continue;

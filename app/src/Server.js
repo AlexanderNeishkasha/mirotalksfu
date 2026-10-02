@@ -62,6 +62,7 @@ const express = require('express');
 
 const { admittedPeer } = require('./BodrikJoinDiagnostics');
 const { registerPageRoutes } = require('./BodrikPageRoutes');
+const { registerRoomChat } = require('./BodrikRoomChat');
 const { DiagnosticStore, registerClientDiagnostics } = require('./ClientDiagnostics');
 
 const cors = require('cors');
@@ -244,13 +245,6 @@ const restApi = {
 const webhook = {
     enabled: config?.integrations?.webhook?.enabled || false,
     url: config?.integrations?.webhook?.url || 'http://localhost:8888/webhook-endpoint',
-};
-
-// Stats
-const defaultStats = {
-    enabled: true,
-    src: 'https://stats.mirotalk.com/script.js',
-    id: '41d26670-f275-45bb-af82-3ce91fe57756',
 };
 
 // directory
@@ -527,13 +521,6 @@ function startServer() {
     // privacy policy
     app.get('/privacy', (req, res) => {
         res.sendFile(views.privacy);
-    });
-
-    // Get stats endpoint
-    app.get('/stats', (req, res) => {
-        const stats = config?.features?.stats || defaultStats;
-        // log.debug('Send stats', stats);
-        res.send(stats);
     });
 
     // handle who are you: Presenter or Guest
@@ -871,13 +858,11 @@ function startServer() {
 
             // Monitoring & Analytics
             monitoring: {
-                stats: config.features?.stats?.enabled ? config.features.stats : false,
                 system_info: config.system?.info,
             },
 
             // Features & Functionality
             features: {
-                survey: config.features?.survey?.enabled ? config.features.survey : false,
                 redirect: config.features?.redirect?.enabled ? config.features.redirect : false,
             },
 
@@ -1027,6 +1012,7 @@ function startServer() {
     // ####################################################
 
     io.on('connection', (socket) => {
+        registerRoomChat(socket, roomList, log);
         recoveryGrace.cancel(socket.id);
         if (clientDiagnostics) registerClientDiagnostics(socket, roomList, clientDiagnostics, getIpSocket(socket));
         log.info('[Recovery] socket connected', {
@@ -1544,111 +1530,6 @@ function startServer() {
                 }
 
                 callback({ error: err.message, code: err.code, retryable: err.retryable });
-            }
-        });
-
-        // ####################################################
-        // DATA CHANNEL (DataProducer / DataConsumer)
-        // ####################################################
-
-        socket.on('produceData', async ({ transportId, sctpStreamParameters, label, protocol, appData }, callback) => {
-            if (!roomExists(socket)) {
-                return callback({ error: 'Room not found' });
-            }
-
-            const { room, peer } = getRoomAndPeer(socket);
-
-            if (!peer) {
-                return callback({ error: 'Peer not found' });
-            }
-
-            if (isPeerInLobby(peer)) {
-                return callback({ error: 'In lobby' });
-            }
-
-            const peerInfo = getPeerInfo(peer);
-
-            try {
-                const dataProducerId = await room.produceData(
-                    socket.id,
-                    transportId,
-                    sctpStreamParameters,
-                    label,
-                    protocol,
-                    appData
-                );
-
-                log.debug('ProduceData', {
-                    dataProducer_id: dataProducerId,
-                    peer_id: socket.id,
-                    label: label,
-                    peerInfo: peerInfo,
-                });
-
-                callback({ id: dataProducerId });
-            } catch (err) {
-                log.warn('ProduceData error', {
-                    error: err.message,
-                    peerInfo,
-                });
-                callback({ error: err.message });
-            }
-        });
-
-        socket.on('consumeData', async ({ consumerTransportId, dataProducerId }, callback) => {
-            if (!roomExists(socket)) {
-                return callback({ error: 'Room not found' });
-            }
-
-            const { room, peer } = getRoomAndPeer(socket);
-
-            if (!peer) {
-                return callback({ error: 'Peer not found' });
-            }
-
-            if (isPeerInLobby(peer)) {
-                return callback({ error: 'In lobby' });
-            }
-
-            const peerInfo = getPeerInfo(peer);
-
-            try {
-                const params = await room.consumeData(socket.id, consumerTransportId, dataProducerId);
-
-                log.debug('ConsumeData', {
-                    dataProducer_id: dataProducerId,
-                    dataConsumer_id: params ? params.id : undefined,
-                    peerInfo: peerInfo,
-                });
-
-                callback(params);
-            } catch (err) {
-                log.warn('ConsumeData error', {
-                    error: err.message,
-                    consumerTransportId,
-                    dataProducerId,
-                    peerInfo,
-                });
-                callback({ error: err.message });
-            }
-        });
-
-        socket.on('getDataProducers', () => {
-            if (!roomExists(socket)) return;
-
-            const { room, peer } = getRoomAndPeer(socket);
-
-            if (isPeerInLobby(peer)) return;
-
-            const peerInfo = getPeerInfo(peer);
-
-            log.debug('Get Data Producers', peerInfo);
-
-            const dataProducerList = room.getDataProducerListForPeer(socket.id);
-
-            // Notify the requesting peer about existing data producers
-            for (const dataProducerInfo of dataProducerList) {
-                socket.emit('newDataProducer', dataProducerInfo);
             }
         });
 
@@ -2360,58 +2241,6 @@ function startServer() {
             };
             log.debug('Refresh Participants count', data);
             room.broadCast(socket.id, 'refreshParticipantsCount', data);
-        });
-
-        socket.on('message', (dataObject) => {
-            if (!roomExists(socket)) return;
-
-            const data = checkXSS(dataObject);
-
-            if (!Validator.isValidData(data)) return;
-
-            const { room, peer } = getRoomAndPeer(socket);
-
-            const { peer_name } = peer || 'undefined';
-
-            const realPeer = data.peer_name === peer_name;
-
-            if (!realPeer) {
-                log.warn('Fake message detected', {
-                    ip: getIpSocket(socket),
-                    realFrom: peer_name,
-                    fakeFrom: data.peer_name,
-                    msg: data.peer_msg,
-                });
-                return;
-            }
-
-            log.debug('message', data);
-
-            // Enforce moderator chat restrictions server-side
-            const isPublicMessage = data.to_peer_id === 'all';
-
-            if (room._moderator) {
-                if (isPublicMessage && room._moderator.chat_cant_publicly) {
-                    log.debug('Blocking public message: disabled by moderator', { peer_name });
-                    return;
-                }
-                if (!isPublicMessage && room._moderator.chat_cant_privately) {
-                    log.debug('Blocking private message: disabled by moderator', { peer_name });
-                    return;
-                }
-            }
-
-            data.to_peer_id == 'all'
-                ? room.broadCast(socket.id, 'message', data)
-                : room.sendTo(data.to_peer_id, 'message', data);
-        });
-
-        socket.on('chatReaction', (dataObject) => {
-            if (!roomExists(socket)) return;
-            const data = checkXSS(dataObject);
-            if (!Validator.isValidData(data)) return;
-            const { room } = getRoomAndPeer(socket);
-            room.broadCast(socket.id, 'chatReaction', data);
         });
 
         socket.on('disconnect', (reason) => {

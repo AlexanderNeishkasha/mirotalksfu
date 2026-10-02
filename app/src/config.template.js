@@ -673,26 +673,6 @@ module.exports = {
 
     features: {
         /**
-         * Survey Configuration (QuestionPro)
-         * =================================
-         * Settings for user feedback and survey integration
-         *
-         * Setup Instructions:
-         * ------------------
-         * 1. Sign up at https://www.questionpro.com/
-         * 2. Create survey:
-         *    - Use template or custom questions
-         *    - Configure survey logic and branching
-         * 3. Get survey URL:
-         *    - Publish survey
-         *    - Copy "Collect Responses" link
-         */
-        survey: {
-            enabled: process.env.SURVEY_ENABLED === 'true',
-            url: process.env.SURVEY_URL || '',
-        },
-
-        /**
          * Post-Call Redirect
          * ---------------------
          * - enabled: Redirect after call ends
@@ -712,38 +692,6 @@ module.exports = {
         createRoomRateLimit: {
             windowMs: Math.max(parseInt(process.env.CREATE_ROOM_RATE_LIMIT_WINDOW_MINUTES, 10) || 1, 1) * 60 * 1000,
             max: Math.max(parseInt(process.env.CREATE_ROOM_RATE_LIMIT_MAX, 10) || 10, 1),
-        },
-
-        /**
-         * Usage Statistics Configuration (Umami)
-         * =====================================
-         * Privacy-focused analytics tracking for service improvement
-         *
-         * Setup Instructions:
-         * ------------------
-         * 1. Self-host Umami or use cloud version:
-         *    - GitHub: https://github.com/umami-software/umami
-         *    - Official Docs: https://umami.is/docs
-         * 2. Create website entry in Umami dashboard
-         * 3. Obtain tracking script URL and website ID
-         *
-         * Privacy & Security:
-         * ------------------
-         * - No cookies used (GDPR compliant)
-         * - No persistent user tracking
-         * - All data aggregated and anonymized
-         * - Self-hosted option keeps data in your infrastructure
-         *
-         * Core Settings:
-         * -------------
-         * - enabled      : Enable/disable analytics [true/false] (default: true)
-         * - src          : Umami tracking script URL
-         * - id           : Your website ID from Umami
-         */
-        stats: {
-            enabled: process.env.STATS_ENABLED !== 'false',
-            src: process.env.STATS_SRC || 'https://stats.mirotalk.com/script.js',
-            id: process.env.STATS_ID || '41d26670-f275-45bb-af82-3ce91fe57756',
         },
     },
 
@@ -828,7 +776,6 @@ module.exports = {
                 'score', // Network score calculations
                 'simulcast', // Simulcast layers
                 'svc', // Scalable Video Coding
-                'sctp', // SCTP data channels
             ],
         },
         numWorkers: NUM_WORKERS, // Number of mediasoup worker processes to create
@@ -1043,17 +990,8 @@ module.exports = {
             minimumAvailableOutgoingBitrate: 1000000, // 1 Mbps minimum guaranteed
             maxIncomingBitrate: 3000000, // 3 Mbps max per producer
 
-            /**
-             * Data Channel Settings (mediasoup 3.20.0+)
-             * - maxSendMessageSize    : Max size for outgoing SCTP messages (data channels)
-             * - maxReceiveMessageSize : Max size for incoming SCTP messages (data channels)
-             * Replaces the legacy `maxSctpMessageSize` / `numSctpStreams` options.
-             * Kubernetes implications:
-             * - Affects memory allocation per transport
-             * - Larger sizes may require Pod resource adjustments
-             */
-            maxSendMessageSize: 262144, // 256 KB max outgoing data-channel message size
-            maxReceiveMessageSize: 262144, // 256 KB max incoming data-channel message size
+            // 256 KB max outgoing data-channel message size
+            // 256 KB max incoming data-channel message size
         },
     },
 };

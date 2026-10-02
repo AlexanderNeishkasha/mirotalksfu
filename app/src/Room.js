@@ -51,7 +51,7 @@ module.exports = class Room {
             chat_cant_publicly: false,
         };
         this._followMe = null;
-        this.survey = config?.features?.survey;
+
         this.redirect = config?.features?.redirect;
 
         this.peers = new Map();
@@ -88,7 +88,7 @@ module.exports = class Room {
             hostProtected: this.isHostProtected,
             moderator: this._moderator,
             followMe: this._followMe,
-            survey: this.survey,
+
             redirect: this.redirect,
 
             dominantSpeaker: this.activeSpeakerObserverEnabled,
@@ -451,14 +451,9 @@ module.exports = class Room {
     // WebRTC TRANSPORT
     // ####################################################
 
+    /** Configure RTP/RTCP media transport and keep SCTP disabled for Socket.IO-only chat. */
     getWebRtcTransportOptions() {
-        const {
-            iceConsentTimeout = 35,
-            initialAvailableOutgoingBitrate,
-            listenInfos,
-            maxSendMessageSize = 262144,
-            maxReceiveMessageSize = 262144,
-        } = this.webRtcTransport;
+        const { iceConsentTimeout = 35, initialAvailableOutgoingBitrate, listenInfos } = this.webRtcTransport;
         return {
             ...(this.webRtcServerActive ? { webRtcServer: this.webRtcServer } : { listenInfos: listenInfos }),
             enableUdp: true,
@@ -466,11 +461,7 @@ module.exports = class Room {
             preferUdp: true,
             iceConsentTimeout,
             initialAvailableOutgoingBitrate,
-            enableSctp: true,
-            // mediasoup 3.20.0: numSctpStreams/maxSctpMessageSize removed;
-            // use maxSendMessageSize / maxReceiveMessageSize instead.
-            maxSendMessageSize,
-            maxReceiveMessageSize,
+            enableSctp: false,
         };
     }
 
@@ -502,7 +493,7 @@ module.exports = class Room {
             throw new Error('Transport is already closed');
         }
 
-        const { id, type, iceParameters, iceCandidates, dtlsParameters, sctpParameters } = transport;
+        const { id, type, iceParameters, iceCandidates, dtlsParameters } = transport;
         const { maxIncomingBitrate, minimumAvailableOutgoingBitrate } = this.webRtcTransport;
 
         if (maxIncomingBitrate) {
@@ -604,14 +595,6 @@ module.exports = class Room {
             }
         });
 
-        transport.on('sctpstatechange', (sctpState) => {
-            log.debug('SCTP state changed', {
-                peer_name: peer_name,
-                transport_id: id,
-                sctpState: sctpState,
-            });
-        });
-
         transport.on('dtlsstatechange', (dtlsState) => {
             if (dtlsState === 'failed' || dtlsState === 'closed') {
                 log.warn('DTLS state changed, closing peer', {
@@ -630,7 +613,7 @@ module.exports = class Room {
             iceParameters: iceParameters,
             iceCandidates: iceCandidates,
             dtlsParameters: dtlsParameters,
-            sctpParameters: sctpParameters,
+
             ...createTurnTransportOptions(socket_id),
         };
     }
@@ -858,157 +841,7 @@ module.exports = class Room {
         return params;
     }
 
-    // ####################################################
-    // PRODUCE DATA (DataChannel)
-    // ####################################################
-
-    async produceData(socket_id, transportId, sctpStreamParameters, label, protocol, appData) {
-        if (!socket_id || !transportId || !sctpStreamParameters) {
-            throw new Error('Missing required parameters for producing data');
-        }
-
-        if (!this.peers.has(socket_id)) {
-            throw new Error(`Peer with socket ID ${socket_id} not found in the room`);
-        }
-
-        const peer = this.getPeer(socket_id);
-        const { peer_name, peer_info } = peer;
-
-        if (!peer.hasTransport(transportId)) {
-            throw new Error(`Transport with ID ${transportId} not found for peer ${socket_id}`);
-        }
-
-        let dataProducer;
-        try {
-            dataProducer = await peer.createDataProducer(transportId, sctpStreamParameters, label, protocol, appData);
-        } catch (error) {
-            log.error(`Error creating data producer for peer ${peer_name} with socket ID ${socket_id}`, {
-                transportId,
-                label,
-                error: error.message,
-            });
-            throw new Error(`Failed to create data producer for peer ${peer_name} with transport ID ${transportId}`);
-        }
-
-        if (!dataProducer) {
-            throw new Error(`Failed to create data producer for peer ${peer_name} with transport ID ${transportId}`);
-        }
-
-        // Notify other peers about the new data producer
-        this.broadCast(socket_id, 'newDataProducer', {
-            dataProducerId: dataProducer.id,
-            peer_id: socket_id,
-            peer_name: peer_name,
-            peer_info: peer_info,
-            label: dataProducer.label,
-        });
-
-        log.debug('DataProducer created successfully', {
-            transportId,
-            dataProducer_id: dataProducer.id,
-            peer_name,
-            label: dataProducer.label,
-        });
-
-        return dataProducer.id;
-    }
-
-    // ####################################################
-    // CONSUME DATA (DataChannel)
-    // ####################################################
-
-    async consumeData(socket_id, consumerTransportId, dataProducerId) {
-        if (!socket_id || !consumerTransportId || !dataProducerId) {
-            throw new Error('Missing required parameters for consuming data');
-        }
-
-        if (!this.peers.has(socket_id)) {
-            throw new Error(`Peer with socket ID ${socket_id} not found in the room`);
-        }
-
-        const peer = this.getPeer(socket_id);
-        const { peer_name } = peer;
-
-        let result;
-        try {
-            result = await peer.createDataConsumer(consumerTransportId, dataProducerId);
-        } catch (error) {
-            const logDetails = {
-                consumerTransportId,
-                dataProducerId,
-                error: error.message,
-            };
-            // Transient races (producer/transport already closed) are expected, not real errors
-            error.transient
-                ? log.warn(`Skipped data consumer for peer ${peer_name} with socket ID ${socket_id}`, logDetails)
-                : log.error(
-                      `Error creating data consumer for peer ${peer_name} with socket ID ${socket_id}`,
-                      logDetails
-                  );
-
-            const wrapped = new Error(
-                `Failed to create data consumer for peer ${peer_name} with transport ID ${consumerTransportId}: ${error.message}`
-            );
-            wrapped.transient = error.transient;
-            throw wrapped;
-        }
-
-        if (!result) {
-            throw new Error(
-                `Data consumer creation failed for peer ${peer_name} with transport ID ${consumerTransportId}`
-            );
-        }
-
-        const { dataConsumer, params } = result;
-
-        dataConsumer.once('dataproducerclose', () => {
-            log.debug('DataConsumer closed due to "dataproducerclose" event', {
-                dataConsumer_id: dataConsumer.id,
-                dataProducer_id: dataProducerId,
-                peer_name,
-            });
-
-            peer.removeDataConsumer(dataConsumer.id);
-
-            this.send(socket_id, 'dataConsumerClosed', {
-                dataConsumer_id: dataConsumer.id,
-            });
-        });
-
-        const consumerTransport = peer.getTransport(consumerTransportId);
-
-        log.debug('DataConsumer created successfully', {
-            consumerTransportId,
-            dataConsumer_id: dataConsumer.id,
-            dataProducer_id: dataProducerId,
-            peer_name,
-            label: dataConsumer.label,
-            transport_state: consumerTransport
-                ? `ICE:${consumerTransport.iceState}, DTLS:${consumerTransport.dtlsState}`
-                : 'unknown',
-        });
-
-        return params;
-    }
-
     // Get list of data producers for a peer (excluding their own)
-    getDataProducerListForPeer(socket_id) {
-        const dataProducerList = [];
-        this.peers.forEach((peer, peerId) => {
-            if (peerId === socket_id) return;
-            const { peer_name, peer_info } = peer;
-            peer.dataProducers.forEach((dataProducer) => {
-                dataProducerList.push({
-                    dataProducerId: dataProducer.id,
-                    peer_id: peerId,
-                    peer_name: peer_name,
-                    peer_info: peer_info,
-                    label: dataProducer.label,
-                });
-            });
-        });
-        return dataProducerList;
-    }
 
     // ####################################################
     // HANDLE BANNED PEERS

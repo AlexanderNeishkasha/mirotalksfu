@@ -72,7 +72,10 @@ test('URL media sharing is retired end to end, without retiring screen sharing o
     assert.match(source('public/views/Room.html'), /id="startScreenButton"/);
     const context = {};
     vm.runInNewContext(`${client}; globalThis.Client = RoomClient`, context);
-    // Chat embeds still depend on these shared URL helpers.
-    assert.equal(context.Client.prototype.getVideoType('https://example.com/video.mp4'), 'video/mp4');
-    assert.equal(typeof context.Client.prototype.getYoutubeEmbed, 'function');
+    // Link/image rendering remains, but the unused media-embed chain is removed.
+    for (const name of ['getIframe', 'getVideoType', 'getYoutubeEmbed']) {
+        assert.equal(typeof context.Client.prototype[name], 'undefined', name);
+    }
+    assert.equal(typeof context.Client.prototype.getLink, 'function');
+    assert.equal(typeof context.Client.prototype.getImage, 'function');
 });

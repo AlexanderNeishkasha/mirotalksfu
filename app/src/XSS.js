@@ -75,7 +75,7 @@ function safeDecodeURIComponent(str) {
     try {
         return decodeURIComponent(str);
     } catch (e) {
-        log.error('Malformed URI component detected:', str);
+        log.error('Malformed URI component detected');
         return str; // Return original string if decoding fails
     }
 }

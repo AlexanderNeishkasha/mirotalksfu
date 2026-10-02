@@ -27,7 +27,6 @@
         <!-- Js scripts -->
 
         <script defer src="../js/Brand.js"></script>
-        <script async src="../js/Stats.js"></script>
 
         <script src="https://unpkg.com/animejs@3.0.1/lib/anime.min.js"></script>
         <script src="https://unpkg.com/scrollreveal@4.0.0/dist/scrollreveal.min.js"></script>
@@ -91,9 +90,6 @@
                                     <strong>Everything is ephemeral.</strong> Display names, chat messages, and session
                                     data only exist while the room is active — once it ends, they're gone. Nothing is
                                     stored on our servers afterward.<br /><br />
-                                    <strong>Anonymized stats only:</strong> We pick up anonymized usage statistics (page
-                                    views, browser type, OS) through our privacy-friendly analytics. No personally
-                                    identifiable information is collected or stored.<br /><br />
                                     <strong>Things we never touch:</strong> We don't record your calls, we don't ask for
                                     payment info or government IDs, and we don't collect sensitive personal data. Your
                                     conversations are yours.
@@ -107,29 +103,23 @@
                                         >Blob</a
                                     >) and downloaded straight to your device. It is
                                     <strong>never uploaded to our servers</strong>.<br /><br />
-                                    Server-side recording is <strong>disabled by default</strong>. If the host enables
-                                    it, the recordings are persistently stored on the server or cloud storage (if
-                                    configured). It is the host's responsibility to manage, secure, and delete those
-                                    recordings. Please remember: if you record other people, make sure you have their
-                                    consent — it's the right thing to do (and usually the law).
+                                    Recordings are not uploaded to the meeting server. Please remember: if you record
+                                    other people, make sure you have their consent — it's the right thing to do (and
+                                    usually the law).
                                 </p>
 
-                                <h3>4. Cookies &amp; Analytics</h3>
+                                <h3>4. Local Preferences</h3>
                                 <p class="hero-paragraph">
-                                    We use <strong>Umami</strong>, a privacy-friendly analytics tool that doesn't use
-                                    cookies and doesn't collect personally identifiable information. It's fully
-                                    compliant with GDPR, CCPA, and PECR.<br /><br />
-                                    The app may store small bits of data in your browser (like your display name or room
-                                    preferences) to make things easier for you. This is purely functional — no tracking
-                                    involved.
+                                    The app may store small bits of data in your browser, such as your display name or
+                                    room preferences, to make things easier for you. This is functional storage, not
+                                    external analytics or advertising tracking.
                                 </p>
 
                                 <h3>5. How Long We Keep Data</h3>
                                 <p class="hero-paragraph">
-                                    Server logs are displayed in real-time on the console and are not stored on disk. By
-                                    default, only error-level logs are enabled. Chat messages and session data disappear
-                                    when the room ends — we don't hold onto them unless the host has explicitly set up
-                                    persistence.
+                                    Chat messages and session state disappear when the room ends. Temporary operational
+                                    connection diagnostics may be retained for a limited investigation period; they do
+                                    not contain chat text, credentials, SDP or ICE candidates.
                                 </p>
 
                                 <h3>6. How We Protect Your Data</h3>

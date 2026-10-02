@@ -67,42 +67,6 @@ describe('test-Room', () => {
         consumeError.should.have.property('retryable', false);
     });
 
-    it('removes and reports a data consumer when its data producer closes', async () => {
-        const room = Object.create(Room.prototype);
-        const dataConsumer = Object.assign(new EventEmitter(), {
-            id: 'data-consumer-id',
-            label: 'chat',
-        });
-        let removedConsumerId;
-        let notification;
-        const peer = {
-            peer_name: 'Consumer',
-            createDataConsumer: async () => ({
-                dataConsumer,
-                params: { id: dataConsumer.id },
-            }),
-            removeDataConsumer: (id) => {
-                removedConsumerId = id;
-            },
-            getTransport: () => ({ iceState: 'connected', dtlsState: 'connected' }),
-        };
-
-        room.peers = new Map([['consumer-peer-id', peer]]);
-        room.send = (socketId, action, data) => {
-            notification = { socketId, action, data };
-        };
-
-        await room.consumeData('consumer-peer-id', 'transport-id', 'data-producer-id');
-        dataConsumer.emit('dataproducerclose');
-
-        removedConsumerId.should.equal(dataConsumer.id);
-        notification.should.deepEqual({
-            socketId: 'consumer-peer-id',
-            action: 'dataConsumerClosed',
-            data: { dataConsumer_id: dataConsumer.id },
-        });
-    });
-
     it('does not become ready until its router has been created', async () => {
         const room = Object.create(Room.prototype);
         let resolveRouter;
@@ -144,7 +108,6 @@ describe('test-Room', () => {
             iceParameters: {},
             iceCandidates: [],
             dtlsParameters: {},
-            sctpParameters: {},
             observer: new EventEmitter(),
             setMinOutgoingBitrate: async (bitrate) => {
                 minimumBitrate = bitrate;

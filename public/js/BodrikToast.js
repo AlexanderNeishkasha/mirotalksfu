@@ -30,7 +30,6 @@
     const settings = [
         'Noise suppression',
         'Buttons always visible',
-        'Chat auto pin',
         'Keyboard shortcuts',
         'Video mirror',
         'Audio pitch bar',
@@ -38,7 +37,6 @@
         'Push to talk',
         'Share room on join',
         'Only host recording',
-        'Speech incoming messages',
 
         'Custom theme keep',
         'Moderator: everyone starts in privacy mode',

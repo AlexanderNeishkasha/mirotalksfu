@@ -26,8 +26,6 @@
         client.consumersProducer.clear();
         client.consumingProducers.clear();
         client.resumedConsumers.clear();
-        client.chatDataConsumers.clear();
-        client.chatDataProducer = null;
         client.audioConsumers.clear();
         client.videoMediaContainer.replaceChildren();
         client.videoPinMediaContainer.replaceChildren();

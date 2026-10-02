@@ -59,11 +59,6 @@ socket.io.backoff.duration = function () {
     return Math.min(attempt === 0 ? 1000 : attempt === 1 ? 2000 : 3000 * 2 ** (attempt - 2), 15000);
 };
 
-let survey = {
-    enabled: true,
-    url: 'https://www.questionpro.com/t/AUs7VZq02P',
-};
-
 let redirect = {
     enabled: true,
     url: '/',
@@ -290,7 +285,6 @@ let pushToTalkTransition = Promise.resolve();
 let isPitchBarEnabled = true;
 let isSoundEnabled = true;
 let isKeepButtonsVisible = false;
-let isChatPinEnabled = true;
 let isShortcutsEnabled = false;
 
 let isLobbyEnabled = false;
@@ -308,7 +302,6 @@ let isVideoControlsOn = false;
 let isChatPasteTxt = false;
 let isChatMarkdownOn = false;
 
-let isSpeechSynthesisSupported = 'speechSynthesis' in window;
 let joinRoomWithoutAudioVideo = true;
 let joinRoomWithScreen = false;
 
@@ -439,7 +432,6 @@ async function initClient() {
         setTippy('switchShare', "Show 'Share Room' popup on join", 'right');
         setTippy('switchKeepButtonsVisible', 'Keep buttons always visible', 'right');
         setTippy('switchKeepAwake', 'Prevent the device from sleeping (if supported)', 'right');
-        setTippy('switchChatPin', 'Auto pin chat when opened', 'right');
         setTippy('roomId', 'Room name', 'right');
         setTippy('copyRoomUrlBtn', 'Share room link', 'left');
         setTippy('sessionTime', 'Session time', 'right');
@@ -453,7 +445,7 @@ async function initClient() {
         setTippy('chatPasteButton', 'Paste', 'top');
         setTippy('chatSendButton', 'Send', 'top');
         setTippy('showChatOnMsg', 'Show chat on new message comes', 'bottom');
-        setTippy('speechIncomingMsg', 'Speech the incoming messages', 'bottom');
+
         setTippy('chatEmojiButton', 'Emoji', 'top');
         setTippy('chatShowParticipantsListBtn', 'Toggle participants list', 'bottom');
         setTippy('chatMarkdownButton', 'Markdown', 'top');
@@ -1574,7 +1566,6 @@ function joinRoom(peer_name, room_id) {
             isVideoAllowed,
             isScreenAllowed,
             joinRoomWithScreen,
-            isSpeechSynthesisSupported,
             roomIsReady
         );
         handleRoomClientEvents();
@@ -1683,7 +1674,7 @@ function roomIsReady() {
 
     BUTTONS.main.aboutButton && show(aboutButton);
     if (!isMobileDevice) show(pinUnpinGridDiv);
-    if (!isSpeechSynthesisSupported) hide(speechMsgDiv);
+
     if (
         isMediaStreamTrackAndTransformerSupported &&
         (BUTTONS.settings.virtualBackground !== undefined ? BUTTONS.settings.virtualBackground : true)
@@ -3109,15 +3100,6 @@ function handleSelects() {
         hide(keepAwakeButton);
     }
 
-    switchChatPin.onchange = (e) => {
-        isChatPinEnabled = e.currentTarget.checked;
-        localStorageSettings.chat_pin = isChatPinEnabled;
-        lS.setSettings(localStorageSettings);
-        const status = isChatPinEnabled ? 'enabled' : 'disabled';
-        userLog('info', `Chat auto pin ${status}`, 'top-end');
-        e.target.blur();
-    };
-
     // recording
     switchHostOnlyRecording.onchange = (e) => {
         hostOnlyRecording = e.currentTarget.checked;
@@ -3184,13 +3166,6 @@ function handleSelects() {
         rc.showChatOnMessage = e.currentTarget.checked;
         rc.roomMessage('showChat', rc.showChatOnMessage);
         localStorageSettings.show_chat_on_msg = rc.showChatOnMessage;
-        lS.setSettings(localStorageSettings);
-        e.target.blur();
-    };
-    speechIncomingMsg.onchange = (e) => {
-        rc.speechInMessages = e.currentTarget.checked;
-        rc.roomMessage('speechMessages', rc.speechInMessages);
-        localStorageSettings.speech_in_msg = rc.speechInMessages;
         lS.setSettings(localStorageSettings);
         e.target.blur();
     };
@@ -3297,63 +3272,64 @@ function handleKeyboardShortcuts() {
         };
 
         document.addEventListener('keydown', (event) => {
-            const key = event.key.toLowerCase(); // Convert to lowercase for simplicity
-            console.log(`Detected shortcut: ${key}`);
+            const action = window.BodrikKeyboardShortcuts.action(event, isShortcutsEnabled);
+            if (!action) return;
+            event.preventDefault();
 
             const { audio_cant_unmute, video_cant_unhide, screen_cant_share } = rc._moderator;
             const notPresenter = isRulesActive && !isPresenter;
 
-            switch (key) {
-                case 'a':
+            switch (action) {
+                case 'audio':
                     if (notPresenter && !audio && (audio_cant_unmute || !BUTTONS.main.startAudioButton)) {
                         userLog('warning', 'The presenter has disabled your ability to enable audio', 'top-end');
                         break;
                     }
                     audio ? stopAudioButton.click() : startAudioButton.click();
                     break;
-                case 'v':
+                case 'video':
                     if (notPresenter && !video && (video_cant_unhide || !BUTTONS.main.startVideoButton)) {
                         userLog('warning', 'The presenter has disabled your ability to enable video', 'top-end');
                         break;
                     }
                     video ? stopVideoButton.click() : startVideoButton.click();
                     break;
-                case 's':
+                case 'screen':
                     if (notPresenter && !screen && (screen_cant_share || !BUTTONS.main.startScreenButton)) {
                         userLog('warning', 'The presenter has disabled your ability to share the screen', 'top-end');
                         break;
                     }
                     screen ? stopScreenButton.click() : startScreenButton.click();
                     break;
-                case 'h':
+                case 'hand':
                     if (notPresenter && !BUTTONS.main.raiseHandButton) {
                         userLog('warning', 'The presenter has disabled your ability to raise your hand', 'top-end');
                         break;
                     }
                     hand ? lowerHandButton.click() : raiseHandButton.click();
                     break;
-                case 'c':
+                case 'chat':
                     if (notPresenter && !BUTTONS.main.chatButton) {
                         userLog('warning', 'The presenter has disabled your ability to open the chat', 'top-end');
                         break;
                     }
                     chatButton.click();
                     break;
-                case 'o':
+                case 'settings':
                     if (notPresenter && !BUTTONS.main.settingsButton) {
                         userLog('warning', 'The presenter has disabled your ability to open the settings', 'top-end');
                         break;
                     }
                     settingsButton.click();
                     break;
-                case 'r':
+                case 'recording':
                     if (notPresenter && (hostOnlyRecording || !BUTTONS.settings.tabRecording)) {
                         userLog('warning', 'The presenter has disabled your ability to start recording', 'top-end');
                         break;
                     }
                     isRecording ? stopRecButton.click() : startRecButton.click();
                     break;
-                case 'f':
+                case 'file':
                     if (notPresenter && !BUTTONS.settings.fileSharing) {
                         userLog('warning', 'The presenter has disabled your ability to share files', 'top-end');
                         break;
@@ -3362,7 +3338,7 @@ function handleKeyboardShortcuts() {
                     break;
                 //...
                 default:
-                    console.log(`Unhandled shortcut key: ${key}`);
+                    break;
             }
         });
     }
@@ -3540,21 +3516,19 @@ function handleChatEmojiPicker() {
 /** Restore supported local preferences without retired server-recording controls. */
 function loadSettingsFromLocalStorage() {
     rc.showChatOnMessage = localStorageSettings.show_chat_on_msg;
-    rc.speechInMessages = localStorageSettings.speech_in_msg;
+
     isPitchBarEnabled = localStorageSettings.pitch_bar;
     isSoundEnabled = localStorageSettings.sounds;
     isKeepButtonsVisible = localStorageSettings.keep_buttons_visible;
-    isChatPinEnabled = localStorageSettings.chat_pin !== undefined ? localStorageSettings.chat_pin : true;
     isShortcutsEnabled = localStorageSettings.keyboard_shortcuts;
 
     showChatOnMsg.checked = rc.showChatOnMessage;
-    speechIncomingMsg.checked = rc.speechInMessages;
+
     switchPitchBar.checked = isPitchBarEnabled;
     switchSounds.checked = isSoundEnabled;
     switchShowCameraOffParticipants.checked = showCameraOffParticipants;
     switchShare.checked = notify;
     switchKeepButtonsVisible.checked = isKeepButtonsVisible;
-    switchChatPin.checked = isChatPinEnabled;
     switchShortcuts.checked = isShortcutsEnabled;
 
     keepCustomTheme.checked = themeCustom.keep;
@@ -3838,7 +3812,8 @@ function initLeaveMeeting() {
     openURL('/');
 }
 
-async function leaveRoom(allowCancel = true, disconnectAll = false) {
+/** Save active recording before leaving; eject-all remains an explicit presenter action. */
+async function leaveRoom(disconnectAll = false) {
     if (rc.isRecording() || rc.hasActiveRecorder()) {
         recShowInfo = false;
         rc.saveRecording('User is leaving the room, saving recording before exit');
@@ -3850,38 +3825,7 @@ async function leaveRoom(allowCancel = true, disconnectAll = false) {
         rc.ejectAllOnLeave();
         disconnectAll = false; // already handled, prevent double-eject below
     }
-    survey && survey.enabled ? leaveFeedback(allowCancel, disconnectAll) : redirectOnLeave(disconnectAll);
-}
-
-function leaveFeedback(allowCancel, disconnectAll = false) {
-    Swal.fire({
-        allowOutsideClick: false,
-        allowEscapeKey: false,
-        showDenyButton: true,
-        showCancelButton: allowCancel,
-        confirmButtonColor: 'green',
-        denyButtonColor: 'red',
-        cancelButtonColor: 'gray',
-        background: swalBackground,
-        imageUrl: image.feedback,
-        position: 'top',
-        title: 'Leave a feedback',
-        text: 'Do you want to rate your MiroTalk experience?',
-        confirmButtonText: `Yes`,
-        denyButtonText: `No`,
-        cancelButtonText: `Cancel`,
-        showClass: { popup: 'animate__animated animate__fadeInDown' },
-        hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-    }).then((result) => {
-        if (result.isConfirmed) {
-            isExiting = true;
-            endRoomSession();
-            rc.exitRoom(disconnectAll);
-            openURL(survey.url);
-        } else if (result.isDenied) {
-            redirectOnLeave(disconnectAll);
-        }
-    });
+    redirectOnLeave(disconnectAll);
 }
 
 function redirectOnLeave(disconnectAll = false) {
@@ -6386,7 +6330,7 @@ function handleExitLeave() {
 
 function handleExitLeaveForAll() {
     setExitMenuOpen(false);
-    leaveRoom(true, true);
+    leaveRoom(true);
 }
 
 function handleExitMenuOutsideClick(e) {

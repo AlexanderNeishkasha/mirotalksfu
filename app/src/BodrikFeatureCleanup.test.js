@@ -15,6 +15,27 @@ function read(file) {
 
 /** Extract the actual registered socket callback rather than duplicating its behavior. */
 function socketHandler(event, context) {
+    if (event === 'message') {
+        const { room, peer } = context.getRoomAndPeer(context.socket);
+        room.id = 'test-room';
+        const target = context.testTarget === 'all' ? 'other' : context.testTarget;
+        room.peers = new Map([
+            [context.socket.id, peer],
+            [target, { peer_name: 'Target' }],
+        ]);
+        room.getPeer = (id) => room.peers.get(id);
+        room.send = (...args) => room.sendTo(...args);
+        let handler;
+        const socket = {
+            ...context.socket,
+            room_id: room.id,
+            on: (name, callback) => {
+                if (name === event) handler = callback;
+            },
+        };
+        require('./BodrikRoomChat').registerRoomChat(socket, new Map([[room.id, room]]), context.log);
+        return handler;
+    }
     const source = read('app/src/Server.js');
     const ast = espree.parse(source, { ecmaVersion: 'latest', range: true });
     let callback;
@@ -172,6 +193,7 @@ for (const [name, target, publiclyBlocked, privatelyBlocked, delivered] of [
             checkXSS: (data) => data,
             Validator: { isValidData: () => true },
             getRoomAndPeer: () => ({ room, peer: { peer_name: 'Human' } }),
+            testTarget: target,
             log: { warn() {}, debug() {} },
         });
         await handler({ peer_name: 'Human', to_peer_id: target, peer_msg: 'hello' });

@@ -59,7 +59,7 @@ const icons = {
     room: '<i class="fas fa-home"></i>',
     chat: '<i class="fas fa-comments"></i>',
     user: '<i class="fas fa-user"></i>',
-    speech: '<i class="fas fa-volume-high"></i>',
+
     share: '<i class="fas fa-share-alt"></i>',
     ptt: '<i class="fa-solid fa-hand-pointer"></i>',
     lobby: '<i class="fas fa-shield-halved"></i>',
@@ -120,7 +120,6 @@ const image = {
     message: '../images/message.png',
     share: '../images/share.png',
     exit: '../images/exit.png',
-    feedback: '../images/feedback.png',
     lobby: '../images/lobby.png',
 
     all: '../images/all.png',
@@ -221,7 +220,6 @@ class RoomClient {
         isVideoAllowed,
         isScreenAllowed,
         joinRoomWithScreen,
-        isSpeechSynthesisSupported,
         successCallback
     ) {
         this.room_id = room_id;
@@ -297,11 +295,6 @@ class RoomClient {
         this.consumerTransport = null;
         this.device = null;
 
-        // DataChannel chat
-        this.chatDataProducer = null;
-        this.chatDataConsumers = new Map();
-        this.useDataChannel = true; // prefer DataChannel for chat
-
         this.isScreenShareSupported =
             navigator.getDisplayMedia || navigator.mediaDevices.getDisplayMedia ? true : false;
 
@@ -317,10 +310,9 @@ class RoomClient {
         this.isChatOpen = false;
         this.isChatEmojiOpen = false;
 
-        this.isSpeechSynthesisSupported = isSpeechSynthesisSupported;
         this.isParticipantsOpen = false;
         this.isChatOpenedByParticipantsBtn = false;
-        this.speechInMessages = false;
+
         this.showChatOnMessage = true;
         this.isChatBgTransparent = false;
         this.isVideoPinned = false;
@@ -613,12 +605,6 @@ class RoomClient {
         // resume can't leave a peer permanently silent for one participant.
         this.startConsumerReconcile();
 
-        // Initialize chat DataChannel
-        await this.initChatDataProducer();
-
-        // Request existing data producers from other peers
-        this.socket.emit('getDataProducers');
-
         {
             await this.startLocalMedia();
         }
@@ -648,9 +634,6 @@ class RoomClient {
         // ##########################################
         this.peers = new Map(JSON.parse(room.peers));
         // ##########################################
-
-        console.log('07.0 ----> Room Survey', room.survey);
-        survey = room.survey;
 
         console.log('07.0 ----> Room Leave Redirect', room.redirect);
         redirect = room.redirect;
@@ -895,24 +878,6 @@ class RoomClient {
                 errback(err);
             }
         });
-
-        this.producerTransport.on(
-            'producedata',
-            async ({ sctpStreamParameters, label, protocol, appData }, callback, errback) => {
-                try {
-                    const { id } = await this.socket.request('produceData', {
-                        transportId: this.producerTransport.id,
-                        sctpStreamParameters,
-                        label,
-                        protocol,
-                        appData,
-                    });
-                    callback({ id });
-                } catch (err) {
-                    errback(err);
-                }
-            }
-        );
 
         const transport = this.producerTransport;
         transport.on('connectionstatechange', async (state) => {
@@ -1175,8 +1140,7 @@ class RoomClient {
         this.socket.on('removeMe', this.handleRemoveMe);
         this.socket.on('refreshParticipantsCount', this.handleRefreshParticipantsCount);
         this.socket.on('newProducers', this.handleNewProducers);
-        this.socket.on('newDataProducer', this.handleNewDataProducer);
-        this.socket.on('dataConsumerClosed', this.handleDataConsumerClosed);
+
         this.socket.on('message', this.handleMessage);
         this.socket.on('roomAction', this.handleRoomAction);
         this.socket.on('roomPassword', this.handleRoomPassword);
@@ -1372,21 +1336,6 @@ class RoomClient {
             }
 
             this.applyPendingFollowMe();
-        }
-    };
-
-    handleNewDataProducer = async (data) => {
-        console.log('SocketOn New data producer:', data);
-        if (data.peer_id === this.peer_id) return;
-        await this.consumeData(data.dataProducerId);
-    };
-
-    handleDataConsumerClosed = (data) => {
-        console.log('SocketOn Data consumer closed:', data);
-        const { dataConsumer_id } = data;
-        if (this.chatDataConsumers.has(dataConsumer_id)) {
-            this.chatDataConsumers.delete(dataConsumer_id);
-            console.log('DataConsumer removed', { dataConsumer_id });
         }
     };
 
@@ -3484,143 +3433,6 @@ class RoomClient {
         }
     }
 
-    // ####################################################
-    // DATA CHANNEL (Chat via mediasoup DataChannel)
-    // ####################################################
-
-    async initChatDataProducer() {
-        if (!this.producerTransport) {
-            console.warn('Producer transport not available, skipping chat DataProducer creation');
-            return;
-        }
-
-        try {
-            this.chatDataProducer = await this.producerTransport.produceData({
-                ordered: true,
-                maxRetransmits: 3,
-                label: 'chat',
-                appData: { type: 'chat' },
-            });
-
-            this.chatDataProducer.on('open', () => {
-                console.log('✅ Chat DataProducer open');
-            });
-
-            this.chatDataProducer.on('close', () => {
-                console.log('Chat DataProducer closed');
-                this.chatDataProducer = null;
-            });
-
-            this.chatDataProducer.on('error', (error) => {
-                console.error('Chat DataProducer error', error);
-            });
-
-            this.chatDataProducer.on('transportclose', () => {
-                console.log('Chat DataProducer transport closed');
-                this.chatDataProducer = null;
-            });
-
-            console.log('Chat DataProducer created', { id: this.chatDataProducer.id });
-        } catch (error) {
-            console.error('Failed to create chat DataProducer', error);
-            this.chatDataProducer = null;
-        }
-    }
-
-    /** Receive DataChannel chat while honoring public/private restrictions. */
-    async consumeData(dataProducerId) {
-        if (!this.consumerTransport) {
-            console.warn('Consumer transport not available, skipping DataConsumer creation');
-            return;
-        }
-
-        try {
-            const params = await this.socket.request('consumeData', {
-                consumerTransportId: this.consumerTransport.id,
-                dataProducerId,
-            });
-
-            if (!params || params.error) {
-                console.error('ConsumeData error', params?.error);
-                return;
-            }
-
-            const dataConsumer = await this.consumerTransport.consumeData({
-                id: params.id,
-                dataProducerId: params.dataProducerId,
-                sctpStreamParameters: params.sctpStreamParameters,
-                label: params.label,
-                protocol: params.protocol,
-                appData: params.appData,
-            });
-
-            dataConsumer.on('message', (data) => {
-                try {
-                    const msg = JSON.parse(data);
-                    if (msg.type === 'chat') {
-                        console.log('DataChannel chat message received', msg);
-                        // Drop messages that violate current moderator restrictions
-                        const isPublicMessage = msg.to_peer_id === 'all';
-
-                        if (isPublicMessage && this._moderator.chat_cant_publicly) {
-                            console.warn('Dropping DataChannel public message: disabled by moderator', msg);
-                            return;
-                        }
-                        if (!isPublicMessage && this._moderator.chat_cant_privately) {
-                            console.warn('Dropping DataChannel private message: disabled by moderator', msg);
-                            return;
-                        }
-
-                        this.showMessage(msg);
-                    }
-                } catch (error) {
-                    console.error('Failed to parse DataChannel message', error);
-                }
-            });
-
-            dataConsumer.on('close', () => {
-                console.log('DataConsumer closed', { id: dataConsumer.id });
-                this.chatDataConsumers.delete(dataConsumer.id);
-            });
-
-            dataConsumer.on('error', (error) => {
-                console.error('DataConsumer error', { id: dataConsumer.id, error });
-            });
-
-            dataConsumer.on('transportclose', () => {
-                console.log('DataConsumer transport closed', { id: dataConsumer.id });
-                this.chatDataConsumers.delete(dataConsumer.id);
-            });
-
-            this.chatDataConsumers.set(dataConsumer.id, dataConsumer);
-
-            console.log('DataConsumer created', {
-                id: dataConsumer.id,
-                dataProducerId: params.dataProducerId,
-                label: params.label,
-            });
-        } catch (error) {
-            console.error('Failed to consume data', error);
-        }
-    }
-
-    isChatDataChannelOpen() {
-        return this.chatDataProducer && !this.chatDataProducer.closed && this.chatDataProducer.readyState === 'open';
-    }
-
-    sendChatDataChannelMessage(data) {
-        if (!this.isChatDataChannelOpen()) return false;
-
-        try {
-            const message = JSON.stringify(data);
-            this.chatDataProducer.send(message);
-            return true;
-        } catch (error) {
-            console.error('Failed to send DataChannel message', error);
-            return false;
-        }
-    }
-
     async getConsumeStream(producerId, peer_id, type) {
         if (!this.device) {
             throw new Error('Device not initialized');
@@ -4861,7 +4673,7 @@ class RoomClient {
                     default:
                         break;
                 }
-                if (!this.speechInMessages) this.speechText(`${data.peer_name} ${data.action}`);
+
                 break;
             //...
             default:
@@ -5729,7 +5541,7 @@ class RoomClient {
 
         if (this.isChatPinned) this.chatUnpin();
 
-        if (!isFullscreenChatDevice(this) && this.isChatOpen && isChatPinEnabled) {
+        if (!isFullscreenChatDevice(this) && this.isChatOpen) {
             this.toggleChatPin();
         }
 
@@ -5966,7 +5778,7 @@ class RoomClient {
             });
     }
 
-    /** Send a moderated public/private message through DataChannel or signaling. */
+    /** Send public/private chat exclusively through the room-authorized Socket.IO channel. */
     sendMessage() {
         if (!this.thereAreParticipants()) {
             this.cleanMessage();
@@ -6061,31 +5873,7 @@ class RoomClient {
 
                 console.log('Send message:', data);
 
-                // Try DataChannel for public messages, fallback to signaling
-                if (isPublicMessage && this.useDataChannel && this.isChatDataChannelOpen()) {
-                    const dcMsg = {
-                        type: 'chat',
-                        room_id: data.room_id,
-                        peer_name: data.peer_name,
-                        peer_avatar: data.peer_avatar,
-                        peer_id: data.peer_id,
-                        to_peer_id: data.to_peer_id,
-                        to_peer_name: data.to_peer_name,
-                        peer_msg: data.peer_msg,
-                        msg_id: data.msg_id,
-                        timestamp: Date.now(),
-                    };
-                    const sent = this.sendChatDataChannelMessage(dcMsg);
-                    if (!sent) {
-                        console.warn('DataChannel send failed, falling back to signaling');
-                        this.socket.emit('message', data);
-                    } else {
-                        console.log('Message sent via DataChannel');
-                    }
-                } else {
-                    // Private messages or DataChannel unavailable: use signaling
-                    this.socket.emit('message', data);
-                }
+                this.socket.emit('message', data);
 
                 this.setMsgAvatar('left', this.peer_name, this.peer_avatar);
                 this.appendMessage(
@@ -6151,11 +5939,7 @@ class RoomClient {
             this.userLog('info', `💬 New message from: ${data.peer_name}`, 'top-end');
         }
 
-        if (this.speechInMessages) {
-            this.speechMessage(true, data.peer_name, data.peer_msg);
-        } else {
-            this.sound('message');
-        }
+        this.sound('message');
 
         // Track unread count when message is not currently visible
         const isMessageVisible = this.isChatOpen && this.chatPeerId === messagePeerId;
@@ -6256,15 +6040,6 @@ class RoomClient {
             ? `<span class="message-data-time">${time}, ${safeFromName} ( me ) </span>`
             : `<span class="message-data-time">${time}, ${safeFromName} </span>`;
 
-        const speechButton = this.isSpeechSynthesisSupported
-            ? `<button 
-                    id="msg-speech-${chatMessagesId}" 
-                    class="mr5" 
-                    onclick="rc.speechElementText('message-${chatMessagesId}')">
-                    ${icons.speech}
-                </button>`
-            : '';
-
         // getImg is a user-controlled URL; use a temporary id and setAttribute
         // after insertion to avoid double-decode XSS via insertAdjacentHTML.
 
@@ -6304,7 +6079,6 @@ class RoomClient {
                             onclick="rc.copyToClipboard('message-${chatMessagesId}')">
                             ${icons.paste}
                         </button>
-                        ${speechButton}
                         <button 
                             id="msg-react-${chatMessagesId}" 
                             class="mr5" 
@@ -6376,7 +6150,7 @@ class RoomClient {
         if (!this.isMobileDevice) {
             this.setTippy('msg-delete-' + chatMessagesId, 'Delete', 'top');
             this.setTippy('msg-copy-' + chatMessagesId, 'Copy', 'top');
-            this.setTippy('msg-speech-' + chatMessagesId, 'Speech', 'top');
+
             this.setTippy('msg-react-' + chatMessagesId, 'React', 'top');
         }
 
@@ -6652,26 +6426,6 @@ class RoomClient {
         return div.firstChild.outerHTML;
     }
 
-    getIframe(input) {
-        const url = filterXSS(input);
-        const iframe = document.createElement('iframe');
-        const div = document.createElement('div');
-        const is_youtube = this.getVideoType(url) == 'na' ? true : false;
-        const video_audio_url = is_youtube ? this.getYoutubeEmbed(url) : url;
-        iframe.setAttribute('title', 'Chat-IFrame');
-        iframe.setAttribute('src', video_audio_url);
-        iframe.setAttribute('width', 'auto');
-        iframe.setAttribute('frameborder', '0');
-        iframe.setAttribute(
-            'allow',
-            'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture'
-        );
-        iframe.setAttribute('allowfullscreen', 'allowfullscreen');
-        div.appendChild(iframe);
-        console.log('GetIFrame', div.firstChild.outerHTML);
-        return div.firstChild.outerHTML;
-    }
-
     getLineBreaks(message) {
         return (message.match(/\n/g) || []).length;
     }
@@ -6691,27 +6445,6 @@ class RoomClient {
             toId: toId,
             toName: toName,
         });
-    }
-
-    speechMessage(newMsg = true, from, msg) {
-        const speech = new SpeechSynthesisUtterance();
-        speech.text = (newMsg ? 'New' : '') + ' message from:' + from + '. The message is:' + msg;
-        speech.rate = 0.9;
-        window.speechSynthesis.speak(speech);
-    }
-
-    speechElementText(elemId) {
-        const element = this.getId(elemId);
-        this.speechText(element.innerText);
-    }
-
-    speechText(msg) {
-        {
-            const speech = new SpeechSynthesisUtterance();
-            speech.text = msg;
-            speech.rate = 0.9;
-            window.speechSynthesis.speak(speech);
-        }
     }
 
     chatToggleBg() {
@@ -6821,7 +6554,7 @@ class RoomClient {
             hideClass: { popup: 'animate__animated animate__fadeOutUp' },
         }).then((result) => {
             if (result.isConfirmed) {
-                survey && survey.enabled ? leaveFeedback(true) : redirectOnLeave();
+                redirectOnLeave();
             }
         });
     }
@@ -7888,20 +7621,6 @@ class RoomClient {
     // CHAT MEDIA URL HELPERS
     // ####################################################
 
-    getVideoType(url) {
-        if (url.endsWith('.mp4')) return 'video/mp4';
-        if (url.endsWith('.mp3')) return 'video/mp3';
-        if (url.endsWith('.webm')) return 'video/webm';
-        if (url.endsWith('.ogg')) return 'video/ogg';
-        return 'na';
-    }
-
-    getYoutubeEmbed(url) {
-        let regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
-        let match = url.match(regExp);
-        return match && match[7].length == 11 ? 'https://www.youtube.com/embed/' + match[7] + '?autoplay=1' : false;
-    }
-
     // ####################################################
     // ROOM ACTION
     // ####################################################
@@ -8075,9 +7794,7 @@ class RoomClient {
                           'top-end'
                       );
                 break;
-            case 'speechMessages':
-                this.userLog('info', `${icons.speech} Speech incoming messages ${status}`, 'top-end');
-                break;
+
             case 'video_start_privacy':
                 this.userLog(
                     'info',

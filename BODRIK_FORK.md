@@ -45,6 +45,14 @@ Load failures retain ordinary camera capture. GIF downloads are cancellable,
 temporary URLs are revoked, and zero-delay GIF frames are normalized to prevent
 gifler 0.1.0's catch-up loop from freezing a tab. Raw producer camera capture is
 owned separately from its derived output so closing effects cannot leak capture.
+
+Unused QR/W3CSS/Stats dependencies, sticky-note remnants, post-call surveys,
+external analytics and browser speech synthesis are retired. Human chat now uses
+only the room-authorized Socket.IO channel; mediasoup SCTP DataChannel setup and
+its producer/consumer lifecycle are removed. Public/private moderation, message
+reactions, images, files, links and Markdown remain. The server derives sender
+identity and room membership from admitted socket state, excludes lobby peers,
+and never relays private chat outside the target's current room.
 Empty camera selectors offer a localized
 permission retry that releases its temporary stream without publishing video.
 The service-specific backend, TURN server, deployment configuration, environment

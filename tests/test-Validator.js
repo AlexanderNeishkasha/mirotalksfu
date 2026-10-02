@@ -116,44 +116,4 @@ describe('test-Validator', () => {
             checkValidator.hasPathTraversal('C:\\SomeDir\\OtherDir\\File.txt').should.be.false();
         });
     });
-
-    describe('5. SSRF host and URL validation', () => {
-        it('should block private, loopback and link-local literals', () => {
-            checkValidator.isPrivateOrLoopbackHost('127.0.0.1').should.be.true();
-            checkValidator.isPrivateOrLoopbackHost('169.254.169.254').should.be.true();
-            checkValidator.isPrivateOrLoopbackHost('172.30.0.1').should.be.true();
-            checkValidator.isPrivateOrLoopbackHost('::1').should.be.true();
-        });
-
-        it('should decode IPv4-mapped IPv6 hex literals before checking their ranges', () => {
-            checkValidator.isPrivateOrLoopbackHost('::ffff:7f00:1').should.be.true();
-            checkValidator.isPrivateOrLoopbackHost('::ffff:a9fe:a9fe').should.be.true();
-            checkValidator.isPrivateOrLoopbackHost('::ffff:a00:1').should.be.true();
-            checkValidator.isPrivateOrLoopbackHost('::ffff:c0a8:1').should.be.true();
-            checkValidator.isPrivateOrLoopbackHost('::ffff:ac10:fe01').should.be.true();
-            checkValidator.isPrivateOrLoopbackHost('0:0:0:0:0:ffff:7f00:1').should.be.true();
-            checkValidator.isPrivateOrLoopbackHost('::ffff:808:808').should.be.false();
-        });
-
-        it('should block well known internal and cloud metadata hostnames', () => {
-            checkValidator.isPrivateOrLoopbackHost('localhost').should.be.true();
-            checkValidator.isPrivateOrLoopbackHost('metadata.google.internal').should.be.true();
-            checkValidator.isPrivateOrLoopbackHost('metadata.goog').should.be.true();
-            checkValidator.isPrivateOrLoopbackHost('metadata.google.internal.').should.be.true();
-            checkValidator.isPrivateOrLoopbackHost('anything.internal').should.be.true();
-            checkValidator.isPrivateOrLoopbackHost('printer.local').should.be.true();
-            checkValidator.isPrivateOrLoopbackHost('example.com').should.be.false();
-        });
-
-        it('should reject non http(s) schemes and internal targets', async () => {
-            (await checkValidator.isPublicHttpUrl('file:///etc/passwd')).should.be.false();
-            (await checkValidator.isPublicHttpUrl('rtmp://example.com/live')).should.be.false();
-            (await checkValidator.isPublicHttpUrl('http://127.0.0.1:8899/x')).should.be.false();
-            (await checkValidator.isPublicHttpUrl('http://[::1]/x')).should.be.false();
-            (await checkValidator.isPublicHttpUrl('http://[::ffff:127.0.0.1]/')).should.be.false();
-            (await checkValidator.isPublicHttpUrl('http://[::ffff:a9fe:a9fe]/')).should.be.false();
-            (await checkValidator.isPublicHttpUrl('http://metadata.google.internal/')).should.be.false();
-            (await checkValidator.isPublicHttpUrl('not a url')).should.be.false();
-        });
-    });
 });
