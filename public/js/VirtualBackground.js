@@ -93,7 +93,7 @@ class VirtualBackground {
         const Segmentation = await assets.wait(assets.segmentation(), job.abort.signal);
         this.assertCurrent(job);
         job.model = new Segmentation({
-            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`,
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation@0.1.1675465747/${file}`,
         });
         job.model.setOptions({ modelSelection: 1, runningMode: 'video', smoothSegmentation: true });
         job.model.onResults((results) => this.handleSegmentationResults(job, results));

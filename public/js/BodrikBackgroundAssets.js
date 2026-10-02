@@ -58,7 +58,8 @@
     window.BodrikBackgroundAssets = {
         wait,
         /** Load the segmentation library on first effect activation. */
-        segmentation: () => load('SelfieSegmentation', 'https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation'),
+        segmentation: () =>
+            load('SelfieSegmentation', 'https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation@0.1.1675465747'),
         /** Load the GIF decoder only when an animated background is requested. */
         gifler: () => load('gifler', 'https://cdn.jsdelivr.net/npm/gifler@0.1.0/gifler.min.js'),
     };

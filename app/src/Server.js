@@ -1,48 +1,5 @@
 'use strict';
 
-/*
-███████ ███████ ██████  ██    ██ ███████ ██████  
-██      ██      ██   ██ ██    ██ ██      ██   ██ 
-███████ █████   ██████  ██    ██ █████   ██████  
-     ██ ██      ██   ██  ██  ██  ██      ██   ██ 
-███████ ███████ ██   ██   ████   ███████ ██   ██                                           
-
-prod dependencies: {
-    axios                   : https://www.npmjs.com/package/axios
-    chokidar                : https://www.npmjs.com/package/chokidar
-    colors                  : https://www.npmjs.com/package/colors
-    compression             : https://www.npmjs.com/package/compression
-    cors                    : https://www.npmjs.com/package/cors
-    crypto-js               : https://www.npmjs.com/package/crypto-js
-    dompurify               : https://www.npmjs.com/package/dompurify
-    express                 : https://www.npmjs.com/package/express
-    he                      : https://www.npmjs.com/package/he
-    helmet                  : https://www.npmjs.com/package/helmet
-    httpolyglot             : https://www.npmjs.com/package/httpolyglot
-    jsdom                   : https://www.npmjs.com/package/jsdom
-    jsonwebtoken            : https://www.npmjs.com/package/jsonwebtoken
-    mediasoup               : https://www.npmjs.com/package/mediasoup
-    mediasoup-client        : https://www.npmjs.com/package/mediasoup-client
-    socket.io               : https://www.npmjs.com/package/socket.io
-    uuid                    : https://www.npmjs.com/package/uuid
-}
-
-dev dependencies: {
-    @babel/core             : https://www.npmjs.com/package/@babel/core
-    @babel/preset-env       : https://www.npmjs.com/package/@babel/preset-env
-    babel-loader            : https://www.npmjs.com/package/babel-loader
-    mocha                   : https://www.npmjs.com/package/mocha
-    node-fetch              : https://www.npmjs.com/package/node-fetch
-    nodemon                 : https://www.npmjs.com/package/nodemon
-    prettier                : https://www.npmjs.com/package/prettier
-    proxyquire              : https://www.npmjs.com/package/proxyquire
-    should                  : https://www.npmjs.com/package/should
-    sinon                   : https://www.npmjs.com/package/sinon
-    webpack                 : https://www.npmjs.com/package/webpack
-    webpack-cli             : https://www.npmjs.com/package/webpack-cli
-}
-*/
-
 /**
  * MiroTalk SFU - Server component
  *

@@ -1129,6 +1129,13 @@ function getInfo() {
 // ENTER YOUR NAME | Enable/Disable AUDIO/VIDEO
 // ####################################################
 
+/** Fetch one same-origin JSON setting with a bounded browser-native request. */
+async function fetchRoomJson(path) {
+    const response = await fetch(path, { signal: AbortSignal.timeout(5000) });
+    if (!response.ok) throw new Error(`Request failed (${response.status})`);
+    return response.json();
+}
+
 async function whoAreYou() {
     console.log('04 ----> Who are you?');
 
@@ -1138,21 +1145,19 @@ async function whoAreYou() {
     document.body.style.background = 'var(--body-bg)';
 
     try {
-        const response = await axios.get('/config', {
-            timeout: 5000,
-        });
-        const serverButtons = response.data.message;
+        const response = await fetchRoomJson('/config');
+        const serverButtons = response.message;
         if (serverButtons) {
             // Merge serverButtons into BUTTONS, keeping the existing keys in BUTTONS if they are not present in serverButtons
             BUTTONS = mergeConfig(BUTTONS, serverButtons);
 
-            console.log('04 ----> AXIOS ROOM BUTTONS SETTINGS', {
+            console.log('04 ----> ROOM BUTTONS SETTINGS', {
                 serverButtons: serverButtons,
                 clientButtons: BUTTONS,
             });
         }
     } catch (error) {
-        console.error('04 ----> AXIOS GET CONFIG ERROR', error.message);
+        console.error('04 ----> GET CONFIG ERROR', error.message);
     }
 
     if (navigator.getDisplayMedia || navigator.mediaDevices.getDisplayMedia) {
@@ -5491,23 +5496,21 @@ function getParticipantAvatar(peerName, peerAvatar = false) {
  */
 async function getThemes() {
     try {
-        const response = await axios.get('/themes', {
-            timeout: 5000,
-        });
-        const serverThemes = response.data.message;
+        const response = await fetchRoomJson('/themes');
+        const serverThemes = response.message;
         if (serverThemes) {
             // Deep merge each theme: server overrides take precedence
             for (const [name, vars] of Object.entries(serverThemes)) {
                 themeMap[name] = themeMap[name] ? { ...themeMap[name], ...vars } : vars;
             }
             renderDynamicThemeCards();
-            console.log('AXIOS ROOM THEMES SETTINGS', {
+            console.log('ROOM THEMES SETTINGS', {
                 serverThemes: serverThemes,
                 clientThemes: Object.keys(themeMap),
             });
         }
     } catch (error) {
-        console.error('AXIOS GET THEMES ERROR', error.message);
+        console.error('GET THEMES ERROR', error.message);
     }
 }
 
