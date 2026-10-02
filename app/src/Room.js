@@ -11,6 +11,7 @@ const log = new Logger('Room');
 const { audioLevelObserverEnabled, activeSpeakerObserverEnabled } = config.mediasoup.router;
 
 module.exports = class Room {
+    /** Initialize authoritative room state and the mediasoup router. */
     constructor(room_id, worker, io) {
         this.id = room_id;
         // Unique, one-time-use identifier for this specific room/conference instance.
@@ -38,21 +39,6 @@ module.exports = class Room {
         this._hostOnlyRecording = false;
 
         // ##########################
-        this.recording = {
-            recSyncServerToS3: (config?.integrations?.s3?.enabled && config?.media?.recording?.uploadToS3) || false,
-            recSyncServerRecording: config?.media?.recording?.enabled || false,
-            recSyncServerEndpoint: config?.media?.recording?.endpoint || '',
-        };
-        // ##########################
-
-        this.notifications = {
-            mode: {
-                email: '',
-            },
-            events: {
-                join: false,
-            },
-        };
 
         this._moderator = {
             video_start_privacy: false,
@@ -63,8 +49,6 @@ module.exports = class Room {
             screen_cant_share: false,
             chat_cant_privately: false,
             chat_cant_publicly: false,
-            chat_cant_chatgpt: false,
-            chat_cant_deep_seek: false,
         };
         this._followMe = null;
         this.survey = config?.features?.survey;
@@ -88,12 +72,12 @@ module.exports = class Room {
     // ROOM INFO
     // ####################################################
 
+    /** Serialize retained room capabilities and state for admitted participants. */
     toJson() {
         return {
             id: this.id,
             sessionId: this.sessionId,
 
-            recording: this.recording,
             config: {
                 isLocked: this._isLocked,
                 isLobbyEnabled: this._isLobbyEnabled,
@@ -106,8 +90,6 @@ module.exports = class Room {
             followMe: this._followMe,
             survey: this.survey,
             redirect: this.redirect,
-
-            chatGPTEnabled: config?.integrations?.chatGPT?.enabled || false,
 
             dominantSpeaker: this.activeSpeakerObserverEnabled,
             peers: JSON.stringify([...this.peers]),
@@ -337,20 +319,6 @@ module.exports = class Room {
     }
 
     // ####################################################
-    // ROOM NOTIFICATIONS
-    // ####################################################
-
-    updateRoomNotifications(data) {
-        log.debug('Update room notifications', data);
-        this.notifications = data.notifications;
-    }
-
-    getRoomNotifications() {
-        log.debug('get room notifications', this.notifications);
-        return this.notifications;
-    }
-
-    // ####################################################
     // ROOM MODERATOR
     // ####################################################
 
@@ -359,6 +327,7 @@ module.exports = class Room {
         log.debug('Update room moderator all data', this._moderator);
     }
 
+    /** Apply a supported microphone, camera, screen, or human-chat restriction. */
     updateRoomModerator(data) {
         log.debug('Update room moderator', data);
         switch (data.type) {
@@ -385,12 +354,6 @@ module.exports = class Room {
                 break;
             case 'chat_cant_publicly':
                 this._moderator.chat_cant_publicly = data.status;
-                break;
-            case 'chat_cant_chatgpt':
-                this._moderator.chat_cant_chatgpt = data.status;
-                break;
-            case 'chat_cant_deep_seek':
-                this._moderator.chat_cant_deep_seek = data.status;
                 break;
 
             default:

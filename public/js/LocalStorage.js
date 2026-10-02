@@ -1,6 +1,7 @@
 'use strict';
 
 class LocalStorage {
+    /** Define retained browser preferences for media, human chat, and local recording. */
     constructor() {
         this.MEDIA_TYPE = {
             audio: 'audio',
@@ -27,8 +28,6 @@ class LocalStorage {
             moderator_screen_cant_share: false, // Everyone can't share screen
             moderator_chat_cant_privately: false, // Everyone can't chat privately, only Public chat allowed
             moderator_chat_cant_publicly: false, // Everyone can't chat publicly, only Private chat allowed
-            moderator_chat_cant_chatgpt: false, // Everyone can't chat with ChatGPT
-            moderator_chat_cant_deep_seek: false, // Everyone can't chat with DeepSeek
             // Everyone can't share media
 
             moderator_disconnect_all_on_leave: false, // Disconnect all participants on leave room
@@ -50,7 +49,6 @@ class LocalStorage {
             chat_pin: true, // Auto pin chat on open
             keyboard_shortcuts: false, // keyboard shortcuts
             host_only_recording: false, // presenter
-            rec_server: false, // The recording will be stored on the server rather than locally
             video_obj_fit: 2, // cover
             video_controls: 0, // off
             theme: 0, // dark

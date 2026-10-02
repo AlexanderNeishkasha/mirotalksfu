@@ -56,37 +56,6 @@ describe('test-Validator', () => {
         });
     });
 
-    describe('2. Handling valid recording file name', () => {
-        it('should return false for non-string inputs', () => {
-            checkValidator.isValidRecFileNameFormat(123).should.be.false();
-            checkValidator.isValidRecFileNameFormat({}).should.be.false();
-            checkValidator.isValidRecFileNameFormat([]).should.be.false();
-            checkValidator.isValidRecFileNameFormat(null).should.be.false();
-            checkValidator.isValidRecFileNameFormat(undefined).should.be.false();
-        });
-
-        it('should return false for strings that do not start with "Rec_" or end with ".webm"', () => {
-            checkValidator.isValidRecFileNameFormat('Recording.webm').should.be.false();
-            checkValidator.isValidRecFileNameFormat('Rec_Recording.mp4').should.be.false();
-            checkValidator.isValidRecFileNameFormat('rec_Recording.webm').should.be.false();
-            checkValidator.isValidRecFileNameFormat('RecordingRec_.webm').should.be.false();
-        });
-
-        it('should return true for valid recording file name format', () => {
-            checkValidator.isValidRecFileNameFormat('Rec_Meeting1.webm').should.be.true();
-            checkValidator.isValidRecFileNameFormat('Rec_Session_2024.webm').should.be.true();
-            checkValidator.isValidRecFileNameFormat('Rec_Test.webm').should.be.true();
-            checkValidator.isValidRecFileNameFormat('Rec_Test.Room.webm').should.be.true();
-        });
-
-        it('should return false for recording file name format with path traversal', () => {
-            checkValidator.isValidRecFileNameFormat('../Rec_Test.webm').should.be.false();
-            checkValidator.isValidRecFileNameFormat('Rec_../Test.webm').should.be.false();
-            checkValidator.isValidRecFileNameFormat('Rec_Test/../../config.webm').should.be.false();
-            checkValidator.isValidRecFileNameFormat('Rec_Test\\..\\..\\config.webm').should.be.false();
-        });
-    });
-
     describe('3. Handle path traversal', () => {
         it('should return false for strings without path traversal', () => {
             checkValidator.hasPathTraversal('Room1').should.be.false();
@@ -145,30 +114,6 @@ describe('test-Validator', () => {
         it('should return false for valid Windows paths with backslashes', () => {
             checkValidator.hasPathTraversal('C:\\Program Files\\MyApp').should.be.false();
             checkValidator.hasPathTraversal('C:\\SomeDir\\OtherDir\\File.txt').should.be.false();
-        });
-    });
-
-    describe('4. Email list and domain validation', () => {
-        it('should parse, normalize and deduplicate valid emails', () => {
-            const emails = checkValidator.parseEmailList(' Alice@Example.com, bob@example.com, alice@example.com ');
-            emails.should.deepEqual(['alice@example.com', 'bob@example.com']);
-        });
-
-        it('should return empty list for invalid input', () => {
-            checkValidator.parseEmailList(null).should.deepEqual([]);
-            checkValidator.parseEmailList(123).should.deepEqual([]);
-            checkValidator.parseEmailList('').should.deepEqual([]);
-        });
-
-        it('should validate allowed domains when list is provided', () => {
-            const emails = ['alice@example.com', 'bob@company.org'];
-            checkValidator.hasAllowedEmailDomains(emails, ['example.com', 'company.org']).should.be.true();
-            checkValidator.hasAllowedEmailDomains(emails, ['example.com']).should.be.false();
-        });
-
-        it('should allow all domains when allowedDomains is empty', () => {
-            const emails = ['alice@example.com'];
-            checkValidator.hasAllowedEmailDomains(emails, []).should.be.true();
         });
     });
 

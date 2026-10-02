@@ -158,9 +158,7 @@ module.exports = {
          * - list           → comma-separated origins, 'self' is always implicitly included.
          *                    Wildcards like https://*.example.com are valid in CSP.
          *
-         * IMPORTANT: This affects the widget too — the MiroTalk widget embeds
-         * the room in an iframe on the host site, so every site that should
-         * load the widget must be listed here.
+         * Sites embedding the retained meeting page must be listed here.
          */
         embed: {
             allowedOrigins: process.env.ALLOWED_EMBED_ORIGINS
@@ -175,53 +173,7 @@ module.exports = {
     // 3. Media Handling Configuration
     // ==============================================
 
-    media: {
-        /**
-         * Recording Configuration
-         * =======================
-         * Server side recording functionality.
-         *
-         * Core Settings:
-         * ------------------------
-         * - enabled        : Enable recording functionality
-         * - uploadToS3     : Upload recording to AWS S3 bucket [true/false]
-         * - endpoint       : Leave empty ('') to store recordings locally OR
-         *   - Set to a valid URL (e.g., 'http://localhost:8080/') to:
-         *      - Push recordings to a remote server
-         *      - Store in cloud storage services
-         *      - Send to processing pipelines
-         * - dir            : Storage directory for recordings (Relative to app/src/ default: app/rec)
-         * - maxFileSize    : Maximum recording size (1GB default)
-         *
-         * Upload Security:
-         * ------------------------
-         * - uploadTokenExp : Lifetime of the per-session upload token issued on join and
-         *                    required by the /recSync* endpoints (default '24h'). Must be
-         *                    long enough to outlast the longest expected recording.
-         * - rateLimit      : Per-IP rate limit for /recSync* upload requests
-         *                    (default: 300 requests / 60s) to mitigate flooding.
-         *
-         * Docker Note:
-         * ------------
-         * - When running in Docker, ensure the recording directory exists and is properly mounted:
-         *   1. Create the directory (e.g., 'app/rec')
-         *   2. Configure as volume in docker-compose.yml
-         *   3. Set appropriate permissions
-         *   4. Restart container after changes
-         */
-        recording: {
-            enabled: process.env.RECORDING_ENABLED === 'true',
-            uploadToS3: process.env.RECORDING_UPLOAD_TO_S3 === 'true',
-            endpoint: process.env.RECORDING_ENDPOINT || '',
-            dir: process.env.RECORDING_DIR || '../rec',
-            maxFileSize: process.env.RECORDING_MAX_FILE_SIZE || 1 * 1024 * 1024 * 1024, // 1GB
-            uploadTokenExp: process.env.RECORDING_UPLOAD_TOKEN_EXP || '24h',
-            rateLimit: {
-                windowMs: parseInt(process.env.RECORDING_RATE_LIMIT_WINDOW_MS) || 60 * 1000,
-                max: parseInt(process.env.RECORDING_RATE_LIMIT_MAX) || 300,
-            },
-        },
-    },
+    media: {},
 
     // ==============================================
     // 4. Security & Authentication
@@ -257,93 +209,6 @@ module.exports = {
         },
 
         /**
-         * OpenID Connect (OIDC) Authentication Configuration
-         * =================================================
-         * Configures authentication using OpenID Connect (OIDC), allowing integration with
-         * identity providers like Auth0, Okta, Keycloak, etc.
-         *
-         * Structure:
-         * - enabled                                : Master switch for OIDC authentication
-         * - baseURLDynamic                         : Whether to dynamically resolve base URL
-         *   allow_rooms_creation_for_auth_users    : Allow all authenticated users via OIDC to create their own rooms
-         * - peer_name                              : Controls which user attributes to enforce/request
-         * - config                                 : Core OIDC provider settings
-         *
-         * Core Settings:
-         * - issuerBaseURL      : Provider's discovery endpoint (e.g., https://your-tenant.auth0.com)
-         * - baseURL            : Your application's base URL
-         * - clientID           : Client identifier issued by provider
-         * - clientSecret       : Client secret issued by provider
-         * - secret             : Application session secret
-         * - authRequired       : Whether all routes require authentication
-         * - auth0Logout        : Whether to use provider's logout endpoint
-         * - authorizationParams: OAuth/OIDC flow parameters including:
-         *   - response_type    : OAuth response type ('code' for Authorization Code Flow)
-         *   - scope            : Requested claims (openid, profile, email)
-         * - routes             : Endpoint path configuration for:
-         *   - callback         : OAuth callback handler path
-         *   - login            : Custom login path (false to disable)
-         *   - logout           : Custom logout path
-         *
-         */
-        oidc: {
-            enabled: process.env.OIDC_ENABLED === 'true',
-            baseURLDynamic: process.env.OIDC_BASE_URL_DYNAMIC === 'true', // Set true if your app has dynamic base URLs
-
-            /*
-             * When `baseURLDynamic` is true, the OIDC baseURL (and therefore the redirect_uri
-             * sent to the IdP) is derived from the incoming `Host` header. To prevent
-             * Host-header injection from redirecting authorization codes to an attacker,
-             * list every origin the server is allowed to serve here (full origin, no path).
-             * The static `config.baseURL` is always trusted and does not need to be repeated.
-             * Example: ['https://meet.example.com', 'https://meet.eu.example.com']
-             */
-            allowedDynamicBaseURLs: process.env.OIDC_ALLOWED_DYNAMIC_BASE_URLS
-                ? process.env.OIDC_ALLOWED_DYNAMIC_BASE_URLS.split(splitChar)
-                      .map((u) => u.trim())
-                      .filter(Boolean)
-                : [],
-
-            // ==================================================================================================
-            allow_rooms_creation_for_auth_users: process.env.OIDC_ALLOW_ROOMS_CREATION_FOR_AUTH_USERS !== 'false',
-            // ==================================================================================================
-
-            // User identity requirements
-            peer_name: {
-                force: process.env.OIDC_USERNAME_FORCE !== 'false', // Forces the username to match the OIDC email or name. If true, the user won't be able to change their name when joining a room
-                email: process.env.OIDC_USERNAME_AS_EMAIL !== 'false', // Uses the OIDC email as the username.
-                name: process.env.OIDC_USERNAME_AS_NAME === 'true', // Uses the OIDC name as the username
-            },
-
-            // Provider configuration
-            config: {
-                // Required provider settings
-                issuerBaseURL: process.env.OIDC_ISSUER || 'https://server.example.com',
-                baseURL: process.env.OIDC_BASE_URL || `http://localhost:${process.env.PORT || 3010}`,
-                clientID: process.env.OIDC_CLIENT_ID || 'clientID',
-                clientSecret: process.env.OIDC_CLIENT_SECRET || 'clientSecret',
-
-                // Session configuration
-                secret: process.env.OIDC_SECRET || 'mirotalksfu-oidc-secret',
-                authRequired: process.env.OIDC_AUTH_REQUIRED === 'true', // Whether all routes require authentication
-                auth0Logout: process.env.OIDC_AUTH_LOGOUT !== 'false', // Use provider's logout endpoint
-
-                // OAuth/OIDC flow parameters
-                authorizationParams: {
-                    response_type: 'code', // Use authorization code flow
-                    scope: 'openid profile email', // Request standard claims
-                },
-
-                // Route customization
-                routes: {
-                    callback: '/auth/callback', // OAuth callback path
-                    login: false, // Disable default login route
-                    logout: '/logout', // Custom logout path
-                },
-            },
-        },
-
-        /**
          * Host Protection Configuration
          * ============================
          * Controls access to host-level functionality and room management.
@@ -358,8 +223,6 @@ module.exports = {
          * - protected      : Enable/disable host protection globally
          * - user_auth      : Require user authentication for host access
          * - users_from_db  : Fetch users from API/database instead of local config
-         * - maxAttempts    : Maximum login attempts before temporary block
-         * - minBlockTime   : Block duration in minutes after max attempts exceeded
          *
          * API Integration:
          * ---------------
@@ -385,7 +248,7 @@ module.exports = {
          * Presenter Management:
          * --------------------
          * - list        : Array of usernames who can be presenters.
-         *                 WARNING: with no auth provider enabled (protected / user_auth / OIDC),
+         *                 WARNING: with no auth provider enabled (protected / user_auth),
          *                 the display name is unverified client input, so each entry acts as a
          *                 shared secret. Use unique, non-guessable values (never a real name or
          *                 email) or anyone who guesses it becomes presenter. Empty by default.
@@ -399,9 +262,6 @@ module.exports = {
         host: {
             protected: process.env.HOST_PROTECTED === 'true',
             user_auth: process.env.HOST_USER_AUTH === 'true',
-
-            maxAttempts: process.env.HOST_MAX_LOGIN_ATTEMPTS || 5,
-            minBlockTime: process.env.HOST_MIN_LOGIN_BLOCK_TIME || 15, // in minutes
 
             users_from_db: process.env.HOST_USERS_FROM_DB === 'true',
             users_api_secret_key: process.env.USERS_API_SECRET || 'mirotalkweb_default_secret',
@@ -480,13 +340,10 @@ module.exports = {
      * - meeting    : Enable/disable single meeting operations [true/false] (default: true)
      * - join       : Enable/disable meeting join endpoint [true/false] (default: true)
      * - token      : Enable/disable token generation endpoint [true/false] (default: false)
-     * - slack      : Enable/disable Slack webhook integration [true/false] (default: true)
-     * - mattermost : Enable/disable Mattermost webhook integration [true/false] (default: true)
      *
      * API Documentation:
      * ------------------
      * - Complete API reference: https://docs.mirotalk.com/mirotalk-sfu/api/
-     * - Webhook setup: See integration guides for Slack/Mattermost
      */
     api: {
         keySecret: process.env.API_KEY_SECRET,
@@ -497,8 +354,6 @@ module.exports = {
             meetingEnd: process.env.API_ALLOW_MEETING_END === 'true',
             join: process.env.API_ALLOW_JOIN !== 'false',
             token: process.env.API_ALLOW_TOKEN === 'true',
-            slack: process.env.API_ALLOW_SLACK !== 'false',
-            mattermost: process.env.API_ALLOW_MATTERMOST !== 'false',
         },
     },
 
@@ -507,318 +362,6 @@ module.exports = {
     // ==============================================
 
     integrations: {
-        /**
-         * ChatGPT Integration Configuration
-         * ================================
-         * OpenAI API integration for AI-powered chat functionality
-         *
-         * Setup Instructions:
-         * ------------------
-         * 1. Go to https://platform.openai.com/
-         * 2. Create your OpenAI account
-         * 3. Generate your API key at https://platform.openai.com/account/api-keys
-         *
-         * Core Settings:
-         * -------------
-         * - enabled    : Enable/disable ChatGPT integration [true/false] (default: false)
-         * - basePath   : OpenAI API endpoint (default: 'https://api.openai.com/v1/')
-         * - apiKey     : OpenAI ProjectAPI secret key (ALWAYS store in .env)
-         * - model      : GPT model version (default: 'gpt-3.5-turbo')
-         *
-         * Advanced Settings:
-         * -----------------
-         * - max_tokens: Maximum response length (default: 1024 tokens)
-         * - temperature: Creativity control (0=strict, 1=creative) (default: 0)
-         *
-         * Usage Example:
-         * -------------
-         * 1. Supported Models:
-         *    - gpt-3.5-turbo (recommended)
-         *    - gpt-4
-         *    - gpt-4-turbo
-         *    - ...
-         *
-         * 2. Temperature Guide:
-         *    - 0.0: Factual responses
-         *    - 0.7: Balanced
-         *    - 1.0: Maximum creativity
-         */
-        chatGPT: {
-            enabled: process.env.CHATGPT_ENABLED === 'true',
-            basePath: process.env.CHATGPT_BASE_PATH || 'https://api.openai.com/v1/',
-            apiKey: process.env.CHATGPT_API_KEY || '',
-            model: process.env.CHATGPT_MODEL || 'gpt-3.5-turbo',
-            max_tokens: parseInt(process.env.CHATGPT_MAX_TOKENS) || 1024,
-            temperature: parseInt(process.env.CHATGPT_TEMPERATURE) || 0.7,
-        },
-
-        /**
-         * DeepSeek Integration Configuration
-         * ================================
-         * DeepSeek API integration for AI-powered chat functionality
-         *
-         * Setup Instructions:
-         * ------------------
-         * 1. Go to https://deepseek.com/
-         * 2. Create your DeepSeek account
-         * 3. Generate your API key at https://deepseek.com/account/api-keys
-         *
-         * Core Settings:
-         * -------------
-         * - enabled    : Enable/disable DeepSeek integration [true/false] (default: false)
-         * - basePath   : DeepSeek API endpoint (default: 'https://api.deepseek.com/v1/')
-         * - apiKey     : DeepSeek API secret key (ALWAYS store in .env)
-         * - model      : DeepSeek model version (default: 'deepseek-v4-flash')
-         *
-         * Advanced Settings:
-         * -----------------
-         * - max_tokens: Maximum response length (default: 1024 tokens)
-         * - temperature: Creativity control (0=strict, 1=creative) (default: 0)
-         *
-         * Usage Example:
-         * -------------
-         * 1. Supported Models:
-         *  - deepseek-v4-flash (recommended)
-         *  - deepseek-v4-pro
-         *  - ...
-         *
-         * 2. Temperature Guide:
-         *  - 0.0: Factual responses
-         *  - 0.7: Balanced
-         *  - 1.0: Maximum creativity
-         *
-         */
-        deepSeek: {
-            enabled: process.env.DEEP_SEEK_ENABLED === 'true',
-            basePath: process.env.DEEP_SEEK_BASE_PATH || 'https://api.deepseek.com/v1/',
-            apiKey: process.env.DEEP_SEEK_API_KEY || '',
-            model: process.env.DEEP_SEEK_MODEL || 'deepseek-v4-flash',
-            max_tokens: parseInt(process.env.DEEP_SEEK_MAX_TOKENS) || 1024,
-            temperature: parseInt(process.env.DEEP_SEEK_TEMPERATURE) || 0.7,
-        },
-
-        /**
-         * Email Notification Configuration
-         * ===============================
-         * SMTP settings for system alerts and notifications
-         *
-         * Core Settings:
-         * -------------
-         * - alert      : Enable/disable email alerts [true/false] (default: false)
-         * - notify     : Enable/disable room email notifications [true/false] (default: false)
-         * - host       : SMTP server address (default: 'localhost')
-         * - port       : SMTP port (default: 1025 for Mailpit, 587 for most providers)
-         * - username   : SMTP auth username
-         * - password   : SMTP auth password (store ONLY in .env)
-         * - from       : Sender email address (default: same as username)
-         * - sendTo     : Recipient email for alerts and notifications
-         *
-         * Common Providers:
-         * ----------------
-         * Gmail:
-         * - host: smtp.gmail.com
-         * - port: 587
-         *
-         * Office365:
-         * - host: smtp.office365.com
-         * - port: 587
-         *
-         * SendGrid:
-         * - host: smtp.sendgrid.net
-         * - port: 587
-         *
-         * Mailpit (local testing):
-         * - host: localhost
-         * - port: 1025
-         * - docker-compose-mailpit.yml
-         */
-        email: {
-            alert: process.env.EMAIL_ALERTS_ENABLED === 'true',
-            notify: process.env.EMAIL_NOTIFICATIONS === 'true',
-            host: process.env.EMAIL_HOST || 'localhost',
-            port: parseInt(process.env.EMAIL_PORT) || 1025,
-            username: process.env.EMAIL_USERNAME || 'test',
-            password: process.env.EMAIL_PASSWORD || 'test',
-            from: process.env.EMAIL_FROM || process.env.EMAIL_USERNAME,
-            sendTo: process.env.EMAIL_SEND_TO || 'test@mirotalk.com',
-        },
-
-        /**
-         * Slack Integration Configuration
-         * ==============================
-         * Settings for Slack slash commands and interactivity
-         *
-         * Setup Instructions:
-         * ------------------
-         * 1. Create a Slack app at https://api.slack.com/apps
-         * 2. Under "Basic Information" → "App Credentials":
-         *    - Copy the Signing Secret
-         * 3. Enable "Interactivity & Shortcuts" and "Slash Commands"
-         * 4. Set Request URL to: https://your-domain.com/slack/commands
-         *
-         * Core Settings:
-         * -------------
-         * - enabled         : Enable/disable Slack integration [true/false] (default: false)
-         * - signingSecret   : From Slack app credentials (store ONLY in .env)
-         *
-         */
-        slack: {
-            enabled: process.env.SLACK_ENABLED === 'true',
-            signingSecret: process.env.SLACK_SIGNING_SECRET || '',
-        },
-
-        /**
-         * Mattermost Integration Configuration
-         * ===================================
-         * Settings for Mattermost slash commands and bot integration
-         *
-         * Setup Instructions:
-         * ------------------
-         * 1. Go to Mattermost System Console → Integrations → Bot Accounts
-         * 2. Create a new bot account and copy:
-         *    - Server URL (e.g., 'https://chat.yourdomain.com')
-         *    - Access Token
-         * 3. For slash commands:
-         *    - Navigate to Integrations → Slash Commands
-         *    - Set Command: '/sfu'
-         *    - Set Request URL: 'https://your-sfu-server.com/mattermost/commands'
-         *
-         * Core Settings:
-         * -------------
-         * - enabled      : Enable/disable integration [true/false] (default: false)
-         * - serverUrl    : Mattermost server URL (include protocol)
-         * - token        : Bot account access token (most secure option)
-         * - OR
-         * - username     : Legacy auth username (less secure)
-         * - password     : Legacy auth password (deprecated)
-         *
-         * Command Configuration:
-         * ---------------------
-         * - commands     : Slash command definitions:
-         *   - name       : Command trigger (e.g., '/sfu')
-         *   - message    : Default response template
-         *
-         */
-        mattermost: {
-            enabled: process.env.MATTERMOST_ENABLED === 'true',
-            serverUrl: process.env.MATTERMOST_SERVER_URL || '',
-            username: process.env.MATTERMOST_USERNAME || '',
-            password: process.env.MATTERMOST_PASSWORD || '',
-            token: process.env.MATTERMOST_TOKEN || '',
-            commands: [
-                {
-                    name: process.env.MATTERMOST_COMMAND_NAME || '/sfu',
-                    message: process.env.MATTERMOST_DEFAULT_MESSAGE || 'Here is your meeting room:',
-                },
-            ],
-            texts: [
-                {
-                    name: process.env.MATTERMOST_COMMAND_NAME || '/sfu',
-                    message: process.env.MATTERMOST_DEFAULT_MESSAGE || 'Here is your meeting room:',
-                },
-            ],
-        },
-
-        /**
-         * Discord Integration Configuration
-         * ================================
-         * Settings for Discord bot and slash commands integration
-         *
-         * Setup Instructions:
-         * ------------------
-         * 1. Create a Discord application at https://discord.com/developers/applications
-         * 2. Navigate to "Bot" section and:
-         *    - Click "Add Bot"
-         *    - Copy the bot token (DISCORD_TOKEN)
-         * 3. Under "OAuth2 → URL Generator":
-         *    - Select "bot" and "applications.commands" scopes
-         *    - Select required permissions (see below)
-         * 4. Invite bot to your server using generated URL
-         *
-         * Core Settings:
-         * -------------
-         * - enabled        : Enable/disable Discord bot [true/false] (default: false)
-         * - token          : Bot token from Discord Developer Portal (store in .env)
-         *
-         * Command Configuration:
-         * ---------------------
-         * - commands       : Slash command definitions:
-         *   - name         : Command trigger (e.g., '/sfu')
-         *   - message      : Response template
-         *   - baseUrl      : Meeting room base URL
-         *
-         */
-        discord: {
-            enabled: process.env.DISCORD_ENABLED === 'true',
-            token: process.env.DISCORD_TOKEN || '',
-            commands: [
-                {
-                    name: process.env.DISCORD_COMMAND_NAME || '/sfu',
-                    message: process.env.DISCORD_DEFAULT_MESSAGE || 'Here is your SFU meeting room:',
-                    baseUrl: process.env.DISCORD_BASE_URL || 'https://sfu.mirotalk.com/join/',
-                },
-            ],
-        },
-
-        /**
-         * Ngrok Tunnel Configuration
-         * =========================
-         * Secure tunneling for local development and testing
-         *
-         * Setup Instructions:
-         * ------------------
-         * 1. Sign up at https://dashboard.ngrok.com/signup
-         * 2. Get your auth token from:
-         *    https://dashboard.ngrok.com/get-started/your-authtoken
-         * 3. For reserved domains/subdomains:
-         *    - Upgrade to paid plan if needed
-         *    - Reserve at https://dashboard.ngrok.com/cloud-edge/domains
-         *
-         * Core Settings:
-         * -------------
-         * - enabled      : Enable/disable Ngrok tunneling [true/false] (default: false)
-         * - authToken    : Your Ngrok authentication token (from dashboard)
-         */
-        ngrok: {
-            enabled: process.env.NGROK_ENABLED === 'true',
-            authToken: process.env.NGROK_AUTH_TOKEN || '',
-        },
-
-        /**
-         * Sentry Error Tracking Configuration
-         * ==================================
-         * Real-time error monitoring and performance tracking
-         *
-         * Setup Instructions:
-         * ------------------
-         * 1. Create a project at https://sentry.io/signup/
-         * 2. Get your DSN from:
-         *    Project Settings → Client Keys (DSN)
-         * 3. Configure alert rules and integrations as needed
-         *
-         * Core Settings:
-         * -------------
-         * enabled              : Enable/disable Sentry [true/false] (default: false)
-         * logLevels            : Array of log levels to capture (default: ['error'])
-         * DSN                  : Data Source Name (from Sentry dashboard)
-         * tracesSampleRate     : Percentage of transactions to capture (0.0-1.0)
-         *
-         * Performance Tuning:
-         * ------------------
-         * - Production         : 0.1-0.2 (10-20% of transactions)
-         * - Staging            : 0.5-1.0
-         * - Development        : 0.0 (disable performance tracking)
-         *
-         */
-        sentry: {
-            enabled: process.env.SENTRY_ENABLED === 'true',
-            logLevels: process.env.SENTRY_LOG_LEVELS
-                ? process.env.SENTRY_LOG_LEVELS.split(splitChar).map((level) => level.trim())
-                : ['error'],
-            DSN: process.env.SENTRY_DSN || '',
-            tracesSampleRate: Math.min(Math.max(parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE) || 0.5, 0), 1),
-        },
-
         /**
          * Webhook Configuration Settings
          * =============================
@@ -837,93 +380,6 @@ module.exports = {
         webhook: {
             enabled: process.env.WEBHOOK_ENABLED === 'true',
             url: process.env.WEBHOOK_URL || 'https://your-site.com/webhook-endpoint',
-        },
-
-        /**
-         * IP Geolocation Service Configuration
-         * ===================================
-         * Enables lookup of geographical information based on IP addresses using the GeoJS.io API.
-         *
-         * Core Settings:
-         * ---------------------
-         * - enabled: Enable/disable the IP lookup functionality [true/false] default false
-         *
-         * Service Details:
-         * --------------
-         * - Uses GeoJS.io free API service (https://www.geojs.io/)
-         * - Returns JSON data containing:
-         *   - Country, region, city
-         *   - Latitude/longitude
-         *   - Timezone and organization
-         * - Rate limits: 60 requests/minute (free tier)
-         */
-        IPLookup: {
-            enabled: process.env.IP_LOOKUP_ENABLED === 'true',
-            getEndpoint(ip) {
-                return `https://get.geojs.io/v1/ip/geo/${ip}.json`;
-            },
-        },
-
-        /**
-         * Example for AWS S3 Storage Configuration
-         * ===========================
-         * Enables cloud file storage using Amazon Simple Storage Service (S3).
-         *
-         * Core Settings:
-         * --------------
-         * - enabled: Enable/disable AWS S3 integration [true/false]
-         * - accessKeyId: AWS access key ID (store in .env)
-         * - secretAccessKey: AWS secret access key (store in .env)
-         * - region: AWS region where the S3 bucket is located
-         * - bucket: Name of the S3 bucket to use for storage
-         *
-         * Advanced Settings:
-         * --------------
-         * - endpoint: Custom S3 endpoint URL (if empty to auto-resolve from region). Useful for S3-compatible services like MinIO, Wasabi, DigitalOcean Spaces, etc.
-         * - forcePathStyle: Set to true for S3-compatible services like MinIO, Wasabi, etc.
-         *
-         * Service Setup:
-         * -------------
-         * 1. Create an S3 Bucket:
-         *    - Sign in to AWS Management Console
-         *    - Navigate to S3 service
-         *    - Click "Create bucket"
-         *    - Choose unique name (e.g., 'mirotalk')
-         *    - Select region (must match AWS_REGION in config)
-         *    - Enable desired settings (versioning, logging, etc.)
-         *
-         * 2. Get Security Credentials:
-         *    - Create IAM user with programmatic access
-         *    - Attach 'AmazonS3FullAccess' policy (or custom minimal policy)
-         *    - Save Access Key ID and Secret Access Key
-         *
-         * 3. Configure CORS (for direct uploads):
-         *    [
-         *      {
-         *        "AllowedHeaders": ["*"],
-         *        "AllowedMethods": ["PUT", "POST"],
-         *        "AllowedOrigins": ["*"],
-         *        "ExposeHeaders": []
-         *      }
-         *    ]
-         *
-         * Technical Details:
-         * -----------------
-         * - Default region: us-east-2 (Ohio)
-         * - Direct upload uses presigned URLs (expire after 1 hour by default)
-         * - Recommended permissions for direct upload:
-         *   - s3:PutObject
-         *   - s3:GetObject
-         *   - s3:DeleteObject
-         */
-        s3: {
-            enabled: process.env.S3_ENABLED === 'true',
-            accessKeyId: process.env.S3_ACCESS_KEY_ID || 'your-access-key-id',
-            secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || 'your-secret-access-key',
-            bucket: process.env.S3_BUCKET || 'mirotalk',
-            region: process.env.S3_REGION || 'us-east-2',
-            endpoint: process.env.S3_ENDPOINT || '',
-            forcePathStyle: process.env.S3_FORCE_PATH_STYLE === 'true',
         },
     },
 
@@ -982,10 +438,6 @@ module.exports = {
                 description:
                     process.env.APP_DESCRIPTION ||
                     'Start your next video call with a single click. No download, plug-in, or login is required.',
-                joinDescription: process.env.JOIN_DESCRIPTION || 'Pick a room name.<br />How about this one?',
-                joinButtonLabel: process.env.JOIN_BUTTON_LABEL || 'JOIN ROOM',
-                customizeButtonLabel: process.env.CUSTOMIZE_BUTTON_LABEL || 'CUSTOMIZE ROOM',
-                joinLastLabel: process.env.JOIN_LAST_LABEL || 'Your recent room:',
             },
 
             /**
@@ -997,9 +449,6 @@ module.exports = {
                 title: process.env.SITE_TITLE || 'MiroTalk SFU - Open Source WebRTC Video Conferencing',
                 icon: process.env.SITE_ICON_PATH || '../images/logo.svg',
                 appleTouchIcon: process.env.APPLE_TOUCH_ICON_PATH || '../images/logo.svg',
-                newRoomTitle: process.env.NEW_ROOM_TITLE || 'Pick name. <br />Share URL. <br />Start conference.',
-                newRoomDescription:
-                    process.env.NEW_ROOM_DESC || 'Each room has its disposable URL. Just pick a name and share.',
             },
 
             /**
@@ -1055,34 +504,6 @@ module.exports = {
              * Prompts users to identify themselves before joining a room.
              * Customizable text and button labels.
              */
-            whoAreYou: {
-                title: process.env.WHO_ARE_YOU_TITLE || 'MiroTalk SFU - Waiting for host to start the meeting',
-                waitingRoomHeading: process.env.WHO_ARE_YOU_WAITING_ROOM_HEADING || 'Waiting for host...',
-                waitingRoomDescription:
-                    process.env.WHO_ARE_YOU_WAITING_ROOM_DESCRIPTION ||
-                    "The meeting hasn't started yet.<br />You'll join automatically when the host opens the room.",
-                waitingRoomStatus: process.env.WHO_ARE_YOU_WAITING_ROOM_STATUS || 'Checking room status...',
-                waitingRoomReady: process.env.WHO_ARE_YOU_WAITING_ROOM_READY || 'Room is ready! Joining...',
-                waitingRoomWaiting:
-                    process.env.WHO_ARE_YOU_WAITING_ROOM_WAITING || 'Waiting for host to start the meeting...',
-                waitingRoomHostLink: process.env.WHO_ARE_YOU_WAITING_ROOM_HOST_LINK || 'Are you the host?',
-                waitingRoomLoginLink: process.env.WHO_ARE_YOU_WAITING_ROOM_LOGIN_LINK || 'Login here',
-                waitingRoomElapsedJust: process.env.WHO_ARE_YOU_WAITING_ROOM_ELAPSED_JUST || 'Just started waiting',
-                waitingRoomElapsedMinutes:
-                    process.env.WHO_ARE_YOU_WAITING_ROOM_ELAPSED_MINUTES || 'Waiting for {minutes}',
-                waitingRoomSongUrl: process.env.WHO_ARE_YOU_WAITING_ROOM_SONG_URL || '../sounds/waiting-music.mp3',
-            },
-
-            /**
-             * Login Page Section
-             * ---------------------
-             * Customizable heading, description, and button label for the login page.
-             */
-            login: {
-                heading: process.env.LOGIN_HEADING || 'Welcome back',
-                description: process.env.LOGIN_DESCRIPTION || 'Enter your credentials to continue.',
-                buttonLabel: process.env.LOGIN_BUTTON_LABEL || 'Login',
-            },
 
             /** About dialog for the meeting, with the deployed source revision. */
             about: {
@@ -1090,51 +511,6 @@ module.exports = {
                 version: packageJson.version,
             },
 
-            /**
-             * Widget Configuration
-             * --------------------
-             * Controls the appearance and behavior of the support widget.
-             * Supports dynamic configuration via environment variables.
-             */
-            widget: {
-                enabled: process.env.WIDGET_ENABLED === 'true',
-                roomId: process.env.WIDGET_ROOM_ID || 'support-room',
-                theme: process.env.WIDGET_THEME || 'dark',
-                widgetState: process.env.WIDGET_STATE || 'minimized',
-                widgetType: process.env.WIDGET_TYPE || 'support',
-                supportWidget: {
-                    position: process.env.WIDGET_SUPPORT_POSITION || 'top-right',
-                    expertImages: process.env.WIDGET_SUPPORT_EXPERT_IMAGES
-                        ? process.env.WIDGET_SUPPORT_EXPERT_IMAGES.split(splitChar)
-                              .map((url) => url.trim())
-                              .filter(Boolean)
-                        : [
-                              'https://photo.cloudron.pocketsolution.net/uploads/original/95/7d/a5f7f7a2c89a5fee7affda5f013c.jpeg',
-                          ],
-                    buttons: {
-                        audio: process.env.WIDGET_SUPPORT_BUTTON_AUDIO !== 'false',
-                        video: process.env.WIDGET_SUPPORT_BUTTON_VIDEO !== 'false',
-                        screen: process.env.WIDGET_SUPPORT_BUTTON_SCREEN !== 'false',
-                        chat: process.env.WIDGET_SUPPORT_BUTTON_CHAT !== 'false',
-                        join: process.env.WIDGET_SUPPORT_BUTTON_JOIN !== 'false',
-                    },
-                    checkOnlineStatus: process.env.WIDGET_SUPPORT_CHECK_ONLINE_STATUS === 'true',
-                    isOnline: process.env.WIDGET_SUPPORT_IS_ONLINE !== 'false',
-                    customMessages: {
-                        heading: process.env.WIDGET_SUPPORT_HEADING || 'Need Help?',
-                        subheading:
-                            process.env.WIDGET_SUPPORT_SUBHEADING || 'Get instant support from our expert team!',
-                        connectText: process.env.WIDGET_SUPPORT_CONNECT_TEXT || 'connect in < 5 seconds',
-                        onlineText: process.env.WIDGET_SUPPORT_ONLINE_TEXT || 'We are online',
-                        offlineText: process.env.WIDGET_SUPPORT_OFFLINE_TEXT || 'We are offline',
-                        poweredBy: process.env.WIDGET_SUPPORT_POWERED_BY || 'Powered by MiroTalk SFU',
-                    },
-                },
-                alert: {
-                    enabled: process.env.WIDGET_ALERT_ENABLED === 'true',
-                    type: process.env.WIDGET_ALERT_TYPE || 'email',
-                },
-            },
             //...
         },
 
@@ -1201,14 +577,12 @@ module.exports = {
             },
             // Settings panel buttons and options
             settings: {
-                activeRooms: process.env.SHOW_ROOMS !== 'false',
                 fileSharing: process.env.ENABLE_FILE_SHARING !== 'false',
                 lockRoomButton: process.env.SHOW_LOCK_ROOM !== 'false',
                 unlockRoomButton: process.env.SHOW_UNLOCK_ROOM !== 'false',
 
                 lobbyButton: process.env.SHOW_LOBBY !== 'false',
                 joinLockButton: process.env.SHOW_JOIN_LOCK !== 'false',
-                sendEmailInvitation: false,
                 micOptionsButton: process.env.SHOW_MIC_OPTIONS !== 'false',
 
                 tabNotificationsBtn: process.env.SHOW_NOTIFICATIONS_TAB !== 'false',
@@ -1250,7 +624,7 @@ module.exports = {
                 muteVideoButton: process.env.SHOW_MUTE_VIDEO !== 'false',
                 muteAudioButton: process.env.SHOW_MUTE_AUDIO !== 'false',
                 audioVolumeInput: process.env.SHOW_VOLUME_CONTROL !== 'false',
-                geolocationButton: false,
+
                 banButton: process.env.SHOW_BAN_BUTTON !== 'false',
                 ejectButton: process.env.SHOW_EJECT_BUTTON !== 'false',
                 presenterRoleButton: process.env.SHOW_PRESENTER_ROLE_BUTTON !== 'false',
@@ -1265,7 +639,7 @@ module.exports = {
 
                 muteAudioButton: process.env.SHOW_MUTE_AUDIO !== 'false',
                 audioVolumeInput: process.env.SHOW_VOLUME_CONTROL !== 'false',
-                geolocationButton: false,
+
                 banButton: process.env.SHOW_BAN_BUTTON !== 'false',
                 ejectButton: process.env.SHOW_EJECT_BUTTON !== 'false',
                 presenterRoleButton: process.env.SHOW_PRESENTER_ROLE_BUTTON !== 'false',
@@ -1278,8 +652,6 @@ module.exports = {
                 chatSaveButton: process.env.SHOW_CHAT_SAVE !== 'false',
                 chatEmojiButton: process.env.SHOW_CHAT_EMOJI !== 'false',
                 chatMarkdownButton: process.env.SHOW_CHAT_MARKDOWN !== 'false',
-                chatGPT: process.env.ENABLE_CHAT_GPT !== 'false',
-                deepSeek: process.env.ENABLE_DEEP_SEEK !== 'false',
             },
 
             // Participants list controls
@@ -1287,7 +659,7 @@ module.exports = {
                 sendFileAllButton: process.env.SHOW_SEND_FILE_ALL !== 'false',
                 ejectAllButton: process.env.SHOW_EJECT_ALL !== 'false',
                 sendFileButton: process.env.SHOW_SEND_FILE !== 'false',
-                geoLocationButton: false,
+
                 banButton: process.env.SHOW_BAN_BUTTON !== 'false',
                 ejectButton: process.env.SHOW_EJECT_BUTTON !== 'false',
                 presenterRoleButton: process.env.SHOW_PRESENTER_ROLE_BUTTON !== 'false',
@@ -1329,32 +701,6 @@ module.exports = {
         redirect: {
             enabled: process.env.REDIRECT_ENABLED === 'true',
             url: process.env.REDIRECT_URL || '',
-        },
-
-        /**
-         * Meeting Scheduler
-         * ---------------------
-         * - enabled: Show "Schedule Meeting" button on landing/newroom pages
-         * - Requires email configuration (integrations.email) to send invitations
-         * - Sends .ics calendar attachments with meeting details
-         * - requireAuth: Require authenticated requester before sending invitations
-         * - maxRecipients: Maximum recipients accepted per request
-         * - allowedDomains: Optional recipient domain allow-list (empty = all domains)
-         * - rateLimit: Throttle requests to prevent abuse
-         */
-        scheduleMeeting: {
-            enabled: process.env.SCHEDULE_MEETING_ENABLED === 'true',
-            requireAuth: process.env.SCHEDULE_MEETING_REQUIRE_AUTH !== 'false',
-            maxRecipients: Math.max(parseInt(process.env.SCHEDULE_MEETING_MAX_RECIPIENTS, 10) || 20, 1),
-            allowedDomains: (process.env.SCHEDULE_MEETING_ALLOWED_DOMAINS || '')
-                .split(splitChar)
-                .map((domain) => domain.trim().toLowerCase())
-                .filter(Boolean),
-            rateLimit: {
-                windowMs:
-                    Math.max(parseInt(process.env.SCHEDULE_MEETING_RATE_LIMIT_WINDOW_MINUTES, 10) || 60, 1) * 60 * 1000,
-                max: Math.max(parseInt(process.env.SCHEDULE_MEETING_RATE_LIMIT_MAX, 10) || 5, 1),
-            },
         },
 
         /**

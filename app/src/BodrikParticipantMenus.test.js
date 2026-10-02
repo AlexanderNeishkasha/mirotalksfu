@@ -22,7 +22,6 @@ for (const label of [
     'Toggle screen',
     'Share file',
     'Share file to all',
-    'Get geolocation',
     'Ban participant',
     'Eject participant',
     'Eject all participants',

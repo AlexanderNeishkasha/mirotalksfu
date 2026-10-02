@@ -55,16 +55,9 @@
 
         <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css" />
 
-        <!-- flatpickr  https://flatpickr.js.org/themes/ -->
-
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css" />
-
         <!--  pickr  https://github.com/simonwep/pickr -->
 
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@simonwep/pickr/dist/themes/classic.min.css" />
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@simonwep/pickr/dist/themes/monolith.min.css" />
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@simonwep/pickr/dist/themes/nano.min.css" />
 
         <!-- Highlight  https://github.com/highlightjs/highlight.js -->
 
@@ -108,7 +101,6 @@
         <!-- Js scripts https://cdn.jsdelivr.net -->
 
         <script defer src="https://cdn.jsdelivr.net/npm/@simonwep/pickr/dist/pickr.min.js"></script>
-        <script defer src="https://cdn.jsdelivr.net/npm/@simonwep/pickr/dist/pickr.es5.min.js"></script>
 
         <script defer src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
         <script defer src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
@@ -117,13 +109,10 @@
         <script defer src="https://cdn.jsdelivr.net/npm/emoji-mart@latest/dist/browser.js"></script>
         <script defer src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/2.11.8/umd/popper.min.js"></script>
         <script defer src="https://cdnjs.cloudflare.com/ajax/libs/tippy.js/6.3.7/tippy-bundle.umd.min.js"></script>
-        <script defer src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
         <script defer src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
         <script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
 
-        <script defer src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation"></script>
-        <script defer src="https://cdn.jsdelivr.net/npm/gifler@0.1.0/gifler.min.js"></script>
         <script defer src="https://cdn.jsdelivr.net/npm/xss/dist/xss.min.js"></script>
 
         <script defer src="/socket.io/socket.io.js"></script>
@@ -135,7 +124,9 @@
         <script defer src="../js/BodrikRecordingAudio.js"></script>
         <script defer src="../js/BodrikRecordingLifecycle.js"></script>
         <script defer src="../js/VideoGrid.js"></script>
+        <script defer src="../js/BodrikBackgroundAssets.js"></script>
         <script defer src="../js/VirtualBackground.js"></script>
+        <script defer src="../js/BodrikBackgroundCapture.js"></script>
         <script defer src="../js/NodeProcessor.js"></script>
         <script defer src="../js/BodrikMicProcessing.js"></script>
         <script defer src="../js/BodrikJoinDiagnostics.js"></script>
@@ -1175,23 +1166,6 @@
                                         </div>
                                     </td>
                                 </tr>
-                                <tr id="roomRecordingServer" class="hidden">
-                                    <td>
-                                        <div class="title">
-                                            <i class="fas fa-cloud-arrow-up"></i>
-                                            <p>Save recording on server</p>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div class="form-check form-switch form-switch-md title">
-                                            <input
-                                                id="switchServerRecording"
-                                                class="form-check-input"
-                                                type="checkbox"
-                                            />
-                                        </div>
-                                    </td>
-                                </tr>
                             </table>
                         </div>
                         <div class="recording-controls">
@@ -1827,8 +1801,7 @@
                         </div>
 
                         <!-- CHAT MESSAGES -->
-                        <ul id="chatGPTMessages" class="mb-0"></ul>
-                        <ul id="deepSeekMessages" class="mb-0"></ul>
+
                         <ul id="chatPublicMessages" class="mb-0"></ul>
                         <ul id="chatPrivateMessages" class="mb-0"></ul>
 
@@ -2050,14 +2023,6 @@
             <div>The server seems away or in maintenance, please wait until it come back up.</div>
         </template>
 
-        <template id="popupRecordingServerAdviceTemplate">
-            <div class="popup-template-copy popup-template-copy--left">
-                <b>Your recording session will be stored on the server.</b><br /><br />
-                If you do not agree, please switch off this option.<br />
-                The recording will then be stored in your browser and downloaded to your device after stopping.
-            </div>
-        </template>
-
         <template id="popupRecordingInfoTemplate">
             <div class="popup-template-copy popup-template-copy--left">
                 <span data-template-text="indicator"></span> <span data-template-text="recordingLocation"></span>
@@ -2151,26 +2116,6 @@ Note</textarea>
                     <button type="button" id="mirotalkFileRemoveBtn" class="mirotalk-file-preview-remove">
                         Remove
                     </button>
-                </div>
-            </div>
-        </template>
-
-        <template id="popupGeoLocationPromptTemplate">
-            <div data-template-text="message"></div>
-        </template>
-
-        <template id="popupDateTimePickerTemplate">
-            <div class="email-invitation-date-field">
-                <label for="datetimePicker">Meeting date and time</label>
-                <div class="email-invitation-date-control">
-                    <i class="fas fa-calendar-days" aria-hidden="true"></i>
-                    <input
-                        type="text"
-                        id="datetimePicker"
-                        class="flatpickr"
-                        placeholder="Choose date and time"
-                        aria-label="Meeting date and time"
-                    />
                 </div>
             </div>
         </template>

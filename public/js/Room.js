@@ -66,7 +66,7 @@ let survey = {
 
 let redirect = {
     enabled: true,
-    url: '/newroom',
+    url: '/',
 };
 
 let recCodecs = null;
@@ -86,7 +86,7 @@ const _PEER = {
     acceptPeer: '<i class="fas fa-check"></i>',
     banPeer: '<i class="fas fa-ban red"></i>',
     ejectPeer: '<i class="fas fa-right-from-bracket red"></i>',
-    geoLocation: '<i class="fas fa-location-dot"></i>',
+
     sendFile: '<i class="fas fa-upload"></i>',
     sendMsg: '<i class="fas fa-paper-plane"></i>',
 
@@ -307,8 +307,7 @@ let isParticipantsListOpen = false;
 let isVideoControlsOn = false;
 let isChatPasteTxt = false;
 let isChatMarkdownOn = false;
-let isChatGPTOn = false;
-let isDeepSeekOn = false;
+
 let isSpeechSynthesisSupported = 'speechSynthesis' in window;
 let joinRoomWithoutAudioVideo = true;
 let joinRoomWithScreen = false;
@@ -395,6 +394,7 @@ function initDocumentListener() {
     });
 }
 
+/** Initialize room admission, device choices, and retained control hints. */
 async function initClient() {
     await getThemes();
     setTheme();
@@ -448,7 +448,6 @@ async function initClient() {
             'Only the host (presenter) has the capability to record the meeting',
             'right'
         );
-        setTippy('switchServerRecording', 'The recording will be stored on the server rather than locally', 'right');
 
         setTippy('chatCleanTextButton', 'Clean', 'top');
         setTippy('chatPasteButton', 'Paste', 'top');
@@ -677,7 +676,11 @@ async function enumerateAudioDevices(stream) {
         });
 }
 
+/** Release preview capture and invalidate any effect derived from its camera track. */
 async function stopTracks(stream) {
+    if (stream.getVideoTracks().includes(virtualBackground.active?.source)) {
+        await virtualBackground.stopCurrentProcessor();
+    }
     stream.getTracks().forEach((track) => {
         track.stop();
     });
@@ -1217,42 +1220,6 @@ async function whoAreYou() {
         hide(initStartScreenButton);
     }
 
-    // Fetch the OIDC profile and manage peer_name
-    let force_peer_name = false;
-
-    try {
-        // Prepare headers for profile request
-        const headers = {};
-        if (peer_token) {
-            headers.Authorization = `Bearer ${peer_token}`;
-        }
-
-        const { data: profile } = await axios.get('/profile', {
-            timeout: 5000,
-            headers: headers,
-        });
-
-        if (profile) {
-            console.log('AXIOS GET OIDC Profile retrieved successfully', profile);
-
-            // Define peer_name based on the profile properties and preferences
-            const peerNamePreference = profile.peer_name || {};
-            default_name =
-                (peerNamePreference.email && profile.email) ||
-                (peerNamePreference.name && profile.name) ||
-                default_name;
-
-            // Set localStorage and force_peer_name if applicable
-            if (default_name && peerNamePreference.force) {
-                window.localStorage.peer_name = default_name;
-                force_peer_name = true;
-            }
-        } else {
-            console.warn('AXIOS GET Profile data is empty or undefined');
-        }
-    } catch (error) {
-        console.error('AXIOS OIDC Error fetching profile', error.message || error);
-    }
     window.BodrikProfile?.init({
         token: peer_token,
         avatar: peer_avatar,
@@ -1318,11 +1285,6 @@ async function whoAreYou() {
 
     // Show the init user container injected in Swal
     initUser.classList.toggle('hidden');
-
-    if (force_peer_name) {
-        getId('usernameInput').disabled = true;
-        hide(initUsernameEmojiButton);
-    }
 
     if (!isVideoAllowed) {
         elemDisplay('initVideo', false);
@@ -1584,53 +1546,6 @@ function copyToClipboard(txt, showTxt = true) {
         : userLog('info', `Copied to clipboard 👍`, 'top-end');
 }
 
-function shareRoomByEmail() {
-    Swal.fire({
-        allowOutsideClick: false,
-        allowEscapeKey: false,
-        background: swalBackground,
-        imageUrl: image.email,
-        position: 'center',
-        title: 'Schedule email invitation',
-        html: renderRoomTemplate('popupDateTimePickerTemplate'),
-        showCancelButton: true,
-        confirmButtonText: 'Open email',
-        cancelButtonColor: 'red',
-        showClass: { popup: 'animate__animated animate__fadeInDown' },
-        hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-        didOpen: () => {
-            flatpickr('#datetimePicker', {
-                enableTime: true,
-                dateFormat: 'Y-m-d H:i',
-                time_24hr: true,
-            });
-        },
-        preConfirm: () => {
-            const selectedDateTime = Swal.getPopup()?.querySelector('#datetimePicker')?.value?.trim() || '';
-
-            if (!selectedDateTime) {
-                Swal.showValidationMessage('Choose a meeting date and time');
-                return false;
-            }
-
-            const newLine = '\r\n\r\n';
-            const roomPassword =
-                isRoomLocked && (room_password || rc.RoomPassword)
-                    ? 'Password: ' + (room_password || rc.RoomPassword) + newLine
-                    : '';
-            const emailSubject = `Please join our ${BRAND.app.name} Video Chat Meeting`;
-            const emailBody = `The meeting is scheduled at:${newLine}DateTime: ${selectedDateTime}${newLine}${roomPassword}Click to join: ${RoomURL}${newLine}`;
-            const mailtoUrl = `mailto:?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
-
-            bypassBeforeUnloadOnce = true;
-            setTimeout(() => {
-                bypassBeforeUnloadOnce = false;
-            }, 1500);
-            window.location.href = mailtoUrl;
-        },
-    });
-}
-
 // ####################################################
 // JOIN ROOM
 // ####################################################
@@ -1666,6 +1581,7 @@ function joinRoom(peer_name, room_id) {
     }
 }
 
+/** Bind retained room controls after successful admission. */
 function roomIsReady() {
     startRoomSession();
 
@@ -1764,7 +1680,7 @@ function roomIsReady() {
     BUTTONS.settings.lobbyButton && show(lobbyButton);
     updateJoinLockButtons();
     !BUTTONS.settings.customNoiseSuppression && hide(noiseSuppressionButton);
-    if (rc.recording.recSyncServerRecording) show(roomRecordingServer);
+
     BUTTONS.main.aboutButton && show(aboutButton);
     if (!isMobileDevice) show(pinUnpinGridDiv);
     if (!isSpeechSynthesisSupported) hide(speechMsgDiv);
@@ -2099,13 +2015,9 @@ function updateChatCharCount() {
     el.textContent = `${len} / 4000`;
 }
 
+/** Show the empty-chat notice when public and private message lists are empty. */
 function updateChatEmptyNotice() {
-    const chatLists = [
-        getId('chatGPTMessages'),
-        getId('deepSeekMessages'),
-        getId('chatPublicMessages'),
-        getId('chatPrivateMessages'),
-    ].filter(Boolean);
+    const chatLists = [getId('chatPublicMessages'), getId('chatPrivateMessages')].filter(Boolean);
     const emptyNotice = getId('chatEmptyNotice');
     if (!emptyNotice) return;
     const hasMessages = chatLists.some((ul) => ul.children.length > 0);
@@ -3033,6 +2945,7 @@ function setPushToTalkPressed(pressed) {
     return pushToTalkTransition;
 }
 
+/** Bind device, recording, and appearance preferences to their controls. */
 function handleSelects() {
     // devices options
     videoSelect.onchange = (e) => {
@@ -3213,13 +3126,7 @@ function handleSelects() {
         lS.setSettings(localStorageSettings);
         e.target.blur();
     };
-    switchServerRecording.onchange = (e) => {
-        rc.recording.recSyncServerRecording = e.currentTarget.checked;
-        rc.roomMessage('recSyncServer', rc.recording.recSyncServerRecording);
-        localStorageSettings.rec_server = rc.recording.recSyncServerRecording;
-        lS.setSettings(localStorageSettings);
-        e.target.blur();
-    };
+
     // styling
     keepCustomTheme.onchange = (e) => {
         themeCustom.keep = e.currentTarget.checked;
@@ -3630,6 +3537,7 @@ function handleChatEmojiPicker() {
 // LOAD SETTINGS FROM LOCAL STORAGE
 // ####################################################
 
+/** Restore supported local preferences without retired server-recording controls. */
 function loadSettingsFromLocalStorage() {
     rc.showChatOnMessage = localStorageSettings.show_chat_on_msg;
     rc.speechInMessages = localStorageSettings.speech_in_msg;
@@ -3648,8 +3556,6 @@ function loadSettingsFromLocalStorage() {
     switchKeepButtonsVisible.checked = isKeepButtonsVisible;
     switchChatPin.checked = isChatPinEnabled;
     switchShortcuts.checked = isShortcutsEnabled;
-
-    switchServerRecording.checked = localStorageSettings.rec_server;
 
     keepCustomTheme.checked = themeCustom.keep;
     selectTheme.disabled = themeCustom.keep;
@@ -3683,6 +3589,7 @@ function loadSettingsFromLocalStorage() {
 // ROOM CLIENT EVENT LISTNERS
 // ####################################################
 
+/** Synchronize room controls with client media and moderation events. */
 function handleRoomClientEvents() {
     rc.on(RoomClient.EVENTS.startRec, () => {
         console.log('Room event: Client start recoding');
@@ -3890,7 +3797,7 @@ function handleRoomClientEvents() {
             hide(recordingTypeField);
             hide(roomHostOnlyRecording);
             hide(roomRecordingOptions);
-            hide(roomRecordingServer);
+
             show(recordingMessage);
             hostOnlyRecording = true;
         }
@@ -3928,7 +3835,7 @@ function handleRoomClientEvents() {
 // ####################################################
 
 function initLeaveMeeting() {
-    openURL('/newroom');
+    openURL('/');
 }
 
 async function leaveRoom(allowCancel = true, disconnectAll = false) {
@@ -3981,7 +3888,7 @@ function redirectOnLeave(disconnectAll = false) {
     isExiting = true;
     endRoomSession();
     rc.exitRoom(disconnectAll);
-    redirect && redirect.enabled ? openURL(redirect.url) : openURL('/newroom');
+    redirect && redirect.enabled ? openURL(redirect.url) : openURL('/');
 }
 
 function saveDataToFile(dataURL, fileName) {
@@ -5015,6 +4922,7 @@ function handleParticipantDropdownPortal(dropdowns) {
     });
 }
 
+/** Render human participants and public chat with authorized participant actions. */
 function getParticipantsList(peers) {
     let li = '';
 
@@ -5092,44 +5000,6 @@ function getParticipantsList(peers) {
                 onClick,
                 avatarSrc,
             },
-        });
-    }
-
-    const chatGPT = BUTTONS.chat.chatGPT !== undefined ? BUTTONS.chat.chatGPT : true;
-
-    // CHAT-GPT
-    if (chatGPT) {
-        const chatgpt_active = rc.chatPeerName === 'ChatGPT' ? ' active' : '';
-
-        li = renderParticipantItem({
-            itemId: 'ChatGPT',
-            toId: 'ChatGPT',
-            toName: 'ChatGPT',
-            itemClass: `clearfix${chatgpt_active}`,
-            onClick: "rc.showPeerAboutAndMessages(this.id, 'ChatGPT', '', event)",
-            avatarSrc: image.chatgpt,
-            name: 'ChatGPT',
-            nameSuffix: ' <span class="chat-peer-badge assistant-green">Assistant</span>',
-            statusHtml: renderParticipantStatus('Private assistant replies'),
-        });
-    }
-
-    const deepSeek = BUTTONS.chat.deepSeek !== undefined ? BUTTONS.chat.deepSeek : true;
-
-    // DEEP-SEEK
-    if (deepSeek) {
-        const deepSeek_active = rc.chatPeerName === 'DeepSeek' ? ' active' : '';
-
-        li += renderParticipantItem({
-            itemId: 'DeepSeek',
-            toId: 'DeepSeek',
-            toName: 'DeepSeek',
-            itemClass: `clearfix${deepSeek_active}`,
-            onClick: "rc.showPeerAboutAndMessages(this.id, 'DeepSeek', '', event)",
-            avatarSrc: image.deepSeek,
-            name: 'DeepSeek',
-            nameSuffix: ' <span class="chat-peer-badge assistant">Assistant</span>',
-            statusHtml: renderParticipantStatus('Private assistant replies'),
         });
     }
 
@@ -5262,7 +5132,7 @@ function getParticipantsList(peers) {
         const peer_hand = peer_info.peer_hand ? _PEER.raiseHand : _PEER.lowerHand;
         const peer_ban = _PEER.banPeer;
         const peer_eject = _PEER.ejectPeer;
-        const peer_geoLocation = _PEER.geoLocation;
+
         const peer_sendFile = _PEER.sendFile;
         const peer_id = peer_info.peer_id;
         const avatarImg = getParticipantAvatar(peer_name, peer_avatar);
@@ -5370,17 +5240,6 @@ function getParticipantsList(peers) {
                     );
                 }
 
-                if (BUTTONS.participantsList.geoLocationButton) {
-                    menuItems += renderParticipantMenuItem(
-                        renderParticipantActionButton({
-                            buttonClass: 'btn-sm ml5',
-                            buttonId: `${peer_id}___geoLocation`,
-                            onClick: `rc.askPeerGeoLocation('${peer_id}')`,
-                            iconHtml: peer_geoLocation,
-                            label: 'Get geolocation',
-                        })
-                    );
-                }
                 if (BUTTONS.participantsList.banButton || BUTTONS.participantsList.ejectButton) {
                     menuItems += renderParticipantMenuGroup('Danger zone');
                 }
@@ -6276,29 +6135,28 @@ function showImageSelector() {
 // VIRTUAL BACKGROUND HELPER
 // ####################################################
 
+/** Apply the latest prejoin effect and persist settings only after successful preparation. */
 async function applyVirtualBackground(videoElement, stream, blurLevel, backgroundImage, backgroundTransparent) {
-    const videoTrack = stream.getVideoTracks()[0];
+    const applied = await window.BodrikBackgroundCapture.preview(virtualBackground, videoElement, stream, {
+        blurLevel,
+        imageUrl: backgroundImage,
+        transparent: backgroundTransparent,
+    });
+    if (!applied) return;
 
     if (blurLevel) {
-        videoElement.srcObject = await virtualBackground.applyBlurToWebRTCStream(videoTrack, blurLevel);
         virtualBackgroundBlurLevel = blurLevel;
         virtualBackgroundSelectedImage = null;
         virtualBackgroundTransparent = null;
     } else if (backgroundImage) {
-        videoElement.srcObject = await virtualBackground.applyVirtualBackgroundToWebRTCStream(
-            videoTrack,
-            backgroundImage
-        );
         virtualBackgroundSelectedImage = backgroundImage;
         virtualBackgroundBlurLevel = null;
         virtualBackgroundTransparent = null;
     } else if (backgroundTransparent) {
-        videoElement.srcObject = await virtualBackground.applyTransparentVirtualBackgroundToWebRTCStream(videoTrack);
         virtualBackgroundBlurLevel = null;
         virtualBackgroundSelectedImage = null;
         virtualBackgroundTransparent = true;
     } else {
-        videoElement.srcObject = stream; // Default case, use original stream
         virtualBackgroundBlurLevel = null;
         virtualBackgroundSelectedImage = null;
         virtualBackgroundTransparent = null;
@@ -6475,6 +6333,7 @@ window.addEventListener('popstate', (event) => {
 // Notify the server while the websocket is still open so the next page can
 // join without waiting for the disconnected peer's recovery grace period.
 window.addEventListener('pagehide', () => {
+    virtualBackground.stopCurrentProcessor().catch((error) => console.warn('Background shutdown failed', error));
     if (socket.connected) socket.disconnect();
 });
 

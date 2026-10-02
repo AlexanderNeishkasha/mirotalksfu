@@ -46,7 +46,6 @@ let BUTTONS = {
         // presenter
         lobbyButton: true, // presenter
         joinLockButton: true, // presenter
-        sendEmailInvitation: true, // presenter
         micOptionsButton: true,
         // presenter
         tabModerator: true, // presenter
@@ -83,7 +82,7 @@ let BUTTONS = {
         muteVideoButton: true,
         muteAudioButton: true,
         audioVolumeInput: true,
-        geolocationButton: true, // Presenter
+        // Presenter
         banButton: true, // presenter
         ejectButton: true, // presenter
         presenterRoleButton: true, // presenter
@@ -97,7 +96,7 @@ let BUTTONS = {
 
         muteAudioButton: true,
         audioVolumeInput: true,
-        geolocationButton: true, // Presenter
+        // Presenter
         banButton: true, // presenter
         ejectButton: true, // presenter
         presenterRoleButton: true, // presenter
@@ -109,15 +108,12 @@ let BUTTONS = {
         chatSaveButton: true,
         chatEmojiButton: true,
         chatMarkdownButton: true,
-        chatGPT: true,
-        deepSeek: true,
     },
 
     participantsList: {
         sendFileAllButton: true, // presenter
         ejectAllButton: true, // presenter
         sendFileButton: true, // presenter & guests
-        geoLocationButton: true, // presenter
         banButton: true, // presenter
         ejectButton: true, // presenter
         presenterRoleButton: true, // presenter
@@ -129,6 +125,7 @@ let BUTTONS = {
 // Baseline snapshot of the server-merged BUTTONS config, used to restore state on role changes
 let buttonsBaseline = null;
 
+/** Apply presenter permissions to retained room controls. */
 function handleRules(isPresenter, roomSetup = true) {
     console.log('07.1 ----> IsPresenter: ' + isPresenter);
     if (!isRulesActive) return;
@@ -152,15 +149,14 @@ function handleRules(isPresenter, roomSetup = true) {
 
         BUTTONS.settings.lobbyButton = false;
         BUTTONS.settings.joinLockButton = false;
-        BUTTONS.settings.sendEmailInvitation = false;
 
         BUTTONS.settings.tabModerator = false;
         BUTTONS.videoOff.muteAudioButton = false;
-        BUTTONS.videoOff.geolocationButton = false;
+
         BUTTONS.videoOff.banButton = false;
         BUTTONS.videoOff.ejectButton = false;
         BUTTONS.videoOff.presenterRoleButton = false;
-        BUTTONS.consumerVideo.geolocationButton = false;
+
         BUTTONS.consumerVideo.banButton = false;
         BUTTONS.consumerVideo.ejectButton = false;
         BUTTONS.consumerVideo.presenterRoleButton = false;
@@ -188,7 +184,6 @@ function handleRules(isPresenter, roomSetup = true) {
 
         BUTTONS.settings.lockRoomButton = BUTTONS.settings.lockRoomButton && !isRoomLocked;
         BUTTONS.settings.unlockRoomButton = BUTTONS.settings.lockRoomButton && isRoomLocked;
-        BUTTONS.settings.sendEmailInvitation = true;
 
         //...
 
@@ -302,6 +297,7 @@ function updateModeratorSwitchUI(type, status) {
     if (switchEl) switchEl.checked = !!status;
 }
 
+/** Collect supported microphone, camera, screen, and human-chat restrictions. */
 function getModeratorData() {
     return {
         video_start_privacy: switchEveryonePrivacy.checked,
@@ -312,7 +308,5 @@ function getModeratorData() {
         screen_cant_share: switchEveryoneCantShareScreen.checked,
         chat_cant_privately: switchEveryoneCantChatPrivately.checked,
         chat_cant_publicly: switchEveryoneCantChatPublicly.checked,
-        chat_cant_chatgpt: localStorageSettings.moderator_chat_cant_chatgpt,
-        chat_cant_deep_seek: localStorageSettings.moderator_chat_cant_deep_seek,
     };
 }

@@ -57,14 +57,6 @@ Every `join`, `exit`, and `disconnect` payload includes a `session_id` field ins
 
 This lets you reliably group all events belonging to the same conference instance — regardless of the room name — without relying on fragile "room emptied" gap-detection, which fails if the server crashes and no exit/disconnect event is ever sent.
 
-The same `session_id` is also embedded in the server recording filename:
-
-```text
-Rec_<roomName>_<dateTime>_<session_id>.webm
-```
-
-so recording files and participants can be correlated directly.
-
 **Example `join` payload with `session_id`**:
 
 ```json

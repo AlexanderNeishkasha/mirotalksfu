@@ -27,7 +27,25 @@ retired. The meeting uses ordinary participant media permissions; screen sharing
 recording, and the native music participant remain. Video AI avatars and the
 LiveKit client are retired; ordinary camera capture, profiles, and virtual
 backgrounds remain available. Document-level picture-in-picture is retired;
-ordinary per-video PiP remains. Empty camera selectors offer a localized
+ordinary per-video PiP remains. ChatGPT/DeepSeek chat, meeting scheduling,
+SMTP alerts/invitations, Slack/Mattermost/Discord integrations, and participant
+geolocation (including IP geolocation lookup) are retired end to end. Server
+recording, chunk uploads, S3 storage, and the standalone recording receiver are
+removed. Local recording still buffers the encoder's final data, repairs WebM
+duration, and downloads to the participant's device; it retains music/participant
+volume and microphone-mute handling. The color picker loads one modern build and
+its active classic theme only. Standalone landing/login/room-creation/catalog,
+waiting-room and widget pages are retired; canonical Bodrik invitation exchange,
+room-bound JWT admission, permission guidance, privacy and error pages remain.
+OIDC, ngrok and Sentry integrations and their dependencies are removed.
+Virtual backgrounds load MediaPipe only on activation, and gifler only for GIFs.
+Each effect owns a cloned camera track, generated output, abortable pipeline and
+animation; disabling, switching cameras and leaving invalidate obsolete work.
+Load failures retain ordinary camera capture. GIF downloads are cancellable,
+temporary URLs are revoked, and zero-delay GIF frames are normalized to prevent
+gifler 0.1.0's catch-up loop from freezing a tab. Raw producer camera capture is
+owned separately from its derived output so closing effects cannot leak capture.
+Empty camera selectors offer a localized
 permission retry that releases its temporary stream without publishing video.
 The service-specific backend, TURN server, deployment configuration, environment
 variables, credentials, and user-uploaded data are not stored in this repository.

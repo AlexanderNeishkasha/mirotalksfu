@@ -35,7 +35,6 @@ test('stop keeps the graph alive through final data, then releases it in the sto
         _recordingStarted: true,
         recScreenAudioTracks: [],
         audioRecorder: { stopMixedAudioStream: () => events.push('release graph') },
-        recording: { recSyncServerRecording: false },
         toggleVideoAudioTabs() {},
         disableRecordingOptions() {},
         handleLocalRecordingStop: () => events.push('save final data'),

@@ -51,7 +51,6 @@ test(
         const room = {
             clientDiagnosticsEnabled: true,
             peers: JSON.stringify([['peer-id', { peer_info: { peer_name: 'Participant' } }]]),
-            recUploadToken: 'test-recording-token',
             sessionId: 'test-session',
         };
         const { client, events, completed, method } = admission(room);
@@ -63,7 +62,7 @@ test(
         assert.equal(outcome.room, room);
         assert.equal(client.peers.size, 1);
         assert.equal(client.peers.get('peer-id').peer_info.peer_name, 'Participant');
-        assert.equal(client.recUploadToken, 'test-recording-token');
+        assert.equal(Object.hasOwn(client, 'recUploadToken'), false);
         assert.equal(client.sessionId, 'test-session');
     }
 );

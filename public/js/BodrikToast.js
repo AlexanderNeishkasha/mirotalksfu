@@ -39,7 +39,7 @@
         'Share room on join',
         'Only host recording',
         'Speech incoming messages',
-        'Server sync recording',
+
         'Custom theme keep',
         'Moderator: everyone starts in privacy mode',
         'Moderator: everyone starts muted',
@@ -49,8 +49,7 @@
         "Moderator: everyone can't share the screen",
         "Moderator: everyone can't chat privately",
         "Moderator: everyone can't chat publicly",
-        "Moderator: everyone can't chat with ChatGPT",
-        "Moderator: everyone can't chat with DeepSeek",
+
         'Moderator: disconnect all on leave room',
         'Moderator: everyone follows me',
         'BROADCASTING',

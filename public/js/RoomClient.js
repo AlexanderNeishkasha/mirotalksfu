@@ -34,7 +34,6 @@ const html = {
     sendFile: 'fas fa-upload',
     sendMsg: 'fas fa-paper-plane',
 
-    geolocation: 'fas fa-location-dot',
     ban: 'fas fa-ban',
     kickOut: 'fas fa-times',
     presenterRole: 'fa-solid fa-user-shield',
@@ -76,7 +75,7 @@ const icons = {
     broadcaster: '<i class="fa-solid fa-wifi"></i>',
     codecs: '<i class="fa-solid fa-film"></i>',
     theme: '<i class="fas fa-fill-drip"></i>',
-    recSync: '<i class="fa-solid fa-cloud-arrow-up"></i>',
+
     refresh: '<i class="fas fa-rotate"></i>',
 
     up: '<i class="fas fa-chevron-up"></i>',
@@ -123,13 +122,10 @@ const image = {
     exit: '../images/exit.png',
     feedback: '../images/feedback.png',
     lobby: '../images/lobby.png',
-    email: '../images/email.png',
-    chatgpt: '../images/chatgpt.png',
-    deepSeek: '../images/deepSeek.png',
+
     all: '../images/all.png',
     forbidden: '../images/forbidden.png',
 
-    geolocation: '../images/geolocation.png',
     network: '../images/network.gif',
 
     save: '../images/save.png',
@@ -209,6 +205,7 @@ const enums = {
 let recordedBlobs = [];
 
 class RoomClient {
+    /** Initialize call, human-chat, and local-recording state before admission. */
     constructor(
         localAudioEl,
         remoteAudioEl,
@@ -276,8 +273,6 @@ class RoomClient {
             screen_cant_share: false,
             chat_cant_privately: false,
             chat_cant_publicly: false,
-            chat_cant_chatgpt: false,
-            chat_cant_deep_seek: false,
         };
 
         // Chat messages
@@ -341,9 +336,6 @@ class RoomClient {
         this.camVideo = false;
         this.videoQualitySelectedIndex = 0;
 
-        this.chatGPTContext = [];
-        this.deepSeekContext = [];
-        this.chatGPTEnabled = false;
         this.chatMessages = [];
         this.leftMsgAvatar = null;
         this.rightMsgAvatar = null;
@@ -385,14 +377,9 @@ class RoomClient {
         this.screenAudioRecorder = null; // mixes participant audio with system/tab audio
         this.recScreenStream = null;
         this.recScreenAudioTracks = []; // raw system/tab audio tracks to stop on recording end
-        this.recording = {
-            recSyncServerRecording: false,
-            recSyncServerToS3: false,
-            recSyncServerEndpoint: '',
-        };
-        this.recSyncTime = 4000; // 4 sec
-        this.recSyncChunkSize = 1000000; // 1MB
-        this.recUploadToken = ''; // Per-session token authorizing /recSync* uploads (issued on join)
+
+        // 4 sec
+        // 1MB
 
         this.sessionId = ''; // Server-side unique conference-instance ID (issued on join)
 
@@ -601,7 +588,7 @@ class RoomClient {
 
                 window.BodrikClientDiagnostics.setEnabled(room.clientDiagnosticsEnabled === true);
                 this.peers = new Map(JSON.parse(room.peers));
-                if (room.recUploadToken) this.recUploadToken = room.recUploadToken;
+
                 if (room.sessionId) this.sessionId = room.sessionId;
                 await this.joinAllowed(room);
             })
@@ -656,6 +643,7 @@ class RoomClient {
         await this.initTransports(this.device);
     }
 
+    /** Apply the server-owned room snapshot and participant moderation state. */
     async handleRoomInfo(room) {
         // ##########################################
         this.peers = new Map(JSON.parse(room.peers));
@@ -707,16 +695,7 @@ class RoomClient {
             this.event(room.config.isJoinLocked ? _EVENTS.joinLockOn : _EVENTS.joinLockOff);
 
             // ###################################################################################################
-            if (room.recording) this.recording = room.recording;
-            if (room.recording && room.recording.recSyncServerRecording) {
-                console.log('07.1 WARNING ----> SERVER SYNC RECORDING ENABLED!', this.recording);
-                this.recording.recSyncServerRecording = localStorageSettings.rec_server;
-                if (BUTTONS.settings.tabRecording && !room.config.hostOnlyRecording) {
-                    show(roomRecordingServer);
-                }
-                switchServerRecording.checked = this.recording.recSyncServerRecording;
-            }
-            console.log('07.1 ----> SERVER SYNC RECORDING', this.recording);
+
             // ###################################################################################################
 
             // Handle Room moderator rules
@@ -755,8 +734,6 @@ class RoomClient {
             if (room.followMe && room.followMe.enabled && !isPresenter) {
                 this._pendingFollowMe = room.followMe;
             }
-
-            this.chatGPTEnabled = room.chatGPTEnabled || false;
 
             {
             }
@@ -1418,17 +1395,16 @@ class RoomClient {
         // Drop messages that violate the current moderator restrictions (defense-in-depth
         // in case a peer bypasses the client-side send guards).
         const isPublicMessage = data.to_peer_id === 'all';
-        const isAIMessage = ['ChatGPT', 'DeepSeek'].includes(data.to_peer_id);
-        if (!isAIMessage) {
-            if (isPublicMessage && this._moderator.chat_cant_publicly) {
-                console.warn('Dropping public message: disabled by moderator', data);
-                return;
-            }
-            if (!isPublicMessage && this._moderator.chat_cant_privately) {
-                console.warn('Dropping private message: disabled by moderator', data);
-                return;
-            }
+
+        if (isPublicMessage && this._moderator.chat_cant_publicly) {
+            console.warn('Dropping public message: disabled by moderator', data);
+            return;
         }
+        if (!isPublicMessage && this._moderator.chat_cant_privately) {
+            console.warn('Dropping private message: disabled by moderator', data);
+            return;
+        }
+
         this.showMessage(data);
     };
 
@@ -1966,6 +1942,7 @@ class RoomClient {
     // ####################################################
 
     /** Capture and publish local media, releasing failed camera captures and restoring video-off state. */
+    /** Publish owned capture; obsolete camera/effect work cannot replace a newer producer. */
     async produce(type, deviceId = null, swapCamera = false, init = false) {
         let mediaConstraints = {};
         let elem;
@@ -2007,6 +1984,9 @@ class RoomClient {
             return console.warn('Producer already exists for this type ' + type);
         }
 
+        const captureGeneration = video
+            ? (this.cameraCaptureGeneration = (this.cameraCaptureGeneration || 0) + 1)
+            : null;
         const videoPrivacyBtn = this.getId(this.peer_id + '__vp');
         if (videoPrivacyBtn) videoPrivacyBtn.style.display = screen ? 'none' : 'inline';
 
@@ -2019,28 +1999,21 @@ class RoomClient {
                 stream = screen
                     ? await navigator.mediaDevices.getDisplayMedia(mediaConstraints)
                     : await navigator.mediaDevices.getUserMedia(mediaConstraints);
+            }
 
-                // Handle Virtual Background and Blur using MediaPipe
-                if (video && isMediaStreamTrackAndTransformerSupported) {
-                    const videoTrack = stream.getVideoTracks()[0];
-
-                    if (virtualBackgroundBlurLevel) {
-                        // Apply blur before sending it to WebRTC stream
-                        stream = await virtualBackground.applyBlurToWebRTCStream(
-                            videoTrack,
-                            virtualBackgroundBlurLevel
-                        );
-                    } else if (virtualBackgroundSelectedImage) {
-                        // Apply virtual background to WebRTC stream
-                        stream = await virtualBackground.applyVirtualBackgroundToWebRTCStream(
-                            videoTrack,
-                            virtualBackgroundSelectedImage
-                        );
-                    } else if (virtualBackgroundTransparent) {
-                        // Apply Transparent virtual background to WebRTC stream
-                        stream = await virtualBackground.applyTransparentVirtualBackgroundToWebRTCStream(videoTrack);
-                    }
-                }
+            if (video) {
+                stream = await window.BodrikBackgroundCapture.prepare(
+                    this,
+                    stream,
+                    captureGeneration,
+                    virtualBackground,
+                    {
+                        blurLevel: virtualBackgroundBlurLevel,
+                        imageUrl: virtualBackgroundSelectedImage,
+                        transparent: virtualBackgroundTransparent,
+                    },
+                    () => this.closeProducer(mediaType.video, 'cameraended')
+                );
             }
 
             if (audio && BUTTONS.settings.customNoiseSuppression) {
@@ -2130,6 +2103,11 @@ class RoomClient {
             });
 
             const producer = await this.producerTransport.produce(params);
+            if (video && (this.isLeaving || captureGeneration !== this.cameraCaptureGeneration)) {
+                producer.close();
+                stream.getTracks().forEach((track) => track.stop());
+                throw new DOMException('Camera operation cancelled', 'AbortError');
+            }
 
             if (!producer) {
                 throw new Error('Producer not found!');
@@ -2154,7 +2132,7 @@ class RoomClient {
                 if (video) {
                     this.localVideoElement = elem;
                     this.videoProducerId = producer.id;
-                    camera = detectCameraFacingMode(stream);
+                    camera = detectCameraFacingMode(this.cameraSourceStream || stream);
                     handleCameraMirror(elem);
                 }
 
@@ -2178,15 +2156,15 @@ class RoomClient {
             }
 
             producer.on('trackended', () => {
-                this.closeProducer(type, 'trackended');
+                if (this.producerLabel.get(type) === producer.id) this.closeProducer(type, 'trackended');
             });
 
             producer.on('transportclose', () => {
-                this.closeProducer(type, 'transportclose');
+                if (this.producerLabel.get(type) === producer.id) this.closeProducer(type, 'transportclose');
             });
 
             producer.on('close', () => {
-                this.closeProducer(type, 'close');
+                if (this.producerLabel.get(type) === producer.id) this.closeProducer(type, 'close');
             });
 
             switch (type) {
@@ -2211,7 +2189,10 @@ class RoomClient {
         } catch (err) {
             console.error('Produce error:', err);
             if (type === mediaType.video) {
+                const obsolete = this.isLeaving || captureGeneration !== this.cameraCaptureGeneration;
                 stream?.getTracks().forEach((track) => track.stop());
+                if (!obsolete) window.BodrikBackgroundCapture.release(this, virtualBackground);
+                if (obsolete || err.name === 'AbortError') return;
                 this.isVideoAllowed = false;
                 this.peer_info.peer_video = false;
                 this.event(_EVENTS.stopVideo);
@@ -3209,7 +3190,9 @@ class RoomClient {
         }
     }
 
+    /** Close a media producer and invalidate pending/derived camera capture when applicable. */
     closeProducer(type, event = 'Close Producer') {
+        if (type === mediaType.video) window.BodrikBackgroundCapture?.release(this, virtualBackground);
         if (!this.producerLabel.has(type)) {
             return console.warn('There is no producer for this type ' + type);
         }
@@ -3552,6 +3535,7 @@ class RoomClient {
         }
     }
 
+    /** Receive DataChannel chat while honoring public/private restrictions. */
     async consumeData(dataProducerId) {
         if (!this.consumerTransport) {
             console.warn('Consumer transport not available, skipping DataConsumer creation');
@@ -3585,17 +3569,16 @@ class RoomClient {
                         console.log('DataChannel chat message received', msg);
                         // Drop messages that violate current moderator restrictions
                         const isPublicMessage = msg.to_peer_id === 'all';
-                        const isAIMessage = ['ChatGPT', 'DeepSeek'].includes(msg.to_peer_id);
-                        if (!isAIMessage) {
-                            if (isPublicMessage && this._moderator.chat_cant_publicly) {
-                                console.warn('Dropping DataChannel public message: disabled by moderator', msg);
-                                return;
-                            }
-                            if (!isPublicMessage && this._moderator.chat_cant_privately) {
-                                console.warn('Dropping DataChannel private message: disabled by moderator', msg);
-                                return;
-                            }
+
+                        if (isPublicMessage && this._moderator.chat_cant_publicly) {
+                            console.warn('Dropping DataChannel public message: disabled by moderator', msg);
+                            return;
                         }
+                        if (!isPublicMessage && this._moderator.chat_cant_privately) {
+                            console.warn('Dropping DataChannel private message: disabled by moderator', msg);
+                            return;
+                        }
+
                         this.showMessage(msg);
                     }
                 } catch (error) {
@@ -3687,8 +3670,9 @@ class RoomClient {
         };
     }
 
+    /** Attach remote media and supported participant controls to a tile. */
     async handleConsumer(id, type, stream, peer_name, peer_info) {
-        let elem, vb, d, p, i, cm, au, pip, fs, sf, sm, gl, ban, ko, pb, pm, pv, pn, ha, hg, mv, role;
+        let elem, vb, d, p, i, cm, au, pip, fs, sf, sm, ban, ko, pb, pm, pv, pn, ha, hg, mv, role;
 
         let eDiv, eBtn, eVc; // expand buttons
 
@@ -3756,7 +3740,7 @@ class RoomClient {
 
                 cm = this.createButton(id + '___' + remotePeerId + '___video', html.videoOn);
                 au = this.createButton(remotePeerId + '__audio', remotePeerAudio ? html.audioOn : html.audioOff);
-                gl = this.createButton(id + '___' + remotePeerId + '___geoLocation', html.geolocation);
+
                 ban = this.createButton(id + '___' + remotePeerId + '___ban', html.ban);
                 ko = this.createButton(id + '___' + remotePeerId + '___kickOut', html.kickOut);
                 role = this.createButton(
@@ -3820,8 +3804,7 @@ class RoomClient {
                     eVc.appendChild(this.createDropdownItem(fs, 'Full Screen', eVc));
                 BUTTONS.consumerVideo.sendMessageButton &&
                     eVc.appendChild(this.createDropdownItem(sm, 'Private Message', eVc));
-                BUTTONS.consumerVideo.geolocationButton &&
-                    eVc.appendChild(this.createDropdownItem(gl, 'Geo Location', eVc));
+
                 BUTTONS.consumerVideo.sendFileButton && eVc.appendChild(this.createDropdownItem(sf, 'Send File', eVc));
 
                 BUTTONS.consumerVideo.banButton && eVc.appendChild(this.createDropdownItem(ban, 'Ban', eVc, 'red'));
@@ -3880,7 +3863,7 @@ class RoomClient {
                 BUTTONS.consumerVideo.muteVideoButton && this.handleCM(cm.id, remotePeerId);
                 BUTTONS.consumerVideo.muteAudioButton && this.handleAU(au.id, remotePeerId);
                 this.handleCV(pv.id);
-                this.handleGL(gl.id, remotePeerId);
+
                 this.handleBAN(ban.id, remotePeerId);
                 this.handleKO(ko.id, remotePeerId);
                 this.handleRole(role.id, remotePeerId, remotePeerPresenter);
@@ -4050,9 +4033,10 @@ class RoomClient {
     // HANDLE VIDEO OFF
     // ####################################################
 
+    /** Render an audio-only participant tile with supported local/moderator controls. */
     setVideoOff(peer_info, remotePeer = false) {
         //console.log('setVideoOff', peer_info);
-        let d, vb, i, h, au, sf, sm, gl, ban, ko, hg, p, pm, pb, pv, pn, st, ri, role;
+        let d, vb, i, h, au, sf, sm, ban, ko, hg, p, pm, pb, pv, pn, st, ri, role;
         let eDiv, eBtn, eVc;
 
         const { peer_id, peer_name, peer_avatar, peer_audio, peer_presenter } = peer_info;
@@ -4091,7 +4075,6 @@ class RoomClient {
             sf = this.createButton('remotePeer___' + peer_id + '___sendFile', html.sendFile);
             sm = this.createButton('remotePeer___' + peer_id + '___sendMsg', html.sendMsg);
 
-            gl = this.createButton('remotePeer___' + peer_id + '___geoLocation', html.geolocation);
             ban = this.createButton('remotePeer___' + peer_id + '___ban', html.ban);
             ko = this.createButton('remotePeer___' + peer_id + '___kickOut', html.kickOut);
             hg = this.createButton('remotePeer___' + peer_id + '___hideFromGrid', html.hideFromGrid);
@@ -4151,7 +4134,7 @@ class RoomClient {
                 );
             BUTTONS.videoOff.hideFromGridButton && eVc.appendChild(this.createDropdownItem(hg, 'Hide from grid', eVc));
             BUTTONS.videoOff.sendMessageButton && eVc.appendChild(this.createDropdownItem(sm, 'Private Message', eVc));
-            BUTTONS.videoOff.geolocationButton && eVc.appendChild(this.createDropdownItem(gl, 'Geo Location', eVc));
+
             BUTTONS.videoOff.sendFileButton && eVc.appendChild(this.createDropdownItem(sf, 'Send File', eVc));
 
             BUTTONS.videoOff.banButton && eVc.appendChild(this.createDropdownItem(ban, 'Ban', eVc, 'red'));
@@ -4200,7 +4183,6 @@ class RoomClient {
             this.handleSM(sm.id, peer_name, peer_id);
             this.handleSF(sf.id, peer_name, peer_id);
 
-            this.handleGL(gl.id, peer_id);
             this.handleBAN(ban.id, peer_id);
             this.handleKO(ko.id, peer_id);
             this.handleHFG(hg.id, peer_id);
@@ -4224,7 +4206,7 @@ class RoomClient {
             this.setTippy(au.id, 'Mute', 'bottom');
             this.setTippy(pv.id, '🔊 Volume', 'bottom');
             this.setTippy(pn.id, 'Pin', 'bottom');
-            this.setTippy(gl.id, 'Geolocation', 'bottom');
+
             this.setTippy(ban.id, 'Ban', 'bottom');
             this.setTippy(ko.id, 'Eject', 'bottom');
             this.setTippy(hg.id, 'Hide from grid', 'bottom');
@@ -4299,8 +4281,10 @@ class RoomClient {
     // ####################################################
 
     /** Suppress recovery during a deliberate leave, then release media after exit acknowledgment or timeout. */
+    /** Leave signaling/media and cancel camera/effect preparation before asynchronous exit. */
     exit(offline = false) {
         this.isLeaving = true;
+        window.BodrikBackgroundCapture?.release(this, virtualBackground);
         this._isConnected = false;
         this.closeReconnectAlert();
 
@@ -5998,8 +5982,9 @@ class RoomClient {
             });
     }
 
+    /** Send a moderated public/private message through DataChannel or signaling. */
     sendMessage() {
-        if (!this.thereAreParticipants() && !isChatGPTOn && !isDeepSeekOn) {
+        if (!this.thereAreParticipants()) {
             this.cleanMessage();
             isChatPasteTxt = false;
             return this.userLog('info', 'No participants in the room', 'top-end');
@@ -6060,195 +6045,76 @@ class RoomClient {
             msg_id: msg_id,
         };
 
-        if (isChatGPTOn) {
-            if (this._moderator.chat_cant_chatgpt) {
-                this.cleanMessage();
-                return this.userLog(
-                    'warning',
-                    'The moderator does not allow you to chat with ChatGPT',
-                    'top-end',
-                    6000
-                );
-            }
+        const participantsList = this.getId('participantsList');
+        const participantsListItems = participantsList.getElementsByTagName('li');
+        for (let i = 0; i < participantsListItems.length; i++) {
+            const li = participantsListItems[i];
+            if (li.classList.contains('active')) {
+                data.to_peer_id = li.getAttribute('data-to-id');
+                data.to_peer_name = li.getAttribute('data-to-name');
 
-            data.to_peer_id = 'ChatGPT';
-            data.to_peer_name = 'ChatGPT';
-            console.log('Send message:', data);
-            this.socket.emit('message', data);
-            this.setMsgAvatar('left', this.peer_name, this.peer_avatar);
-            this.appendMessage(
-                'left',
-                this.leftMsgAvatar,
-                this.peer_name,
-                this.peer_id,
-                peer_msg,
-                data.to_peer_id,
-                data.to_peer_name
-            );
-            this.cleanMessage();
+                const isPublicMessage = data.to_peer_id === 'all';
 
-            this.showAITypingIndicator('ChatGPT');
-
-            this.socket
-                .request('getChatGPT', {
-                    time: getDataTimeString(),
-                    room: this.room_id,
-                    name: this.peer_name,
-                    prompt: peer_msg,
-                    context: this.chatGPTContext,
-                })
-                .then((completion) => {
-                    this.hideAITypingIndicator('ChatGPT');
-                    if (!completion) return;
-                    const { message, context } = completion;
-                    this.chatGPTContext = context ? context : [];
-                    console.log('Receive message:', message);
-                    this.setMsgAvatar('right', 'ChatGPT');
-                    this.appendMessage('right', image.chatgpt, 'ChatGPT', this.peer_id, message, 'ChatGPT', 'ChatGPT');
+                if (isPublicMessage && this._moderator.chat_cant_publicly) {
                     this.cleanMessage();
-
-                    this.speechInMessages ? this.speechMessage(true, 'ChatGPT', message) : this.sound('message');
-                })
-                .catch((err) => {
-                    this.hideAITypingIndicator('ChatGPT');
-                    console.log('ChatGPT error:', err);
-                });
-        }
-
-        if (isDeepSeekOn) {
-            if (this._moderator.chat_cant_deep_seek) {
-                this.cleanMessage();
-                return this.userLog(
-                    'warning',
-                    'The moderator does not allow you to chat with DeepSeek',
-                    'top-end',
-                    6000
-                );
-            }
-            data.to_peer_id = 'DeepSeek';
-            data.to_peer_name = 'DeepSeek';
-            console.log('Send message:', data);
-            this.socket.emit('message', data);
-            this.setMsgAvatar('left', this.peer_name, this.peer_avatar);
-            this.appendMessage(
-                'left',
-                this.leftMsgAvatar,
-                this.peer_name,
-                this.peer_id,
-                peer_msg,
-                data.to_peer_id,
-                data.to_peer_name
-            );
-            this.cleanMessage();
-
-            this.showAITypingIndicator('DeepSeek');
-
-            this.socket
-                .request('getDeepSeek', {
-                    time: getDataTimeString(),
-                    room: this.room_id,
-                    name: this.peer_name,
-                    prompt: peer_msg,
-                    context: this.deepSeekContext,
-                })
-                .then((completion) => {
-                    this.hideAITypingIndicator('DeepSeek');
-                    if (!completion) return;
-                    const { message, context } = completion;
-                    this.deepSeekContext = context ? context : [];
-                    console.log('Receive message:', message);
-                    this.setMsgAvatar('right', 'DeepSeek');
-                    this.appendMessage(
-                        'right',
-                        image.deepSeek,
-                        'DeepSeek',
-                        this.peer_id,
-                        message,
-                        'DeepSeek',
-                        'DeepSeek'
+                    return this.userLog(
+                        'warning',
+                        'The moderator does not allow you to chat publicly',
+                        'top-end',
+                        6000
                     );
-                    this.cleanMessage();
-
-                    this.speechInMessages ? this.speechMessage(true, 'DeepSeek', message) : this.sound('message');
-                })
-                .catch((err) => {
-                    this.hideAITypingIndicator('DeepSeek');
-                    console.log('DeepSeek error:', err);
-                });
-        }
-
-        if (!isChatGPTOn && !isDeepSeekOn) {
-            const participantsList = this.getId('participantsList');
-            const participantsListItems = participantsList.getElementsByTagName('li');
-            for (let i = 0; i < participantsListItems.length; i++) {
-                const li = participantsListItems[i];
-                if (li.classList.contains('active')) {
-                    data.to_peer_id = li.getAttribute('data-to-id');
-                    data.to_peer_name = li.getAttribute('data-to-name');
-
-                    const isPublicMessage = data.to_peer_id === 'all';
-
-                    if (isPublicMessage && this._moderator.chat_cant_publicly) {
-                        this.cleanMessage();
-                        return this.userLog(
-                            'warning',
-                            'The moderator does not allow you to chat publicly',
-                            'top-end',
-                            6000
-                        );
-                    }
-
-                    if (!isPublicMessage && this._moderator.chat_cant_privately) {
-                        this.cleanMessage();
-                        return this.userLog(
-                            'warning',
-                            'The moderator does not allow you to chat privately',
-                            'top-end',
-                            6000
-                        );
-                    }
-
-                    console.log('Send message:', data);
-
-                    // Try DataChannel for public messages, fallback to signaling
-                    if (isPublicMessage && this.useDataChannel && this.isChatDataChannelOpen()) {
-                        const dcMsg = {
-                            type: 'chat',
-                            room_id: data.room_id,
-                            peer_name: data.peer_name,
-                            peer_avatar: data.peer_avatar,
-                            peer_id: data.peer_id,
-                            to_peer_id: data.to_peer_id,
-                            to_peer_name: data.to_peer_name,
-                            peer_msg: data.peer_msg,
-                            msg_id: data.msg_id,
-                            timestamp: Date.now(),
-                        };
-                        const sent = this.sendChatDataChannelMessage(dcMsg);
-                        if (!sent) {
-                            console.warn('DataChannel send failed, falling back to signaling');
-                            this.socket.emit('message', data);
-                        } else {
-                            console.log('Message sent via DataChannel');
-                        }
-                    } else {
-                        // Private messages or DataChannel unavailable: use signaling
-                        this.socket.emit('message', data);
-                    }
-
-                    this.setMsgAvatar('left', this.peer_name, this.peer_avatar);
-                    this.appendMessage(
-                        'left',
-                        this.leftMsgAvatar,
-                        this.peer_name,
-                        this.peer_id,
-                        peer_msg,
-                        data.to_peer_id,
-                        data.to_peer_name,
-                        data.msg_id
-                    );
-                    this.cleanMessage();
                 }
+
+                if (!isPublicMessage && this._moderator.chat_cant_privately) {
+                    this.cleanMessage();
+                    return this.userLog(
+                        'warning',
+                        'The moderator does not allow you to chat privately',
+                        'top-end',
+                        6000
+                    );
+                }
+
+                console.log('Send message:', data);
+
+                // Try DataChannel for public messages, fallback to signaling
+                if (isPublicMessage && this.useDataChannel && this.isChatDataChannelOpen()) {
+                    const dcMsg = {
+                        type: 'chat',
+                        room_id: data.room_id,
+                        peer_name: data.peer_name,
+                        peer_avatar: data.peer_avatar,
+                        peer_id: data.peer_id,
+                        to_peer_id: data.to_peer_id,
+                        to_peer_name: data.to_peer_name,
+                        peer_msg: data.peer_msg,
+                        msg_id: data.msg_id,
+                        timestamp: Date.now(),
+                    };
+                    const sent = this.sendChatDataChannelMessage(dcMsg);
+                    if (!sent) {
+                        console.warn('DataChannel send failed, falling back to signaling');
+                        this.socket.emit('message', data);
+                    } else {
+                        console.log('Message sent via DataChannel');
+                    }
+                } else {
+                    // Private messages or DataChannel unavailable: use signaling
+                    this.socket.emit('message', data);
+                }
+
+                this.setMsgAvatar('left', this.peer_name, this.peer_avatar);
+                this.appendMessage(
+                    'left',
+                    this.leftMsgAvatar,
+                    this.peer_name,
+                    this.peer_id,
+                    peer_msg,
+                    data.to_peer_id,
+                    data.to_peer_name,
+                    data.msg_id
+                );
+                this.cleanMessage();
             }
         }
     }
@@ -6266,6 +6132,7 @@ class RoomClient {
         !this.isChatOpen ? this.toggleChat() : this.showPeerAboutAndMessages(to_peer_id, to_peer_name);
     }
 
+    /** Route a received public/private message and update unread indicators. */
     async showMessage(data, toggleChat = true) {
         const isPublicMessage = data.to_peer_id === 'all';
         const messagePeerId = isPublicMessage ? 'all' : data.peer_id;
@@ -6324,7 +6191,7 @@ class RoomClient {
             // INCOMING PRIVATE MESSAGE
             if (li.id === data.peer_id && !isPublicMessage && !isMessageVisible) {
                 li.classList.add('pulsate');
-                if (!['all', 'ChatGPT', 'DeepSeek'].includes(data.to_peer_id)) {
+                if (!['all'].includes(data.to_peer_id)) {
                     // unread-count badge handled by updateUnreadCountBadge
                 }
             }
@@ -6375,6 +6242,7 @@ class RoomClient {
         avatar === 'left' ? (this.leftMsgAvatar = avatarImg) : (this.rightMsgAvatar = avatarImg);
     }
 
+    /** Render a sanitized human message, image, and per-message reactions. */
     appendMessage(side, img, fromName, fromId, msg, toId, toName, msgId = '') {
         const getSide = filterXSS(side);
         // img is always internally computed (isValidAvatarURL / genAvatarSvg / genGravatar) and is
@@ -6478,12 +6346,6 @@ class RoomClient {
         console.log('Append message to:', { to_id: getToId, to_name: getToName });
 
         switch (getToId) {
-            case 'ChatGPT':
-                chatGPTMessages.insertAdjacentHTML('beforeend', newMessageHTML);
-                break;
-            case 'DeepSeek':
-                deepSeekMessages.insertAdjacentHTML('beforeend', newMessageHTML);
-                break;
             case 'all':
                 chatPublicMessages.insertAdjacentHTML('beforeend', newMessageHTML);
                 break;
@@ -6500,33 +6362,28 @@ class RoomClient {
 
         const message = getId(`message-${chatMessagesId}`);
         if (message) {
-            if (['ChatGPT', 'DeepSeek'].includes(getFromName)) {
-                // Stream the message for ChatGPT or DeepSeek
-                this.streamMessage(message, getMsg, 100);
-            } else {
-                // Process the message for other senders
-                const chatImage = window.BodrikChatImage?.parseMessage(msg);
-                if (chatImage) {
-                    const link = document.createElement('a');
-                    link.href = chatImage.url;
-                    link.target = '_blank';
-                    link.rel = 'noopener noreferrer';
-                    const img = document.createElement('img');
-                    img.src = chatImage.url;
-                    img.alt = 'Картинка из чата';
-                    img.style.cssText = 'max-width:260px;max-height:240px;object-fit:contain;border-radius:8px';
-                    link.appendChild(img);
-                    message.replaceChildren(link);
-                    if (chatImage.caption) {
-                        const caption = document.createElement('span');
-                        caption.className = 'bodrik-image-caption';
-                        caption.textContent = chatImage.caption;
-                        message.appendChild(caption);
-                    }
-                } else {
-                    message.innerHTML = this.processMessage(getMsg);
-                    hljs.highlightAll();
+            // Process the message for other senders
+            const chatImage = window.BodrikChatImage?.parseMessage(msg);
+            if (chatImage) {
+                const link = document.createElement('a');
+                link.href = chatImage.url;
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer';
+                const img = document.createElement('img');
+                img.src = chatImage.url;
+                img.alt = 'Картинка из чата';
+                img.style.cssText = 'max-width:260px;max-height:240px;object-fit:contain;border-radius:8px';
+                link.appendChild(img);
+                message.replaceChildren(link);
+                if (chatImage.caption) {
+                    const caption = document.createElement('span');
+                    caption.className = 'bodrik-image-caption';
+                    caption.textContent = chatImage.caption;
+                    message.appendChild(caption);
                 }
+            } else {
+                message.innerHTML = this.processMessage(getMsg);
+                hljs.highlightAll();
             }
         }
 
@@ -6633,75 +6490,6 @@ class RoomClient {
         if (!msgEl) return;
         this.applyReactionToElement(msgEl, emoji, peer_name, action);
     };
-
-    showAITypingIndicator(aiName) {
-        const containerId = aiName === 'ChatGPT' ? 'chatGPTMessages' : 'deepSeekMessages';
-        const container = this.getId(containerId);
-        if (!container) return;
-        const existing = this.getId(`ai-typing-${aiName}`);
-        if (existing) return;
-        const typingHTML = `
-            <li id="ai-typing-${aiName}" class="clearfix">
-                <div class="ai-typing-indicator">
-                    <div class="typing-dots">
-                        <span></span>
-                        <span></span>
-                        <span></span>
-                    </div>
-                </div>
-            </li>
-        `;
-        container.insertAdjacentHTML('beforeend', typingHTML);
-        const chatHistory = this.getId('chatHistory');
-        if (chatHistory) chatHistory.scrollTop = chatHistory.scrollHeight;
-    }
-
-    hideAITypingIndicator(aiName) {
-        const indicator = this.getId(`ai-typing-${aiName}`);
-        if (indicator) indicator.remove();
-    }
-
-    streamMessage(element, message, speed = 100) {
-        // Cancel any in-progress stream on this element
-        if (element._streamInterval) {
-            clearInterval(element._streamInterval);
-        }
-
-        const safeMessage = this.sanitizeHtml(String(message ?? ''));
-        const words = safeMessage.split(' ').filter((w) => w.length > 0);
-
-        let textBuffer = '';
-        let wordIndex = 0;
-
-        element._streamInterval = setInterval(() => {
-            if (wordIndex < words.length) {
-                textBuffer += words[wordIndex] + ' ';
-                // Preserve visual line breaks while streaming plain text.
-                element.innerHTML = textBuffer.replace(/\n/g, '<br/>');
-                wordIndex++;
-            } else {
-                clearInterval(element._streamInterval);
-                element._streamInterval = null;
-                element.innerHTML = this.processAIMessage(message);
-                this.highlightCodeBlocks(element);
-            }
-        }, speed);
-    }
-
-    highlightCodeBlocks(element) {
-        element.querySelectorAll('pre code').forEach((block) => {
-            hljs.highlightElement(block);
-        });
-    }
-
-    processAIMessage(message) {
-        const raw = String(message ?? '');
-        if (typeof marked !== 'undefined') {
-            return filterXSS(marked.parse(raw));
-        }
-        // Fallback if markdown parser is unavailable.
-        return filterXSS(raw).replace(/\n/g, '<br/>');
-    }
 
     processMessage(message) {
         const codeBlockRegex = /```([a-zA-Z0-9]+)?\n([\s\S]*?)```/g;
@@ -6960,6 +6748,7 @@ class RoomClient {
         }
     }
 
+    /** Clear local public/private history after user confirmation. */
     chatClean() {
         if (this.chatMessages.length === 0) {
             return userLog('info', 'No chat messages to clean', 'top-end');
@@ -6982,19 +6771,18 @@ class RoomClient {
                     }
                 }
                 // Remove child nodes from different message containers
-                removeAllChildNodes(chatGPTMessages);
-                removeAllChildNodes(deepSeekMessages);
+
                 removeAllChildNodes(chatPublicMessages);
                 removeAllChildNodes(chatPrivateMessages);
                 this.chatMessages = [];
-                this.chatGPTContext = [];
-                this.deepSeekContext = [];
+
                 updateChatEmptyNotice();
                 this.sound('delete');
             }
         });
     }
 
+    /** Export retained public/private chat history to a local file. */
     chatSave() {
         if (this.chatMessages.length === 0) {
             return userLog('info', 'No chat messages to save', 'top-end');
@@ -7002,8 +6790,7 @@ class RoomClient {
         const grouped = {
             room: this.room_id,
             public: [],
-            chatGPT: [],
-            deepSeek: [],
+
             private: {},
         };
         for (const msg of this.chatMessages) {
@@ -7012,12 +6799,7 @@ class RoomClient {
                 case 'all':
                     grouped.public.push(entry);
                     break;
-                case 'ChatGPT':
-                    grouped.chatGPT.push(entry);
-                    break;
-                case 'DeepSeek':
-                    grouped.deepSeek.push(entry);
-                    break;
+
                 default:
                     const name = msg.toName || msg.toId;
                     if (!grouped.private[name]) grouped.private[name] = [];
@@ -7027,8 +6809,6 @@ class RoomClient {
         }
         // Remove empty sections
         if (grouped.public.length === 0) delete grouped.public;
-        if (grouped.chatGPT.length === 0) delete grouped.chatGPT;
-        if (grouped.deepSeek.length === 0) delete grouped.deepSeek;
         if (Object.keys(grouped.private).length === 0) delete grouped.private;
         saveObjToJsonFile(grouped, 'CHAT');
     }
@@ -7058,25 +6838,6 @@ class RoomClient {
         }).then((result) => {
             if (result.isConfirmed) {
                 survey && survey.enabled ? leaveFeedback(true) : redirectOnLeave();
-            }
-        });
-    }
-
-    showRecServerSideAdvice() {
-        Swal.fire({
-            background: swalBackground,
-            position: 'center',
-            imageUrl: image.recording,
-            title: 'Server Sync Recording Enabled',
-            html: renderRoomTemplate('popupRecordingServerAdviceTemplate'),
-            showDenyButton: true,
-            confirmButtonText: 'OK',
-            denyButtonText: 'Switch Off',
-            showClass: { popup: 'animate__animated animate__fadeInDown' },
-            hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-        }).then((result) => {
-            if (result.isDenied) {
-                switchServerRecording.checked = false;
             }
         });
     }
@@ -7304,35 +7065,16 @@ class RoomClient {
         return audioStream;
     }
 
+    /** Attach encoder callbacks and periodically flush local recording data. */
     handleMediaRecorder() {
         if (this.mediaRecorder) {
-            this.recServerFileName = this.getServerRecFileName();
             this.mediaRecorder.addEventListener('start', this.handleMediaRecorderStart);
             this.mediaRecorder.addEventListener('dataavailable', this.handleMediaRecorderData);
             this.mediaRecorder.addEventListener('stop', this.handleMediaRecorderStop);
             // Always pass a timeslice so the browser flushes encoded chunks periodically
             // instead of buffering the entire recording in renderer memory.
-            // - Server sync: 4 s chunks → fewer HTTP POSTs to /recSync.
-            // - Local blob: 1 s chunks → faster internal flush, lighter recorder buffer.
-            rc.recording.recSyncServerRecording
-                ? this.mediaRecorder.start(this.recSyncTime)
-                : this.mediaRecorder.start(1000);
+            this.mediaRecorder.start(1000);
         }
-    }
-
-    generateUUIDv4() {
-        return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, (c) =>
-            (c ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (c / 4)))).toString(16)
-        );
-    }
-
-    getServerRecFileName() {
-        const roomName = this.room_id.trim();
-        const dateTime = getDataTimeStringFormat();
-        // Prefer the server-side session ID so recordings correlate with join/exit webhook
-        // events for the same conference instance; fall back to a client UUID if unavailable.
-        const uuid = this.sessionId || this.generateUUIDv4();
-        return `Rec_${roomName}_${dateTime}_${uuid}.webm`;
     }
 
     handleMediaRecorderStart(evt) {
@@ -7342,50 +7084,11 @@ class RoomClient {
         rc._recStartTs = performance.now();
     }
 
+    /** Keep nonempty encoded chunks for local download, including the final chunk. */
     handleMediaRecorderData(evt) {
         // console.log('MediaRecorder data: ', evt);
         if (evt.data && evt.data.size > 0) {
-            rc.recording.recSyncServerRecording ? rc.syncRecordingInCloud(evt.data) : recordedBlobs.push(evt.data);
-        }
-    }
-
-    async syncRecordingInCloud(data) {
-        const arrayBuffer = await data.arrayBuffer();
-        const chunkSize = rc.recSyncChunkSize;
-        const totalChunks = Math.ceil(arrayBuffer.byteLength / chunkSize);
-        for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
-            const chunk = arrayBuffer.slice(chunkIndex * chunkSize, (chunkIndex + 1) * chunkSize);
-            try {
-                const response = await axios.post(
-                    `${this.recording.recSyncServerEndpoint}/recSync?fileName=` + rc.recServerFileName,
-                    chunk,
-                    {
-                        headers: {
-                            'Content-Type': 'application/octet-stream',
-                            Authorization: `Bearer ${rc.recUploadToken}`,
-                        },
-                    }
-                );
-                console.log('Chunk synced successfully:', response.data);
-            } catch (error) {
-                let errorMessage = 'Recording stopped! ';
-                if (error.response) {
-                    errorMessage += error.response.data.message;
-                    console.error('Error syncing chunk', {
-                        status_code: error.response.status,
-                        response_data: error.response.data,
-                        response_headers: error.response.headers,
-                    });
-                } else if (error.request) {
-                    console.error('Error syncing chunk: No response received', { request_details: error.request });
-                } else {
-                    errorMessage += error.message;
-                    console.error('Error syncing chunk:', error.message);
-                }
-                userLog('warning', errorMessage, 'top-end', 3000);
-                rc.stopRecording();
-                rc.saveLastRecordingInfo('<br/><span class="red">' + errorMessage + '.</span>');
-            }
+            recordedBlobs.push(evt.data);
         }
     }
 
@@ -7393,44 +7096,8 @@ class RoomClient {
     async handleMediaRecorderStop(evt) {
         try {
             console.log('MediaRecorder stopped: ', evt);
-            rc.recording.recSyncServerRecording ? rc.handleServerRecordingStop() : rc.handleLocalRecordingStop();
+            rc.handleLocalRecordingStop();
             rc.disableRecordingOptions(false);
-
-            // If cloud sync is enabled, patch duration on the server
-            if (rc.recording.recSyncServerRecording) {
-                const durationMs = rc._recStartTs ? Math.round(performance.now() - rc._recStartTs) : undefined;
-
-                // Option S3: pass duration to your existing finalize endpoint (preferred if it uploads to S3)
-                if (rc.recording.recSyncServerToS3) {
-                    try {
-                        await axios.post(`${rc.recording.recSyncServerEndpoint}/recSyncFinalize`, null, {
-                            params: { fileName: rc.recServerFileName, durationMs },
-                            headers: { Authorization: `Bearer ${rc.recUploadToken}` },
-                        });
-                        console.log('Finalized (with duration fix) and uploaded to S3');
-                        if (recShowInfo) userLog('success', 'Recording successfully uploaded to S3.', 'top-end', 3000);
-                    } catch (error) {
-                        let errorMessage = 'Finalization failed! ';
-                        if (error.response) errorMessage += error.response.data?.message || 'Server error';
-                        else if (error.request) errorMessage += 'No response from server';
-                        else errorMessage += error.message;
-                        if (recShowInfo) userLog('warning', errorMessage, 'top-end', 3000);
-                    }
-                } else {
-                    // Option Disk: if you don’t use S3 finalize, call a dedicated “fix” endpoint
-                    try {
-                        await axios.post(`${rc.recording.recSyncServerEndpoint}/recSyncFixWebm`, null, {
-                            params: { fileName: rc.recServerFileName, durationMs },
-                            headers: { Authorization: `Bearer ${rc.recUploadToken}` },
-                        });
-                        console.log('Server-side WEBM duration fixed for', rc.recServerFileName);
-                    } catch (error) {
-                        console.warn('WEBM duration server-side fix failed:', error?.message || error);
-                    }
-                }
-
-                rc._recStartTs = null;
-            }
         } catch (err) {
             console.error('Recording save failed', err);
             rc.handleRecordingError('Recording save failed: ' + err.message);
@@ -7449,43 +7116,10 @@ class RoomClient {
         }
     }
 
-    async handleMediaRecorderStopOLD(evt) {
-        try {
-            console.log('MediaRecorder stopped: ', evt);
-            rc.recording.recSyncServerRecording ? rc.handleServerRecordingStop() : rc.handleLocalRecordingStop();
-            rc.disableRecordingOptions(false);
-
-            // Only do this if cloud sync was enabled and upload to s3
-            if (rc.recording.recSyncServerRecording && rc.recording.recSyncServerToS3) {
-                try {
-                    const response = await axios.post(
-                        `${rc.recording.recSyncServerEndpoint}/recSyncFinalize?fileName=` + rc.recServerFileName
-                    );
-                    console.log('Finalized and uploaded to S3:', response.data);
-                    userLog('success', 'Recording successfully uploaded to S3.', 'top-end', 3000);
-                } catch (error) {
-                    let errorMessage = 'Finalization failed! ';
-                    if (error.response) {
-                        errorMessage += error.response.data?.message || 'Server error';
-                        console.error('Finalization error response:', error.response);
-                    } else if (error.request) {
-                        errorMessage += 'No response from server';
-                        console.error('Finalization error: No response', error.request);
-                    } else {
-                        errorMessage += error.message;
-                        console.error('Finalization error:', error.message);
-                    }
-                    userLog('warning', errorMessage, 'top-end', 3000);
-                }
-            }
-        } catch (err) {
-            console.error('Recording save failed', err);
-        }
-    }
-
+    /** Prevent recording-mode changes while the local encoder is active. */
     disableRecordingOptions(disabled = true) {
         recordingTypeSelect.disabled = disabled;
-        switchServerRecording.disabled = disabled;
+
         switchHostOnlyRecording.disabled = disabled;
     }
 
@@ -7525,7 +7159,7 @@ class RoomClient {
         const recordingMsg = 'Processing the recording. It will download to your device when ready.';
 
         this.saveLastRecordingInfo(recordingInfo);
-        this.showRecordingInfo(recType, recordingInfo, recordingMsg);
+        this.showRecordingInfo(recordingInfo, recordingMsg);
 
         // Fix WebM duration to make it seekable
         const fixWebmDuration = async (blob) => {
@@ -7548,24 +7182,6 @@ class RoomClient {
         })();
     }
 
-    handleServerRecordingStop() {
-        console.log('MediaRecorder Stop');
-        const recTimeText = this._lastRecTimeText || '0s';
-        const recType = 'Server';
-        const recordingInfo = `
-        <br/><br/>
-        <ul>
-            <li><span>Stored:</span> <span>${recType}</span></li>
-            <li><span>Time:</span> <span>${recTimeText}</span></li>
-            <li><span>File:</span> <span class="notranslate">${this.recServerFileName}</span></li>
-            <li><span>Codecs:</span> <span class="notranslate">${recCodecs}</span></li>
-        </ul>
-        <br/>
-        `;
-        this.saveLastRecordingInfo(recordingInfo);
-        this.showRecordingInfo(recType, recordingInfo);
-    }
-
     saveLastRecordingInfo(recordingInfo) {
         const lastRecordingInfo = document.getElementById('lastRecordingInfo');
         lastRecordingInfo.style.color = '#FFFFFF';
@@ -7583,7 +7199,8 @@ class RoomClient {
         hide(lastRecordingInfo);
     }
 
-    showRecordingInfo(recType, recordingInfo, recordingMsg = '') {
+    /** Show information about the completed recording downloaded to this device. */
+    showRecordingInfo(recordingInfo, recordingMsg = '') {
         if (!recShowInfo) return;
         if (window.localStorage.isReconnected === 'false') {
             Swal.fire({
@@ -7593,7 +7210,7 @@ class RoomClient {
                 html: renderRoomTemplate('popupRecordingInfoTemplate', {
                     text: {
                         indicator: '🔴',
-                        recordingLocation: recType === 'Locally' ? 'Local recording' : 'Server recording',
+                        recordingLocation: 'Local recording',
                         recordingMsg: recordingMsg,
                     },
                     html: {
@@ -7717,10 +7334,6 @@ class RoomClient {
     // ####################################################
     // ACTIVE ROOMS
     // ####################################################
-
-    showActiveRooms() {
-        openURL('/activeRooms', true);
-    }
 
     // ####################################################
     // FILE SHARING
@@ -8446,6 +8059,7 @@ class RoomClient {
         }
     }
 
+    /** Display notifications for supported room preferences and moderation actions. */
     roomMessage(action, active = false) {
         const status = active ? 'ON' : 'OFF';
         this.sound('switch');
@@ -8524,20 +8138,6 @@ class RoomClient {
             case 'chat_cant_publicly':
                 this.userLog('info', `${icons.moderator} Moderator: everyone can't chat publicly ${status}`, 'top-end');
                 break;
-            case 'chat_cant_chatgpt':
-                this.userLog(
-                    'info',
-                    `${icons.moderator} Moderator: everyone can't chat with ChatGPT ${status}`,
-                    'top-end'
-                );
-                break;
-            case 'chat_cant_deep_seek':
-                this.userLog(
-                    'info',
-                    `${icons.moderator} Moderator: everyone can't chat with DeepSeek ${status}`,
-                    'top-end'
-                );
-                break;
 
             case 'disconnect_all_on_leave':
                 this.userLog('info', `${icons.moderator} Moderator: disconnect all on leave room ${status}`, 'top-end');
@@ -8545,17 +8145,11 @@ class RoomClient {
             case 'everyone_follows_me':
                 this.userLog('info', `${icons.moderator} Moderator: everyone follows me ${status}`, 'top-end');
                 break;
-            case 'recSyncServer':
-                active
-                    ? this.showRecServerSideAdvice()
-                    : this.userLog('info', `${icons.recording} Server sync recording ${status}`, 'top-end');
-                break;
+
             case 'customThemeKeep':
                 this.userLog('info', `${icons.theme} Custom theme keep ${status}`, 'top-end');
                 break;
-            case 'save_room_notifications':
-                this.userLog('success', 'Room notifications saved successfully', 'top-end');
-                break;
+
             default:
                 break;
         }
@@ -8835,7 +8429,7 @@ class RoomClient {
         }).then(() => {
             // Login required to join room
             endRoomSession();
-            openURL(`/login/?room=${this.room_id}`);
+            openURL('/login');
         });
     }
 
@@ -9365,17 +8959,6 @@ class RoomClient {
     // HANDLE BAN
     // ###################################################
 
-    handleGL(uid, peer_id) {
-        let btnGl = this.getId(uid);
-        if (btnGl) {
-            btnGl.addEventListener('click', () => {
-                isPresenter
-                    ? this.askPeerGeoLocation(peer_id)
-                    : this.userLog('warning', 'Only the presenter can ask geolocation to the participants', 'top-end');
-            });
-        }
-    }
-
     // ####################################################
     // HANDLE BAN
     // ###################################################
@@ -9540,9 +9123,7 @@ class RoomClient {
         }
     }
 
-    // After a mid-session role change, reconcile the presenter-only moderation controls
-    // (set/remove presenter, geo location, ban, kick out) on every existing remote tile so
-    // the video-feed dropdowns and video-off tiles match the local user's new role.
+    /** Reconcile role, ban, and eject controls on existing tiles after a presenter change. */
     refreshRemoteVideoMenus() {
         const canModerate = isPresenter;
 
@@ -9579,16 +9160,7 @@ class RoomClient {
                     this.handleRole(role.id, remotePeerId, peerPresenter);
                 }
             );
-            this.reconcilePresenterMenuItem(
-                eVc,
-                `${prefix}geoLocation`,
-                canModerate && BUTTONS.consumerVideo.geolocationButton,
-                () => {
-                    const gl = this.createButton(`${prefix}geoLocation`, html.geolocation);
-                    eVc.appendChild(this.createDropdownItem(gl, 'Geo Location', eVc));
-                    this.handleGL(gl.id, remotePeerId);
-                }
-            );
+
             this.reconcilePresenterMenuItem(eVc, `${prefix}ban`, canModerate && BUTTONS.consumerVideo.banButton, () => {
                 const ban = this.createButton(`${prefix}ban`, html.ban);
                 eVc.appendChild(this.createDropdownItem(ban, 'Ban', eVc, 'red'));
@@ -9652,16 +9224,6 @@ class RoomClient {
                     );
                     eVc.insertBefore(item, eVc.firstChild);
                     this.handleRole(role.id, peerId, peerPresenter);
-                }
-            );
-            this.reconcilePresenterMenuItem(
-                eVc,
-                `${prefix}geoLocation`,
-                canModerate && BUTTONS.videoOff.geolocationButton,
-                () => {
-                    const gl = this.createButton(`${prefix}geoLocation`, html.geolocation);
-                    eVc.appendChild(this.createDropdownItem(gl, 'Geo Location', eVc));
-                    this.handleGL(gl.id, peerId);
                 }
             );
         });
@@ -9783,16 +9345,13 @@ class RoomClient {
         this.socket.emit('cmd', cmd);
     }
 
+    /** Apply supported incoming privacy and room-ejection commands. */
     handleCmd(cmd) {
         switch (cmd.type) {
             case 'privacy':
                 this.setVideoPrivacyStatus(cmd.peer_id, cmd.active);
                 break;
 
-            case 'geoLocation':
-            case 'geoLocationOK':
-            case 'geoLocationKO':
-                break;
             case 'ejectAll':
                 this.handleEjectAllFromRoom(cmd);
                 break;
@@ -10329,19 +9888,15 @@ class RoomClient {
     // SHOW PEER ABOUT AND MESSAGES
     // ####################################################
 
+    /** Select a human/public conversation while honoring moderator restrictions. */
     showPeerAboutAndMessages(peer_id, peer_name, peer_avatar = false, event = null) {
         // Early moderator guards: refuse to switch (and to mutate any state) when the
         // requested chat is currently blocked by the moderator.
-        if (peer_id === 'ChatGPT' && this._moderator.chat_cant_chatgpt) {
-            return userLog('warning', 'The moderator does not allow you to chat with ChatGPT', 'top-end', 6000);
-        }
-        if (peer_id === 'DeepSeek' && this._moderator.chat_cant_deep_seek) {
-            return userLog('warning', 'The moderator does not allow you to chat with DeepSeek', 'top-end', 6000);
-        }
+
         if (peer_id === 'all' && this._moderator.chat_cant_publicly) {
             return userLog('warning', 'The moderator does not allow you to chat publicly', 'top-end', 6000);
         }
-        if (!['all', 'ChatGPT', 'DeepSeek'].includes(peer_id) && this._moderator.chat_cant_privately) {
+        if (!['all'].includes(peer_id) && this._moderator.chat_cant_privately) {
             return userLog('warning', 'The moderator does not allow you to chat privately', 'top-end', 6000);
         }
 
@@ -10359,25 +9914,22 @@ class RoomClient {
         const participantsListItems = participantsList.getElementsByTagName('li');
         const avatarImg = getParticipantAvatar(peer_name, peer_avatar);
 
-        const generateChatAboutHTML = (imgSrc, title, status = 'online', participants = '', category = '') => {
-            const isSensitiveChat = !['all', 'ChatGPT', 'DeepSeek'].includes(peer_id) && title.length > 15;
+        /** Render public/private chat identity without treating nicknames as assistant names. */
+        const generateChatAboutHTML = (imgSrc, title, status = 'online', participants = '') => {
+            const isSensitiveChat = peer_id !== 'all' && title.length > 15;
             const truncatedTitle = isSensitiveChat ? `${title.substring(0, 10)}*****` : title;
-            const categoryHTML = category ? `<span class="chat-header-category">${category}</span>` : '';
             const statusText =
-                category === 'AI ASSISTANT'
-                    ? 'Assistant replies are visible only to you'
-                    : peer_id === 'all'
-                      ? (window.i18n?.t('Everyone in room {count}', 'labels') || 'Everyone in room {count}').replace(
-                            '{count}',
-                            participants
-                        )
-                      : `${status}`;
+                peer_id === 'all'
+                    ? (window.i18n?.t('Everyone in room {count}', 'labels') || 'Everyone in room {count}').replace(
+                          '{count}',
+                          participants
+                      )
+                    : `${status}`;
             return `
                 <a data-toggle="modal" data-target="#view_info">
                     <img src="${imgSrc}" alt="avatar" />
                 </a>
                 <div class="chat-about">
-                    ${categoryHTML}
                     <h6 class="mb-0">${truncatedTitle}</h6>
                     <span class="status">
                         ${icons.statusCircle(status)} ${statusText}
@@ -10395,43 +9947,15 @@ class RoomClient {
         const selectedLi = this.getId(peer_id);
         if (selectedLi) selectedLi.classList.remove('pulsate');
 
-        if (!['all', 'ChatGPT', 'DeepSeek'].includes(peer_id)) {
-            // unread-count badge cleared by updateUnreadCountBadge below
-        }
-
         // Clear unread count badge for selected peer
         this.unreadMessageCounts[peer_id] = 0;
         this.updateUnreadCountBadge(peer_id);
 
         participant.classList.add('active');
 
-        isChatGPTOn = false;
-        isDeepSeekOn = false;
-
         console.log('Display messages', peer_id);
 
         switch (peer_id) {
-            case 'ChatGPT':
-                if (this._moderator.chat_cant_chatgpt) {
-                    return userLog('warning', 'The moderator does not allow you to chat with ChatGPT', 'top-end', 6000);
-                }
-                isChatGPTOn = true;
-                chatAbout.innerHTML = generateChatAboutHTML(image.chatgpt, 'ChatGPT', 'online', '', 'AI ASSISTANT');
-                this.getId('chatGPTMessages').style.display = 'block';
-                break;
-            case 'DeepSeek':
-                if (this._moderator.chat_cant_deep_seek) {
-                    return userLog(
-                        'warning',
-                        'The moderator does not allow you to chat with DeepSeek',
-                        'top-end',
-                        6000
-                    );
-                }
-                isDeepSeekOn = true;
-                chatAbout.innerHTML = generateChatAboutHTML(image.deepSeek, 'DeepSeek', 'online', '', 'AI ASSISTANT');
-                this.getId('deepSeekMessages').style.display = 'block';
-                break;
             case 'all':
                 if (this._moderator.chat_cant_publicly) {
                     return userLog('warning', 'The moderator does not allow you to chat publicly', 'top-end', 6000);
@@ -10464,8 +9988,7 @@ class RoomClient {
 
         const chatMsg = this.getId('chatMessage');
         if (chatMsg) {
-            const isAI = ['ChatGPT', 'DeepSeek'].includes(peer_id);
-            chatMsg.placeholder = isAI ? `Ask ${peer_name} anything...` : t('Type a message...');
+            chatMsg.placeholder = t('Type a message...');
         }
 
         const emptyTitle = document.querySelector('.empty-chat-title');
@@ -10482,9 +10005,8 @@ class RoomClient {
         }
     }
 
+    /** Hide both retained message lists before selecting a conversation. */
     hidePeerMessages() {
-        elemDisplay('chatGPTMessages', false);
-        elemDisplay('deepSeekMessages', false);
         elemDisplay('chatPublicMessages', false);
         elemDisplay('chatPrivateMessages', false);
     }
@@ -10515,6 +10037,7 @@ class RoomClient {
         };
     }
 
+    /** Apply a supported server-broadcast moderator restriction. */
     handleUpdateRoomModerator(data) {
         switch (data.type) {
             case 'video_start_privacy':
@@ -10552,10 +10075,6 @@ class RoomClient {
             case 'chat_cant_publicly':
                 this._moderator.chat_cant_publicly = data.status;
                 rc.roomMessage('chat_cant_publicly', data.status);
-                break;
-            case 'chat_cant_chatgpt':
-                this._moderator.chat_cant_chatgpt = data.status;
-                rc.roomMessage('chat_cant_chatgpt', data.status);
                 break;
 
             default:
@@ -10943,164 +10462,8 @@ class RoomClient {
     }
 
     // ####################################################
-    // HANDLE PEER GEOLOCATION
+    // VIDEO MIRROR
     // ####################################################
-
-    askPeerGeoLocation(peer_id) {
-        const cmd = {
-            type: 'geoLocation',
-            from_peer_name: this.peer_name,
-            from_peer_id: this.peer_id,
-            peer_id: peer_id,
-            broadcast: false,
-        };
-        this.emitCmd(cmd);
-        this.peerActionProgress(
-            'Geolocation',
-            'Geolocation requested. Please wait for confirmation...',
-            6000,
-            'geolocation'
-        );
-    }
-
-    sendPeerGeoLocation(peer_id, type, data) {
-        const cmd = {
-            type: type,
-            from_peer_name: this.peer_name,
-            from_peer_id: this.peer_id,
-            peer_id: peer_id,
-            data: data,
-            broadcast: false,
-        };
-        this.emitCmd(cmd);
-    }
-
-    confirmPeerGeoLocation(cmd) {
-        this.sound('notify');
-        Swal.fire({
-            allowOutsideClick: false,
-            allowEscapeKey: false,
-            background: swalBackground,
-            imageUrl: image.geolocation,
-            position: 'center',
-            title: 'Geo Location',
-            html: renderRoomTemplate('popupGeoLocationPromptTemplate', {
-                text: {
-                    message: `Would you like to share your location to ${cmd.from_peer_name}?`,
-                },
-            }),
-            showDenyButton: true,
-            confirmButtonText: `Yes`,
-            denyButtonText: `No`,
-            showClass: { popup: 'animate__animated animate__fadeInDown' },
-            hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-        }).then((result) => {
-            result.isConfirmed ? this.getPeerGeoLocation(cmd.from_peer_id) : this.denyPeerGeoLocation(cmd.from_peer_id);
-        });
-    }
-
-    getPeerGeoLocation(peer_id, options = {}) {
-        if ('geolocation' in navigator) {
-            navigator.geolocation.getCurrentPosition(
-                function (position) {
-                    const geoLocation = {
-                        latitude: position.coords.latitude,
-                        longitude: position.coords.longitude,
-                    };
-                    console.log('GeoLocation --->', geoLocation);
-
-                    rc.sendPeerGeoLocation(peer_id, 'geoLocationOK', geoLocation);
-                    // openURL(`https://www.openstreetmap.org/?mlat=${geoLocation.latitude}&mlon=${geoLocation.longitude}`, true);
-                    // openURL(`http://maps.apple.com/?ll=${geoLocation.latitude},${geoLocation.longitude}`, true);
-                    // openURL(`https://www.google.com/maps/search/?api=1&query=${geoLocation.latitude},${geoLocation.longitude}`, true);
-                },
-                function (error) {
-                    let geoError = error;
-                    switch (error.code) {
-                        case error.PERMISSION_DENIED:
-                            geoError = 'User denied the request for Geolocation';
-                            break;
-                        case error.POSITION_UNAVAILABLE:
-                            geoError = 'Location information is unavailable';
-                            break;
-                        case error.TIMEOUT:
-                            geoError = 'The request to get user location timed out';
-                            break;
-                        case error.UNKNOWN_ERROR:
-                            geoError = 'An unknown error occurred';
-                            break;
-                        case 'NOT_SUPPORTED':
-                            geoError = 'Geolocation is not supported by this browser';
-                            break;
-                        default:
-                            geoError =
-                                'Unable to retrieve your location. Please ensure location services are enabled in your device and browser settings, and try again';
-                            break;
-                    }
-                    // Add suggestion for unknown errors
-                    if (
-                        error.code === error.UNKNOWN_ERROR ||
-                        error.code === undefined ||
-                        geoError.startsWith('Unable to retrieve')
-                    ) {
-                        geoError +=
-                            ' If the problem persists, check your device and browser location permissions, and ensure you have a clear view of the sky (for GPS)';
-                    }
-                    rc.sendPeerGeoLocation(peer_id, 'geoLocationKO', `${rc.peer_name}: ${geoError}`);
-                    rc.userLog('warning', geoError, 'top-end', 5000);
-                },
-                {
-                    enableHighAccuracy: true,
-                    timeout: 10000,
-                    maximumAge: 0,
-                    ...options,
-                }
-            );
-        } else {
-            rc.sendPeerGeoLocation(
-                peer_id,
-                'geoLocationKO',
-                `${rc.peer_name}: Geolocation is not supported by this browser`
-            );
-            rc.userLog('warning', 'Geolocation is not supported by this browser', 'top-end', 5000);
-        }
-    }
-
-    denyPeerGeoLocation(peer_id) {
-        rc.sendPeerGeoLocation(peer_id, 'geoLocationKO', `${rc.peer_name}: Has declined permission for geolocation`);
-    }
-
-    handleGeoPeerLocation(cmd) {
-        const geoLocation = cmd.data;
-        this.sound('notify');
-        Swal.fire({
-            allowOutsideClick: false,
-            allowEscapeKey: false,
-            background: swalBackground,
-            imageUrl: image.geolocation,
-            position: 'center',
-            title: 'Geo Location',
-            html: renderRoomTemplate('popupGeoLocationPromptTemplate', {
-                text: {
-                    message: `Would you like to open ${cmd.from_peer_name} geolocation?`,
-                },
-            }),
-            showDenyButton: true,
-            confirmButtonText: `Yes`,
-            denyButtonText: `No`,
-            showClass: { popup: 'animate__animated animate__fadeInDown' },
-            hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-        }).then((result) => {
-            if (result.isConfirmed) {
-                // openURL(`https://www.openstreetmap.org/?mlat=${geoLocation.latitude}&mlon=${geoLocation.longitude}`, true);
-                // openURL(`http://maps.apple.com/?ll=${geoLocation.latitude},${geoLocation.longitude}`, true);
-                openURL(
-                    `https://www.google.com/maps/search/?api=1&query=${geoLocation.latitude},${geoLocation.longitude}`,
-                    true
-                );
-            }
-        });
-    }
 
     // ##############################################
 

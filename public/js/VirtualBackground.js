@@ -1,440 +1,361 @@
 'use strict';
 
+/** Own one cancellable background-processing session, never the caller's original camera track. */
 class VirtualBackground {
     static instance = null;
 
+    /** Create the shared processor without downloading scripts or initializing a model. */
     constructor() {
-        // Ensure only one instance of VirtualBackground exists
-        if (VirtualBackground.instance) {
-            return VirtualBackground.instance;
-        }
+        if (VirtualBackground.instance) return VirtualBackground.instance;
         VirtualBackground.instance = this;
-
-        // Check for API support
         this.isSupported = this.checkSupport();
-
-        this.resetState();
+        this.generation = 0;
+        this.active = null;
+        this.cleanup = Promise.resolve();
+        this.isProcessing = false;
     }
 
+    /** Require all APIs used by the main-thread frame pipeline. */
     checkSupport() {
-        // Check if required APIs are supported.
-        // Note: MediaStreamTrackGenerator is a non-standard/experimental API that newer
-        // Chromium builds are phasing out in favor of VideoTrackGenerator, so accept either.
-        const hasProcessor = Boolean(window.MediaStreamTrackProcessor);
-        const hasTransformStream = Boolean(window.TransformStream);
-        const hasGenerator = Boolean(window.MediaStreamTrackGenerator || window.VideoTrackGenerator);
-
-        if (!hasProcessor || !hasTransformStream || !hasGenerator) {
-            const missing = [];
-            if (!hasProcessor) missing.push('MediaStreamTrackProcessor');
-            if (!hasGenerator) missing.push('MediaStreamTrackGenerator/VideoTrackGenerator');
-            if (!hasTransformStream) missing.push('TransformStream');
-            console.warn(
-                `⚠️ Virtual background unsupported in this environment. Missing API(s): ${missing.join(', ')}`
-            );
-        }
-
-        return hasProcessor && hasTransformStream && hasGenerator;
+        return Boolean(
+            window.MediaStreamTrackProcessor &&
+            window.TransformStream &&
+            (window.MediaStreamTrackGenerator || window.VideoTrackGenerator) &&
+            window.OffscreenCanvas &&
+            window.VideoFrame &&
+            window.createImageBitmap
+        );
     }
 
+    /** Create the generated video track across legacy and newer Chromium APIs. */
     createVideoTrackGenerator() {
-        // MediaStreamTrackGenerator (legacy, main-thread) is itself a MediaStreamTrack and exposes a writable.
         if (window.MediaStreamTrackGenerator) {
             const generator = new MediaStreamTrackGenerator({ kind: 'video' });
             return { generator, track: generator };
         }
-        // VideoTrackGenerator (newer replacement) exposes a writable and a separate .track.
-        if (window.VideoTrackGenerator) {
-            const generator = new VideoTrackGenerator();
-            return { generator, track: generator.track };
-        }
-        throw new Error('Neither MediaStreamTrackGenerator nor VideoTrackGenerator is available.');
+        const generator = new VideoTrackGenerator();
+        return { generator, track: generator.track };
     }
 
-    resetState() {
-        // Reset all necessary state variables
-        this.segmentation = null;
-        this.initialized = false;
-        this.pendingFrames = [];
-        this.activeProcessor = null;
-        this.activeGenerator = null;
-        this.isProcessing = false;
-        this.gifAnimation = null;
-        this.gifCanvas = null;
-        this.frameCounter = 0;
-        this.frameSkipRatio = 3;
-        this.lastSegmentationMask = null;
-    }
-
-    async initializeSegmentation() {
-        // Initialize the segmentation model if not already done
-        if (this.initialized) {
-            console.log('✅ Segmentation already initialized');
-            return;
-        }
-
-        try {
-            this.segmentation = new SelfieSegmentation({
-                locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`,
-            });
-
-            this.segmentation.setOptions({
-                modelSelection: 1, // Higher accuracy
-                runningMode: 'video', // Smoother segmentation for streaming
-                smoothSegmentation: true, // Enables smoother edges
-            });
-
-            this.segmentation.onResults(this.handleSegmentationResults.bind(this));
-
-            await this.segmentation.initialize();
-            this.initialized = true;
-            console.log('✅ Segmentation initialized successfully.');
-        } catch (error) {
-            console.error('❌ Error initializing segmentation:', error);
-            throw error;
-        }
-    }
-
-    handleSegmentationResults(results) {
-        if (!results?.segmentationMask) return;
-
-        this.lastSegmentationMask = results.segmentationMask;
-
-        const pendingFrame = this.pendingFrames.shift();
-
-        if (!pendingFrame) return;
-
-        this.processFrame(
-            pendingFrame.videoFrame,
-            pendingFrame.controller,
-            pendingFrame.imageBitmap,
-            pendingFrame.maskHandler,
-            this.lastSegmentationMask
+    /** Determine whether a prepared effect still belongs to the selected live source. */
+    isCurrent(job) {
+        return (
+            this.active === job &&
+            job.generation === this.generation &&
+            !job.abort.signal.aborted &&
+            job.source.readyState !== 'ended'
         );
     }
 
-    processFrame(videoFrame, controller, imageBitmap, maskHandler, segmentationMask) {
-        if (!controller) {
-            console.warn('Controller invalid, closing frames');
-            this.closeFrames(videoFrame, imageBitmap);
+    /** Reject obsolete work before it can allocate a pipeline or publish a generated track. */
+    assertCurrent(job) {
+        if (!this.isCurrent(job)) throw new DOMException('Background operation cancelled', 'AbortError');
+    }
+
+    /** Stop owned tracks immediately; close the model only after initialization and sends settle. */
+    dispose(job) {
+        if (!job || job.disposed) return;
+        job.disposed = true;
+        job.abort.abort();
+        job.source.removeEventListener('ended', job.onEnded);
+        job.input?.stop();
+        job.output?.stop();
+        job.animation?.stop();
+        this.releaseGifUrl(job);
+        this.cleanup = Promise.allSettled([this.cleanup, job.initializing, job.pipeline]).then(async () => {
+            this.closeFrames(job.pending?.frame, job.pending?.bitmap);
+            job.pending = null;
+            job.mask = null;
+            if (job.model) {
+                try {
+                    await job.model.close();
+                } catch (error) {
+                    console.warn('Virtual background model cleanup failed', error);
+                }
+                job.model = null;
+            }
+        });
+    }
+
+    /** Invalidate pending loads and release owned streams/animation without stopping the raw camera. */
+    async stopCurrentProcessor() {
+        this.generation++;
+        const job = this.active;
+        this.active = null;
+        this.isProcessing = false;
+        this.dispose(job);
+    }
+
+    /** Initialize one job's model lazily, serializing against cleanup of the preceding model. */
+    async initializeSegmentation(job) {
+        const assets = window.BodrikBackgroundAssets;
+        await assets.wait(this.cleanup, job.abort.signal);
+        const Segmentation = await assets.wait(assets.segmentation(), job.abort.signal);
+        this.assertCurrent(job);
+        job.model = new Segmentation({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`,
+        });
+        job.model.setOptions({ modelSelection: 1, runningMode: 'video', smoothSegmentation: true });
+        job.model.onResults((results) => this.handleSegmentationResults(job, results));
+        job.initializing = Promise.resolve().then(() => job.model.initialize());
+        await assets.wait(job.initializing, job.abort.signal);
+        this.assertCurrent(job);
+    }
+
+    /** Consume only this job's pending frame; late callbacks cannot reach a newer session. */
+    handleSegmentationResults(job, results) {
+        const pending = job.pending;
+        job.pending = null;
+        if (!pending) return;
+        if (!this.isCurrent(job)) {
+            this.closeFrames(pending.frame, pending.bitmap);
             return;
         }
+        job.mask = results?.segmentationMask || null;
+        this.processFrame(job, pending.frame, pending.controller, pending.bitmap);
+    }
 
+    /** Composite one frame, falling back to its original pixels if a mask/render operation fails. */
+    processFrame(job, frame, controller, bitmap) {
         try {
-            const canvas = new OffscreenCanvas(videoFrame.displayWidth, videoFrame.displayHeight);
+            if (!this.isCurrent(job)) return;
+            if (!job.mask) {
+                controller.enqueue(frame.clone());
+                return;
+            }
+            const canvas = new OffscreenCanvas(frame.displayWidth, frame.displayHeight);
             const ctx = canvas.getContext('2d');
-
-            // Apply original frame
-            ctx.drawImage(imageBitmap, 0, 0, canvas.width, canvas.height);
-
-            // Apply mask processing
-            maskHandler(ctx, canvas, segmentationMask, imageBitmap);
-
-            // Create new video frame with the processed content
-            const processedFrame = new VideoFrame(canvas, {
-                timestamp: videoFrame.timestamp,
-                alpha: 'keep', // Ensure transparency is preserved
-            });
-
+            ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+            job.maskHandler(ctx, canvas, job.mask, bitmap);
+            const output = new VideoFrame(canvas, { timestamp: frame.timestamp, alpha: 'keep' });
             try {
-                // Enqueue the processed frame to continue the stream
-                controller.enqueue(processedFrame);
-            } catch (enqueueError) {
-                console.warn('Failed to enqueue frame', enqueueError);
-                // Close the processed frame if enqueue fails
-                if (!processedFrame.closed) {
-                    processedFrame.close();
-                }
+                controller.enqueue(output);
+            } catch (error) {
+                output.close();
+                throw error;
             }
         } catch (error) {
-            console.error('❌ Frame processing error:', error);
+            if (this.isCurrent(job)) {
+                console.warn('Virtual background frame rendering failed', error);
+                this.enqueueOriginal(frame, controller);
+            }
         } finally {
-            // Close frames after processing to release resources
-            this.closeFrames(videoFrame, imageBitmap);
+            this.closeFrames(frame, bitmap);
         }
     }
 
-    closeFrames(videoFrame, imageBitmap) {
-        if (videoFrame && !videoFrame.closed) {
-            videoFrame.close();
-        }
-        if (imageBitmap && !imageBitmap.closed) {
-            imageBitmap.close();
-        }
-    }
-
-    async processStreamWithSegmentation(videoTrack, maskHandler) {
-        // Check if the required APIs are supported
-        if (!this.isSupported) {
-            throw new Error(
-                'MediaStreamTrackProcessor, MediaStreamTrackGenerator, or TransformStream is not supported in this environment.'
-            );
-        }
-
-        // Stop current processing before starting new one
-        await this.stopCurrentProcessor();
-
-        // Initialize segmentation if not already done
-        await this.initializeSegmentation();
-
-        // Create new processor and generator for stream transformation
-        const processor = new MediaStreamTrackProcessor({ track: videoTrack });
-        const { generator, track: outputTrack } = this.createVideoTrackGenerator();
-
-        const transformer = new TransformStream({
-            transform: async (videoFrame, controller) => {
-                if (!this.segmentation || !this.initialized) {
-                    console.warn('⚠️ Segmentation is not initialized, skipping frame.');
-                    this.closeFrames(videoFrame);
-                    return;
-                }
-
-                let imageBitmap = null;
-
-                try {
-                    // Create image bitmap from video frame
-                    imageBitmap = await createImageBitmap(videoFrame);
-
-                    if (!imageBitmap) {
-                        console.warn('⚠️ Failed to create imageBitmap, skipping frame.');
-                        this.closeFrames(videoFrame);
-                        return;
-                    }
-
-                    if (this.frameCounter % this.frameSkipRatio === 0) {
-                        // Process only every 3rd frame (reduce CPU load)
-                        this.pendingFrames.push({
-                            videoFrame,
-                            controller,
-                            imageBitmap,
-                            maskHandler,
-                        });
-
-                        // Send the image to the segmentation model
-                        await this.segmentation.send({ image: imageBitmap });
-                    } else if (this.lastSegmentationMask) {
-                        // Use last segmentation mask for skipped frames
-                        this.processFrame(videoFrame, controller, imageBitmap, maskHandler, this.lastSegmentationMask);
-                    } else {
-                        // If no previous mask, just enqueue the original frame
-                        controller.enqueue(videoFrame);
-                    }
-
-                    this.frameCounter++; // Increment frame counter
-                } catch (error) {
-                    console.error('❌ Frame transformation error:', error);
-                    this.closeFrames(videoFrame, imageBitmap);
-                }
-            },
-            flush: () => {
-                // Clean up any pending frames when the stream ends
-                console.log('Transform stream flushing...');
-                this.cleanPendingFrames();
-            },
-        });
-
-        // Store active streams
-        this.activeProcessor = processor;
-        this.activeGenerator = generator;
-        this.isProcessing = true;
-
+    /** Transfer an original-frame clone only if the pipeline still accepts frames. */
+    enqueueOriginal(frame, controller) {
+        let clone;
         try {
-            // Pipeline error handling without recursive calls
-            const pipelinePromise = processor.readable.pipeThrough(transformer).pipeTo(generator.writable);
+            clone = frame.clone();
+            controller.enqueue(clone);
+        } catch {
+            clone?.close();
+        }
+    }
 
-            // Handle errors without awaiting (prevents blocking and recursion)
-            pipelinePromise.catch(() => {
-                // Only stop if we're still processing (avoid recursive calls)
-                if (this.isProcessing && this.activeProcessor) {
-                    console.log('Stopping processor due to pipeline error...');
-                    // Don't await this - let it run async to avoid recursion
-                    this.stopCurrentProcessor().catch((stopError) => {
-                        console.warn('Error during processor cleanup:', stopError);
-                    });
+    /** Release native frame/bitmap resources; close is idempotent for these APIs. */
+    closeFrames(frame, bitmap) {
+        frame?.close();
+        bitmap?.close();
+    }
+
+    /** Serialize segmentation sends and retain no more than one in-flight frame per session. */
+    async transformFrame(job, frame, controller) {
+        let bitmap;
+        try {
+            this.assertCurrent(job);
+            bitmap = await createImageBitmap(frame);
+            this.assertCurrent(job);
+            if (job.frameCounter++ % 3 === 0) {
+                job.pending = { frame, bitmap, controller };
+                await job.model.send({ image: bitmap });
+                if (job.pending) this.handleSegmentationResults(job, null);
+            } else {
+                this.processFrame(job, frame, controller, bitmap);
+            }
+        } catch (error) {
+            job.pending = null;
+            if (this.isCurrent(job)) {
+                console.warn('Virtual background segmentation failed', error);
+                this.enqueueOriginal(frame, controller);
+            }
+            this.closeFrames(frame, bitmap);
+        }
+    }
+
+    /** Prepare an effect and transform an owned camera clone; obsolete preparation always rejects. */
+    async processStreamWithSegmentation(source, createMaskHandler) {
+        const stopping = this.stopCurrentProcessor();
+        const generation = this.generation;
+        await stopping;
+        if (generation !== this.generation) throw new DOMException('Background operation cancelled', 'AbortError');
+        if (!this.isSupported) throw new Error('Virtual background is not supported');
+        if (!source || source.readyState === 'ended') throw new DOMException('Camera closed', 'AbortError');
+        const job = { generation, source, abort: new AbortController(), frameCounter: 0 };
+        job.onEnded = () => {
+            if (this.active === job) this.stopCurrentProcessor();
+        };
+        this.active = job;
+        source.addEventListener('ended', job.onEnded, { once: true });
+        try {
+            await this.initializeSegmentation(job);
+            job.maskHandler = await createMaskHandler(job);
+            this.assertCurrent(job);
+            job.input = source.clone();
+            const processor = new MediaStreamTrackProcessor({ track: job.input });
+            const { generator, track } = this.createVideoTrackGenerator();
+            job.output = track;
+            const transformer = new TransformStream({
+                transform: (frame, controller) => this.transformFrame(job, frame, controller),
+            });
+            job.pipeline = processor.readable
+                .pipeThrough(transformer, { signal: job.abort.signal })
+                .pipeTo(generator.writable, { signal: job.abort.signal });
+            job.pipeline.catch((error) => {
+                if (this.active === job) {
+                    console.warn('Virtual background pipeline stopped', error);
+                    this.stopCurrentProcessor();
                 }
             });
-
-            return new MediaStream([outputTrack]);
+            this.isProcessing = true;
+            return new MediaStream([track]);
         } catch (error) {
-            console.error('Error setting up processing pipeline', error);
-            await this.stopCurrentProcessor();
+            const current = this.active === job && generation === this.generation;
+            if (current) {
+                this.active = null;
+                this.isProcessing = false;
+            }
+            this.dispose(job);
+            if (!current) throw new DOMException('Background operation cancelled', 'AbortError');
             throw error;
         }
     }
 
-    cleanPendingFrames() {
-        // Close all pending frames to release resources
-        while (this.pendingFrames.length) {
-            const { videoFrame, imageBitmap } = this.pendingFrames.pop();
-            this.closeFrames(videoFrame, imageBitmap);
-        }
-        this.pendingFrames = [];
-        console.log('✅ Cleaned pending frames');
-    }
-
-    async stopCurrentProcessor() {
-        if (!this.activeProcessor) {
-            console.warn('⚠️ No active processing to stop');
-            return;
-        }
-
-        this.isProcessing = false;
-        this.cleanPendingFrames();
-
-        try {
-            // Abort the writable stream if it's not locked
-            if (this.activeGenerator?.writable && !this.activeGenerator.writable.locked) {
-                await this.activeGenerator.writable.abort('Processing stopped');
-            }
-
-            // Cancel the readable stream if it's not locked
-            if (this.activeProcessor?.readable && !this.activeProcessor.readable.locked) {
-                await this.activeProcessor.readable.cancel('Processing stopped');
-            }
-
-            console.log('✅ Processor successfully stopped');
-        } catch (error) {
-            console.error('❌ Processor shutdown error', error);
-        } finally {
-            // Reset active processor and generator
-            this.activeProcessor = null;
-            this.activeGenerator = null;
-        }
-    }
-
-    async applyBlurToWebRTCStream(videoTrack, blurLevel = 10) {
-        // Check if the required APIs are supported
-        if (!this.isSupported) {
-            throw new Error(
-                'MediaStreamTrackProcessor, MediaStreamTrackGenerator, or TransformStream is not supported in this environment.'
-            );
-        }
-
-        // Handler for applying blur effect to the background
-        const maskHandler = (ctx, canvas, mask, imageBitmap) => {
-            // Keep only the person using the segmentation mask
+    /** Blur only the background while retaining the segmented person. */
+    applyBlurToWebRTCStream(track, blurLevel = 10) {
+        return this.processStreamWithSegmentation(track, async () => (ctx, canvas, mask, bitmap) => {
             ctx.save();
             ctx.globalCompositeOperation = 'destination-in';
             ctx.drawImage(mask, 0, 0, canvas.width, canvas.height);
             ctx.restore();
-
-            // Apply blur to background and draw image behind the person
             ctx.save();
             ctx.globalCompositeOperation = 'destination-over';
             ctx.filter = `blur(${blurLevel}px)`;
-            ctx.drawImage(imageBitmap, 0, 0, canvas.width, canvas.height);
+            ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
             ctx.restore();
-        };
-
-        console.log('✅ Apply Blur.');
-        return this.processStreamWithSegmentation(videoTrack, maskHandler);
-    }
-
-    async applyVirtualBackgroundToWebRTCStream(videoTrack, imageUrl) {
-        // Check if the required APIs are supported
-        if (!this.isSupported) {
-            throw new Error(
-                'MediaStreamTrackProcessor, MediaStreamTrackGenerator, or TransformStream is not supported in this environment.'
-            );
-        }
-
-        // Determine if the background is a GIF
-        const isGif = imageUrl.endsWith('.gif') || imageUrl.startsWith('data:image/gif');
-        const background = isGif ? await this.loadGifImage(imageUrl) : await this.loadImage(imageUrl);
-
-        // Handler for applying virtual background
-        const maskHandler = (ctx, canvas, mask, imageBitmap) => {
-            // Create an offscreen canvas for a softer mask
-            const maskCanvas = new OffscreenCanvas(canvas.width, canvas.height);
-            const maskCtx = maskCanvas.getContext('2d');
-
-            // Apply slight blur to mask to smooth edges
-            maskCtx.filter = 'blur(5px)'; // Adjust to control softness
-            maskCtx.drawImage(mask, 0, 0, canvas.width, canvas.height);
-
-            // Apply the softened mask
-            ctx.globalCompositeOperation = 'destination-in';
-            ctx.drawImage(maskCanvas, 0, 0, canvas.width, canvas.height);
-
-            // Draw background behind the person
-            ctx.globalCompositeOperation = 'destination-over';
-            ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
-        };
-
-        console.log('✅ Apply Virtual Background.');
-        return this.processStreamWithSegmentation(videoTrack, maskHandler);
-    }
-
-    async applyTransparentVirtualBackgroundToWebRTCStream(videoTrack) {
-        // Check if the required APIs are supported
-        if (!this.isSupported) {
-            throw new Error(
-                'MediaStreamTrackProcessor, MediaStreamTrackGenerator, or TransformStream is not supported in this environment.'
-            );
-        }
-
-        // Handler for applying transparency by using only the mask
-        const maskHandler = (ctx, canvas, mask, imageBitmap) => {
-            // Clear the canvas (ensures transparency)
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // Draw the original frame (so we start with the full image)
-            ctx.drawImage(imageBitmap, 0, 0, canvas.width, canvas.height);
-
-            // Create an offscreen canvas for smooth masking
-            const maskCanvas = new OffscreenCanvas(canvas.width, canvas.height);
-            const maskCtx = maskCanvas.getContext('2d');
-
-            // Blur the mask slightly for softer edges
-            maskCtx.filter = 'blur(5px)';
-            maskCtx.drawImage(mask, 0, 0, canvas.width, canvas.height);
-
-            // Apply the mask to keep only the person
-            ctx.globalCompositeOperation = 'destination-in';
-            ctx.drawImage(maskCanvas, 0, 0, canvas.width, canvas.height);
-
-            // Reset blending mode to normal
-            ctx.globalCompositeOperation = 'source-over';
-        };
-
-        console.log('✅ Apply Transparent Background');
-        return this.processStreamWithSegmentation(videoTrack, maskHandler);
-    }
-
-    async loadImage(src) {
-        // Load an image from the provided source URL
-        return new Promise((resolve, reject) => {
-            const img = new Image();
-            img.crossOrigin = 'anonymous';
-            img.src = src;
-            img.onload = () => resolve(img);
-            img.onerror = reject;
         });
     }
 
-    async loadGifImage(src) {
-        // Load and animate a GIF using gifler
-        return new Promise((resolve, reject) => {
+    /** Load static images without gifler, and GIF animation only when that format is selected. */
+    applyVirtualBackgroundToWebRTCStream(track, url) {
+        return this.processStreamWithSegmentation(track, async (job) => {
+            const isGif = /^data:image\/gif/i.test(url) || /\.gif(?:$|[?#])/i.test(url);
+            const image = isGif ? await this.loadGifImage(url, job) : await this.loadImage(url, job);
+            return (ctx, canvas, mask) => {
+                const softMask = new OffscreenCanvas(canvas.width, canvas.height);
+                const maskCtx = softMask.getContext('2d');
+                maskCtx.filter = 'blur(5px)';
+                maskCtx.drawImage(mask, 0, 0, canvas.width, canvas.height);
+                ctx.globalCompositeOperation = 'destination-in';
+                ctx.drawImage(softMask, 0, 0, canvas.width, canvas.height);
+                ctx.globalCompositeOperation = 'destination-over';
+                ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+            };
+        });
+    }
+
+    /** Retain just the segmented person with a transparent background. */
+    applyTransparentVirtualBackgroundToWebRTCStream(track) {
+        return this.processStreamWithSegmentation(track, async () => (ctx, canvas, mask) => {
+            const softMask = new OffscreenCanvas(canvas.width, canvas.height);
+            const maskCtx = softMask.getContext('2d');
+            maskCtx.filter = 'blur(5px)';
+            maskCtx.drawImage(mask, 0, 0, canvas.width, canvas.height);
+            ctx.globalCompositeOperation = 'destination-in';
+            ctx.drawImage(softMask, 0, 0, canvas.width, canvas.height);
+            ctx.globalCompositeOperation = 'source-over';
+        });
+    }
+
+    /** Load one image with bounded waiting and remove obsolete network/event work. */
+    async loadImage(src, job) {
+        const image = new Image();
+        image.crossOrigin = 'anonymous';
+        let loaded = false;
+        const pending = new Promise((resolve, reject) => {
+            image.onload = () => {
+                loaded = true;
+                resolve(image);
+            };
+            image.onerror = () => reject(new Error('Could not load background image'));
+            image.src = src;
+        });
+        try {
+            return await window.BodrikBackgroundAssets.wait(pending, job.abort.signal);
+        } finally {
+            image.onload = image.onerror = null;
+            if (!loaded) image.src = '';
+        }
+    }
+
+    /** Revoke a session's temporary GIF URL exactly once, including cancellation. */
+    releaseGifUrl(job) {
+        if (job.gifUrl) {
+            URL.revokeObjectURL(job.gifUrl);
+            job.gifUrl = null;
+        }
+    }
+
+    /** Keep gifler 0.1.0's catch-up loop progressing even for zero-delay GIF frames. */
+    normalizeGifFrameDelays(animation) {
+        if (!Array.isArray(animation._frames) || !animation._frames.length) {
+            throw new Error('Unsupported GIF decoder frames');
+        }
+        for (const frame of animation._frames) {
+            if (!Number.isFinite(frame.delay) || frame.delay <= 0) frame.delay = 10;
+            else if (frame.delay < 2) frame.delay = 2;
+        }
+    }
+
+    /** Fetch GIF bytes cancellably and stop late decode callbacks from obsolete selections. */
+    async loadGifImage(src, job) {
+        const assets = window.BodrikBackgroundAssets;
+        const animate = await assets.wait(assets.gifler(), job.abort.signal);
+        this.assertCurrent(job);
+        const response = await assets.wait(fetch(src, { signal: job.abort.signal }), job.abort.signal);
+        if (!response.ok) throw new Error('Could not load background GIF');
+        const blob = await assets.wait(response.blob(), job.abort.signal);
+        this.assertCurrent(job);
+        job.gifUrl = URL.createObjectURL(blob);
+        const canvas = document.createElement('canvas');
+        const decoded = new Promise((resolve, reject) => {
             try {
-                if (this.gifAnimation) {
-                    this.gifAnimation.stop(); // Stop previous animation
-                    this.gifAnimation = null;
-                }
-
-                if (!this.gifCanvas) {
-                    this.gifCanvas = document.createElement('canvas');
-                }
-
-                gifler(src).get((animation) => {
-                    this.gifAnimation = animation;
-                    animation.animateInCanvas(this.gifCanvas); // Start the animation
-                    console.log('✅ GIF loaded and animation started.');
-                    resolve(this.gifCanvas);
+                animate(job.gifUrl).get((animation) => {
+                    if (!this.isCurrent(job)) {
+                        animation.stop();
+                        reject(new DOMException('Background operation cancelled', 'AbortError'));
+                        return;
+                    }
+                    try {
+                        this.normalizeGifFrameDelays(animation);
+                        job.animation = animation;
+                        animation.animateInCanvas(canvas);
+                        resolve(canvas);
+                    } catch (error) {
+                        animation.stop();
+                        reject(error);
+                    }
                 });
             } catch (error) {
-                console.error('❌ Error loading GIF with gifler:', error);
                 reject(error);
             }
         });
+        try {
+            return await assets.wait(decoded, job.abort.signal);
+        } finally {
+            this.releaseGifUrl(job);
+        }
     }
 }
