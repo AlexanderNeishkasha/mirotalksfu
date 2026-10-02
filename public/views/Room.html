@@ -108,7 +108,7 @@
         <script defer src="../js/BodrikBackgroundAssets.js"></script>
         <script defer src="../js/VirtualBackground.js"></script>
         <script defer src="../js/BodrikBackgroundCapture.js"></script>
-        <script defer src="../js/NodeProcessor.js"></script>
+        <script defer src="../js/BodrikNoiseSuppression.js"></script>
         <script defer src="../js/BodrikMicProcessing.js"></script>
         <script defer src="../js/BodrikJoinDiagnostics.js"></script>
         <script defer src="../js/FixWebmDuration.js"></script>
@@ -788,24 +788,45 @@
                                     <td>
                                         <div class="title">
                                             <i class="fas fa-ear-listen"></i>
-                                            <p id="labelNoiseSuppression">Noise Suppression</p>
+                                            <span class="mic-setting-label">
+                                                <span>Noise suppression</span>
+                                                <button
+                                                    id="noiseSuppressionHelp"
+                                                    class="setting-help-button"
+                                                    type="button"
+                                                    aria-label="About noise suppression"
+                                                >
+                                                    ?
+                                                </button>
+                                            </span>
                                         </div>
                                     </td>
                                     <td>
-                                        <div class="form-check form-switch form-switch-md title">
-                                            <input
-                                                id="switchNoiseSuppression"
-                                                class="form-check-input"
-                                                type="checkbox"
-                                            />
-                                        </div>
+                                        <select
+                                            id="noiseSuppressionMode"
+                                            class="mic-noise-mode-select form-select text-light bg-dark"
+                                        >
+                                            <option value="off">Off</option>
+                                            <option value="browser">Browser</option>
+                                            <option value="rnnoise">RNNoise</option>
+                                        </select>
                                     </td>
                                 </tr>
                                 <tr>
                                     <td>
                                         <div class="title">
                                             <i class="fas fa-headphones"></i>
-                                            <p>Echo cancellation</p>
+                                            <span class="mic-setting-label">
+                                                <span>Echo cancellation</span>
+                                                <button
+                                                    id="echoCancellationHelp"
+                                                    class="setting-help-button"
+                                                    type="button"
+                                                    aria-label="About echo cancellation"
+                                                >
+                                                    ?
+                                                </button>
+                                            </span>
                                         </div>
                                     </td>
                                     <td>
@@ -822,7 +843,17 @@
                                     <td>
                                         <div class="title">
                                             <i class="fas fa-wave-square"></i>
-                                            <p>Automatic gain control</p>
+                                            <span class="mic-setting-label">
+                                                <span>Automatic gain control</span>
+                                                <button
+                                                    id="autoGainControlHelp"
+                                                    class="setting-help-button"
+                                                    type="button"
+                                                    aria-label="About automatic gain control"
+                                                >
+                                                    ?
+                                                </button>
+                                            </span>
                                         </div>
                                     </td>
                                     <td>

@@ -397,7 +397,6 @@ class RoomClient {
 
         // Noise Suppression
         this.RNNoiseProcessor = null;
-        this.isRNNoiseSupported = true; // Will be set to false if AudioWorklet/WASM not available
 
         this.videoProducerId = null;
         this.screenProducerId = null;
@@ -1965,14 +1964,19 @@ class RoomClient {
                 );
             }
 
-            if (audio && BUTTONS.settings.customNoiseSuppression) {
-                /*
-                 * Initialize RNNoise Suppression if enabled and supported
-                 * This will only apply to audio tracks
-                 * and will not affect video tracks.
-                 */
-                await this.initRNNoiseSuppression();
-                stream = await this.getRNNoiseSuppressionStream(stream);
+            if (
+                audio &&
+                BUTTONS.settings.customNoiseSuppression &&
+                window.BodrikNoiseSuppression.normalize(localStorageSettings.mic_noise_suppression_mode) === 'rnnoise'
+            ) {
+                const rnnoiseReady = await this.initRNNoiseSuppression();
+                const processed = rnnoiseReady ? await this.getRNNoiseSuppressionStream(stream) : null;
+                if (processed) {
+                    stream = processed;
+                } else {
+                    stream.getTracks().forEach((track) => track.stop());
+                    stream = await navigator.mediaDevices.getUserMedia(this.getAudioConstraints(deviceId));
+                }
             }
 
             console.log('Supported Constraints', navigator.mediaDevices.getSupportedConstraints());
@@ -2432,41 +2436,28 @@ class RoomClient {
     // NOISE SUPPRESSION
     // ####################################################
 
+    /** Lazily load and probe RNNoise only after the explicit enhanced-mode selection. */
     async initRNNoiseSuppression() {
-        if (typeof RNNoiseProcessor === 'undefined') {
-            console.warn('RNNoiseProcessor is not available.');
+        try {
+            const Processor = await window.BodrikNoiseSuppression.load();
+            if (!Processor.isSupported()) throw new Error('AudioWorklet or WebAssembly is unsupported');
+            if (!(await Processor.isSampleRateSupported())) throw new Error('48 kHz audio is unsupported');
+            this.disableRNNoiseSuppression();
+            this.RNNoiseProcessor = new Processor();
+            return true;
+        } catch (error) {
+            console.warn('RNNoise unavailable; falling back to browser noise suppression', error);
             this.handleRNNoiseNotSupported();
-            return;
+            return false;
         }
-
-        if (!RNNoiseProcessor.isSupported()) {
-            console.warn('RNNoise: AudioWorklet or WebAssembly not supported on this device, skipping.');
-            this.handleRNNoiseNotSupported();
-            return;
-        }
-
-        const supports48k = await RNNoiseProcessor.isSampleRateSupported();
-        if (!supports48k) {
-            console.warn('RNNoise: device does not support 48 kHz sample rate, skipping.');
-            this.handleRNNoiseNotSupported();
-            return;
-        }
-
-        this.disableRNNoiseSuppression();
-
-        this.RNNoiseProcessor = new RNNoiseProcessor();
     }
 
+    /** Persist the safe browser fallback and keep the active call usable after RNNoise failure. */
     handleRNNoiseNotSupported() {
-        this.isRNNoiseSupported = false;
-
-        // Uncheck the toggle so localStorage stays consistent
-        if (switchNoiseSuppression) switchNoiseSuppression.checked = false;
-        localStorageSettings.mic_noise_suppression = false;
+        localStorageSettings.mic_noise_suppression_mode = 'browser';
         lS.setSettings(localStorageSettings);
-
-        // Hide the custom noise suppression toggle in audio settings
-        elemDisplay('noiseSuppressionButton', false);
+        if (typeof noiseSuppressionMode !== 'undefined') noiseSuppressionMode.value = 'browser';
+        userLog('warning', 'RNNoise is unavailable. Browser noise suppression is enabled.', 'top-end', 6000);
     }
 
     async getRNNoiseSuppressionStream(stream) {
@@ -2478,20 +2469,16 @@ class RoomClient {
 
         try {
             const processedStream = await this.RNNoiseProcessor.startProcessing(stream);
-
-            if (localStorageSettings.mic_noise_suppression) {
-                this.RNNoiseProcessor.toggleNoiseSuppression();
-                switchNoiseSuppression.checked = this.RNNoiseProcessor.noiseSuppressionEnabled;
+            if (!processedStream) {
+                this.handleRNNoiseNotSupported();
+                return null;
             }
-
-            if (typeof labelNoiseSuppression !== 'undefined') {
-                labelNoiseSuppression.style.color = this.RNNoiseProcessor.noiseSuppressionEnabled ? 'lime' : 'white';
-            }
-
+            this.RNNoiseProcessor.setNoiseSuppression(true);
             return processedStream;
         } catch (err) {
-            console.warn('RNNoiseProcessor failed, using original stream:', err);
-            return stream;
+            console.warn('RNNoiseProcessor failed:', err);
+            this.handleRNNoiseNotSupported();
+            return null;
         }
     }
 
@@ -2512,15 +2499,12 @@ class RoomClient {
     // ####################################################
 
     getAudioConstraints(deviceId) {
-        // Use the browser fallback only when noise suppression is enabled but RNNoise is unavailable.
-        const useBuiltInNoiseSuppression =
-            localStorageSettings.mic_noise_suppression &&
-            (!BUTTONS.settings.customNoiseSuppression || !this.isRNNoiseSupported);
-
+        const selectedMode = window.BodrikNoiseSuppression.normalize(localStorageSettings.mic_noise_suppression_mode);
+        const mode = selectedMode === 'rnnoise' && !BUTTONS.settings.customNoiseSuppression ? 'browser' : selectedMode;
         const audioConstraints = {
             echoCancellation: localStorageSettings.mic_echo_cancellation === true,
             autoGainControl: localStorageSettings.mic_auto_gain_control === true,
-            noiseSuppression: useBuiltInNoiseSuppression,
+            noiseSuppression: window.BodrikNoiseSuppression.browserConstraint(mode),
         };
         /* 
         deviceId handling is platform-dependent:
@@ -3140,6 +3124,7 @@ class RoomClient {
 
         const producer_id = this.producerLabel.get(type);
         const producer = this.producers.get(producer_id);
+        if (type === mediaType.audio && this.RNNoiseProcessor) this.disableRNNoiseSuppression();
 
         // Stop all tracks of the producer's stream
         if (producer && producer.track) {

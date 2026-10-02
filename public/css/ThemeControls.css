@@ -17,6 +17,92 @@
     box-shadow: none !important;
 }
 
+#micOptionsButton select.mic-noise-mode-select {
+    width: 190px !important;
+    min-width: 190px;
+    margin: 0 !important;
+    align-self: center;
+}
+
+@media (max-width: 600px) {
+    #micOptionsButton select.mic-noise-mode-select {
+        width: 160px !important;
+        min-width: 160px;
+    }
+}
+
+#micOptionsButton .settingsTable td {
+    vertical-align: middle;
+}
+
+#micOptionsButton .settingsTable td:first-child .title {
+    display: inline-flex;
+    width: auto;
+}
+
+#micOptionsButton .settingsTable td:first-child .title > i,
+#micOptionsButton .settingsTable td:first-child .title > .svg-inline--fa {
+    width: 20px;
+    flex: 0 0 20px;
+    margin-right: 10px;
+}
+
+.mic-setting-label {
+    display: inline-flex;
+    min-width: 0;
+    flex: 0 1 auto;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+    white-space: nowrap;
+}
+
+#mySettings .setting-help-button {
+    display: inline-grid;
+    width: 20px;
+    min-width: 20px;
+    height: 20px;
+    flex: 0 0 20px;
+    align-self: center;
+    place-items: center;
+    margin: 0;
+    padding: 0;
+    border: 1px solid color-mix(in srgb, var(--room-switch-accent) 70%, transparent);
+    border-radius: 50%;
+    color: var(--room-switch-accent);
+    background: color-mix(in srgb, var(--room-switch-accent) 10%, transparent);
+    font: 700 12px/1 sans-serif;
+    cursor: help;
+}
+
+#mySettings .setting-help-button:hover,
+#mySettings .setting-help-button:focus-visible {
+    color: #fff;
+    background: var(--room-switch-accent);
+    outline: none;
+    transform: none;
+}
+
+.mic-setting-help {
+    max-width: 320px;
+    text-align: left;
+    line-height: 1.45;
+}
+
+.mic-setting-help strong {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--room-switch-accent);
+}
+
+.mic-setting-help p {
+    margin: 0 0 9px;
+}
+
+.mic-setting-help p:last-child {
+    margin-bottom: 0;
+}
+
 /* Native range controls retain keyboard/touch behavior and browser progress rendering. */
 body input[type='range'],
 body .navbar-dropdown-control input[type='range'] {

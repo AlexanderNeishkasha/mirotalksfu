@@ -333,11 +333,7 @@ async function initClient() {
             'If Active, When a participant speaks, their video will be focused and enlarged',
             'right'
         );
-        setTippy(
-            'switchNoiseSuppression',
-            'If Active, the audio will be processed to reduce background noise, making the voice clearer',
-            'right'
-        );
+        setMicProcessingHelpTippy();
         setTippy(
             'switchPushToTalk',
             'If Active, When SpaceBar keydown the microphone will be resumed, on keyup will be paused, like a walkie-talkie',
@@ -437,6 +433,64 @@ function refreshExitButtonTooltip(placement) {
 // ####################################################
 // HANDLE TOOLTIP
 // ####################################################
+
+/** Translate one maintained tooltip sentence without translating generated HTML markup. */
+function micHelpText(text) {
+    return window.i18n?.t(text, 'tooltips') || text;
+}
+
+/** Render short usage guidance for one microphone-processing control. */
+function micHelpHtml(sections) {
+    return `<div class="mic-setting-help">${sections
+        .map(({ title, text }) => `<p><strong>${micHelpText(title)}</strong>${micHelpText(text)}</p>`)
+        .join('')}</div>`;
+}
+
+/** Attach hover/focus/tap help to the three exclusive microphone processing controls. */
+function setMicProcessingHelpTippy() {
+    const definitions = [
+        [
+            'noiseSuppressionHelp',
+            [
+                {
+                    title: 'Browser noise suppression — recommended',
+                    text: 'Uses the browser or device audio processing with the lowest load. Start with this mode.',
+                },
+                {
+                    title: 'RNNoise — enhanced',
+                    text: 'Removes steady background noise more aggressively, but uses more CPU, memory, and battery. Choose browser mode if audio stutters or sounds distorted.',
+                },
+                {
+                    title: 'Off',
+                    text: 'Leaves microphone noise unfiltered. Useful in a quiet room or when preserving non-speech audio matters.',
+                },
+            ],
+        ],
+        [
+            'echoCancellationHelp',
+            [
+                {
+                    title: 'Echo cancellation',
+                    text: 'Enable it when sound plays through speakers or a laptop: it helps prevent other participants from hearing their voices returned through your microphone. Headphones usually do not need it.',
+                },
+            ],
+        ],
+        [
+            'autoGainControlHelp',
+            [
+                {
+                    title: 'Automatic gain control',
+                    text: 'Keeps quiet and loud speech at a more even level. Enable it for a distant microphone or changing speaking volume; disable it if volume pumps or you transmit music.',
+                },
+            ],
+        ],
+    ];
+    for (const [id, sections] of definitions) {
+        setTippy(id, micHelpHtml(sections), 'right', true);
+        const instance = getId(id)?._tippy;
+        instance?.setProps({ trigger: 'mouseenter focus click', hideOnClick: true, maxWidth: 340 });
+    }
+}
 
 function setTippy(elem, content, placement, allowHTML = false) {
     const element = document.getElementById(elem);
@@ -1600,7 +1654,6 @@ function roomIsReady() {
 
     BUTTONS.settings.lobbyButton && show(lobbyButton);
     updateJoinLockButtons();
-    !BUTTONS.settings.customNoiseSuppression && hide(noiseSuppressionButton);
 
     BUTTONS.main.aboutButton && show(aboutButton);
     if (!isMobileDevice) show(pinUnpinGridDiv);
@@ -2968,6 +3021,17 @@ function handleSelects() {
         lS.setSettings(localStorageSettings);
         e.target.blur();
     };
+    noiseSuppressionMode.onchange = (event) => {
+        let mode = window.BodrikNoiseSuppression.normalize(event.currentTarget.value);
+        if (mode === 'rnnoise' && !BUTTONS.settings.customNoiseSuppression) mode = 'browser';
+        localStorageSettings.mic_noise_suppression_mode = mode;
+        lS.setSettings(localStorageSettings);
+        noiseSuppressionMode.value = mode;
+        if (rc.producerExist(RoomClient.mediaType.audio)) {
+            rc.closeThenProduce(RoomClient.mediaType.audio, microphoneSelect.value);
+        }
+        event.currentTarget.blur();
+    };
     bindBodrikMicSettings({
         echoInput: switchEchoCancellation,
         gainInput: switchAutoGainControl,
@@ -3425,7 +3489,16 @@ function loadSettingsFromLocalStorage() {
     switchShortcuts.checked = isShortcutsEnabled;
 
     switchDominantSpeakerFocus.checked = localStorageSettings.dominant_speaker_focus;
-    switchNoiseSuppression.checked = localStorageSettings.mic_noise_suppression;
+    let noiseMode = window.BodrikNoiseSuppression.normalize(localStorageSettings.mic_noise_suppression_mode);
+    if (!BUTTONS.settings.customNoiseSuppression) {
+        noiseSuppressionMode.querySelector('option[value="rnnoise"]')?.remove();
+        if (noiseMode === 'rnnoise') {
+            noiseMode = 'browser';
+            localStorageSettings.mic_noise_suppression_mode = noiseMode;
+            lS.setSettings(localStorageSettings);
+        }
+    }
+    noiseSuppressionMode.value = noiseMode;
     switchEchoCancellation.checked = localStorageSettings.mic_echo_cancellation === true;
     switchAutoGainControl.checked = localStorageSettings.mic_auto_gain_control === true;
 
@@ -4492,16 +4565,12 @@ function setupQuickDeviceSwitchDropdowns() {
         appendSelectOptions(audioMenu, microphoneSelect, 'No microphones found', buildAudioMenu, audioMeterEntries);
         if (audioMeterManager.active) audioMeterManager.start(audioMeterEntries);
 
-        const showNoiseSuppression = BUTTONS.settings.customNoiseSuppression && rc.isRNNoiseSupported;
         const showPushToTalk = BUTTONS.settings.pushToTalk;
         const showDominantSpeakerFocus = rc.dominantSpeaker;
 
         appendMenuDivider(audioMenu);
         appendMenuHeader(audioMenu, 'fas fa-ear-listen', 'Microphone Controls');
 
-        if (showNoiseSuppression) {
-            appendMenuToggle(audioMenu, 'deviceMenuNoiseSuppression', 'Noise cancellation', switchNoiseSuppression);
-        }
         appendMenuToggle(audioMenu, 'deviceMenuEchoCancellation', 'Echo cancellation', switchEchoCancellation);
         appendMenuToggle(audioMenu, 'deviceMenuAutoGainControl', 'Automatic gain control', switchAutoGainControl);
         if (showPushToTalk) {
@@ -4628,7 +4697,6 @@ function setupQuickDeviceSwitchDropdowns() {
     if (microphoneSelect) microphoneSelect.addEventListener('change', rebuildAudioMenu);
     if (speakerSelect) speakerSelect.addEventListener('change', rebuildAudioMenu);
     [
-        [switchNoiseSuppression, 'deviceMenuNoiseSuppression'],
         [switchEchoCancellation, 'deviceMenuEchoCancellation'],
         [switchAutoGainControl, 'deviceMenuAutoGainControl'],
         [switchPushToTalk, 'deviceMenuPushToTalk'],

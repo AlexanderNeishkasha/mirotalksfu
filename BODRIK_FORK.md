@@ -33,7 +33,7 @@ geolocation (including IP geolocation lookup) are retired end to end. Server
 recording, chunk uploads, S3 storage, and the standalone recording receiver are
 removed. Local recording still buffers the encoder's final data, repairs WebM
 duration, and downloads to the participant's device; it retains music/participant
-volume and microphone-mute handling. The hidden local Appearance tab, custom color state and Pickr are removed;
+volume and microphone-mute handling. Microphone noise suppression is one exclusive mode and defaults to off: browser processing is available as a lightweight option, while RNNoise lazily loads its controller, AudioWorklet and 4.6 MiB WASM only when selected. RNNoise disables the browser constraint to avoid double processing and falls back to browser mode on failure. The hidden local Appearance tab, custom color state and Pickr are removed;
 `BodrikTheme` follows the authoritative Studio palette as the only theme source. Standalone landing/login/room-creation/catalog,
 waiting-room and widget pages are retired; canonical Bodrik invitation exchange,
 room-bound JWT admission, permission guidance, privacy and error pages remain.

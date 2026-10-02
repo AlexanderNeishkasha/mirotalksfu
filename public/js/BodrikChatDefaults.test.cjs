@@ -34,7 +34,8 @@ test('existing visitors reset auto-open once without losing other settings', () 
     const store = new Store();
     const migrated = store.getLocalStorageSettings();
     assert.equal(migrated.show_chat_on_msg, false);
-    assert.equal(migrated.mic_noise_suppression, false);
+    assert.equal(migrated.mic_noise_suppression_mode, 'off');
+    assert.equal(Object.hasOwn(migrated, 'mic_noise_suppression'), false);
     assert.equal(migrated.theme, 7);
     assert.equal(values.get('BODRIK_CHAT_AUTO_OPEN_OFF_V1'), '1');
     migrated.show_chat_on_msg = true;

@@ -1,5 +1,15 @@
 {
     "tooltips": {
+        "Browser noise suppression — recommended": "Browser noise suppression — recommended",
+        "Uses the browser or device audio processing with the lowest load. Start with this mode.": "Uses the browser or device audio processing with the lowest load. Start with this mode.",
+        "RNNoise — enhanced": "RNNoise — enhanced",
+        "Off": "Off",
+        "Removes steady background noise more aggressively, but uses more CPU, memory, and battery. Choose browser mode if audio stutters or sounds distorted.": "Removes steady background noise more aggressively, but uses more CPU, memory, and battery. Choose browser mode if audio stutters or sounds distorted.",
+        "Leaves microphone noise unfiltered. Useful in a quiet room or when preserving non-speech audio matters.": "Leaves microphone noise unfiltered. Useful in a quiet room or when preserving non-speech audio matters.",
+        "Echo cancellation": "Echo cancellation",
+        "Enable it when sound plays through speakers or a laptop: it helps prevent other participants from hearing their voices returned through your microphone. Headphones usually do not need it.": "Enable it when sound plays through speakers or a laptop: it helps prevent other participants from hearing their voices returned through your microphone. Headphones usually do not need it.",
+        "Automatic gain control": "Automatic gain control",
+        "Keeps quiet and loud speech at a more even level. Enable it for a distant microphone or changing speaking volume; disable it if volume pumps or you transmit music.": "Keeps quiet and loud speech at a more even level. Enable it for a distant microphone or changing speaking volume; disable it if volume pumps or you transmit music.",
         "Attach image": "Attach image",
         "Disconnect": "Disconnect",
         "🔊 Volume": "🔊 Volume",
@@ -379,6 +389,14 @@
         "Request camera access": "Request camera access"
     },
     "labels": {
+        "Off": "Off",
+        "About noise suppression": "About noise suppression",
+        "About echo cancellation": "About echo cancellation",
+        "About automatic gain control": "About automatic gain control",
+        "Noise suppression": "Noise suppression",
+        "RNNoise uses more CPU and memory": "RNNoise uses more CPU and memory",
+        "Browser": "Browser",
+        "RNNoise": "RNNoise",
         "Stored:": "Stored:",
         "Time:": "Time:",
         "File:": "File:",
@@ -1106,6 +1124,7 @@
         "Could not request camera access. Check device availability and browser settings.": "Could not request camera access. Check device availability and browser settings."
     },
     "toasts": {
+        "RNNoise is unavailable. Browser noise suppression is enabled.": "RNNoise is unavailable. Browser noise suppression is enabled.",
         "Could not load the virtual background. Your camera will work without effects. Try again.": "Could not load the virtual background. Your camera will work without effects. Try again.",
         "⚪ Wake Lock released": "⚪ Wake Lock released",
         "🔴 Failed to request Wake Lock:": "🔴 Failed to request Wake Lock:",

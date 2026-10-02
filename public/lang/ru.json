@@ -1,5 +1,15 @@
 {
     "tooltips": {
+        "Browser noise suppression — recommended": "Браузерное шумоподавление — рекомендуется",
+        "Uses the browser or device audio processing with the lowest load. Start with this mode.": "Использует обработку браузера или устройства с минимальной нагрузкой. Начните с этого режима.",
+        "RNNoise — enhanced": "RNNoise — усиленное",
+        "Off": "Выключено",
+        "Removes steady background noise more aggressively, but uses more CPU, memory, and battery. Choose browser mode if audio stutters or sounds distorted.": "Сильнее подавляет постоянный фоновый шум, но расходует больше процессора, памяти и заряда. Выберите браузерный режим, если звук прерывается или искажается.",
+        "Leaves microphone noise unfiltered. Useful in a quiet room or when preserving non-speech audio matters.": "Оставляет звук микрофона без фильтрации шума. Подходит для тихой комнаты или когда важно сохранить не только речь.",
+        "Echo cancellation": "Эхоподавление",
+        "Enable it when sound plays through speakers or a laptop: it helps prevent other participants from hearing their voices returned through your microphone. Headphones usually do not need it.": "Включайте при использовании колонок или динамиков ноутбука: это помогает не возвращать голоса участников обратно через ваш микрофон. С наушниками обычно не требуется.",
+        "Automatic gain control": "Выравнивание громкости",
+        "Keeps quiet and loud speech at a more even level. Enable it for a distant microphone or changing speaking volume; disable it if volume pumps or you transmit music.": "Выравнивает тихую и громкую речь. Включайте, если микрофон находится далеко от вас или громкость голоса часто меняется; выключайте, если громкость пульсирует или вы передаёте музыку.",
         "Attach image": "Прикрепить картинку",
         "Disconnect": "Отключиться",
         "🔊 Volume": "🔊 Громкость",
@@ -379,6 +389,14 @@
         "Request camera access": "Запросить доступ к камере"
     },
     "labels": {
+        "Off": "Выключено",
+        "About noise suppression": "О шумоподавлении",
+        "About echo cancellation": "Об эхоподавлении",
+        "About automatic gain control": "О выравнивании громкости",
+        "Noise suppression": "Шумоподавление",
+        "RNNoise uses more CPU and memory": "RNNoise требует больше ресурсов процессора и памяти",
+        "Browser": "Браузерное",
+        "RNNoise": "RNNoise",
         "Stored:": "Сохранено:",
         "Time:": "Длительность:",
         "File:": "Файл:",
@@ -1106,6 +1124,7 @@
         "Could not request camera access. Check device availability and browser settings.": "Не удалось получить доступ к камере. Проверьте устройство и разрешения браузера."
     },
     "toasts": {
+        "RNNoise is unavailable. Browser noise suppression is enabled.": "RNNoise недоступен. Включено браузерное шумоподавление.",
         "Could not load the virtual background. Your camera will work without effects. Try again.": "Не удалось загрузить виртуальный фон. Камера продолжит работать без эффектов. Попробуйте ещё раз.",
         "Select a grouped object to ungroup.": "Выберите сгруппированный объект для разгруппировки.",
         "Select two or more objects to group.": "Выберите два или более объекта для группировки.",

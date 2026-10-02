@@ -30,8 +30,6 @@ class UIManager {
             `Audio processing ${isProcessing ? 'started' : 'stopped'}`,
             isProcessing ? 'success' : 'info'
         );
-
-        this.elements.labelNoiseSuppression.style.color = noiseSuppressionEnabled ? 'lime' : 'white';
     }
 }
 
@@ -74,7 +72,7 @@ class WasmLoader {
 
             this.uiManager.updateStatus('📦 Loading RNNoise sync module...', 'info');
 
-            const jsResponse = await fetch('../js/RnnoiseSync.js');
+            const jsResponse = await fetch(window.BodrikNoiseSuppression.url('/js/RnnoiseSync.js'));
 
             if (!jsResponse.ok) {
                 throw new Error('Failed to load rnnoise-sync.js');
@@ -153,24 +151,9 @@ class RNNoiseProcessor {
         }
     }
 
+    /** RNNoise has no UI ownership; the room's exclusive mode select owns state. */
     initializeUI() {
-        this.elements = {
-            labelNoiseSuppression: document.getElementById('labelNoiseSuppression'),
-            switchNoiseSuppression: document.getElementById('switchNoiseSuppression'),
-        };
-
-        this.elements.switchNoiseSuppression.onchange = (e) => {
-            const enabled = e.currentTarget.checked;
-            localStorageSettings.mic_noise_suppression = enabled;
-            lS.setSettings(localStorageSettings);
-            userLog(
-                enabled ? 'success' : 'info',
-                `Noise suppression ${enabled ? 'enabled' : 'disabled'}`,
-                'top-end',
-                3000
-            );
-            this.setNoiseSuppression(enabled);
-        };
+        this.elements = {};
     }
 
     initializeDependencies() {
@@ -219,7 +202,9 @@ class RNNoiseProcessor {
                 throw new Error('No audio tracks found in the provided media stream');
             }
 
-            await this.audioContext.audioWorklet.addModule('../js/NoiseSuppressionProcessor.js');
+            await this.audioContext.audioWorklet.addModule(
+                window.BodrikNoiseSuppression.url('/js/NoiseSuppressionProcessor.js')
+            );
 
             this.workletNode = new AudioWorkletNode(this.audioContext, 'NoiseSuppressionProcessor', {
                 numberOfInputs: 1,
@@ -308,3 +293,5 @@ class RNNoiseProcessor {
         this.setNoiseSuppression(!this.noiseSuppressionEnabled);
     }
 }
+
+window.RNNoiseProcessor = RNNoiseProcessor;

@@ -31,7 +31,7 @@ class LocalStorage {
 
             moderator_disconnect_all_on_leave: false, // Disconnect all participants on leave room
             dominant_speaker_focus: false, // Focus on dominant speaker
-            mic_noise_suppression: false, // Noise suppression, using RNNoise or browser fallback
+            mic_noise_suppression_mode: 'off', // off | browser | rnnoise
             mic_echo_cancellation: false, // Browser echo cancellation
             mic_auto_gain_control: false, // Browser automatic gain control
             speaker_volume: 100, // master output volume 0-100
@@ -149,10 +149,19 @@ class LocalStorage {
         const settings = this.getObjectLocalStorage('SFU_SETTINGS');
         if (!settings) return settings;
 
-        const migrations = [
-            ['BODRIK_NOISE_DEFAULT_OFF_V1', 'mic_noise_suppression'],
-            ['BODRIK_CHAT_AUTO_OPEN_OFF_V1', 'show_chat_on_msg'],
-        ];
+        const noiseMigration = 'BODRIK_NOISE_MODE_V3_DEFAULT_OFF';
+        if (!localStorage.getItem(noiseMigration)) {
+            settings.mic_noise_suppression_mode = 'off';
+            delete settings.mic_noise_suppression;
+            this.setSettings(settings);
+            localStorage.setItem(noiseMigration, '1');
+        } else if (!['off', 'browser', 'rnnoise'].includes(settings.mic_noise_suppression_mode)) {
+            settings.mic_noise_suppression_mode = 'off';
+            delete settings.mic_noise_suppression;
+            this.setSettings(settings);
+        }
+
+        const migrations = [['BODRIK_CHAT_AUTO_OPEN_OFF_V1', 'show_chat_on_msg']];
         for (const [key, setting, value = false] of migrations) {
             if (localStorage.getItem(key)) continue;
             settings[setting] = value;

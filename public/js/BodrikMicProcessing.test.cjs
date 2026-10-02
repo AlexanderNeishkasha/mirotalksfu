@@ -17,40 +17,63 @@ function fixture(track) {
     return { settings, input, storage, roomClient };
 }
 
-test('existing browser settings default both microphone enhancements to off', () => {
-    const context = vm.createContext({
-        localStorage: { getItem: () => JSON.stringify({ mic_noise_suppression: false }) },
-    });
+test('new microphone settings default all optional processing to off', () => {
+    const context = vm.createContext({ localStorage: { getItem: () => null } });
     const source = fs.readFileSync(require('node:path').join(__dirname, 'LocalStorage.js'), 'utf8');
     vm.runInContext(source + '\nglobalThis.LocalStorage = LocalStorage;', context);
-    const settings = new context.LocalStorage().getLocalStorageSettings();
+    const settings = new context.LocalStorage().SFU_SETTINGS;
+    assert.equal(settings.mic_noise_suppression_mode, 'off');
     assert.notEqual(settings.mic_echo_cancellation, true);
     assert.notEqual(settings.mic_auto_gain_control, true);
 });
 
-test('capture constraints default off and follow each saved enhancement', () => {
-    const source = fs.readFileSync(require('node:path').join(__dirname, 'RoomClient.js'), 'utf8');
-    const method = source.slice(
-        source.indexOf('    getAudioConstraints(deviceId) {'),
-        source.indexOf('    getCameraConstraints() {')
-    );
-    const settings = { mic_noise_suppression: false };
-    const Client = vm.runInNewContext(`(class { ${method} })`, {
-        localStorageSettings: settings,
-        BUTTONS: { settings: { customNoiseSuppression: true } },
+for (const [mode, customEnabled, expected] of [
+    ['off', true, false],
+    ['browser', true, true],
+    ['rnnoise', true, false],
+    ['rnnoise', false, true],
+    ['invalid', true, false],
+]) {
+    test(`capture constraint for ${mode}; custom=${customEnabled}`, () => {
+        const source = fs.readFileSync(require('node:path').join(__dirname, 'RoomClient.js'), 'utf8');
+        const method = source.slice(
+            source.indexOf('    getAudioConstraints(deviceId) {'),
+            source.indexOf('    getCameraConstraints() {')
+        );
+        const settings = { mic_noise_suppression_mode: mode };
+        const Client = vm.runInNewContext(`(class { ${method} })`, {
+            localStorageSettings: settings,
+            BUTTONS: { settings: { customNoiseSuppression: customEnabled } },
+            window: {
+                BodrikNoiseSuppression: {
+                    normalize: (value) => (['off', 'browser', 'rnnoise'].includes(value) ? value : 'off'),
+                    browserConstraint: (value) => value === 'browser',
+                },
+            },
+        });
+        assert.equal(new Client().getAudioConstraints().audio.noiseSuppression, expected);
     });
-    const client = new Client();
-    client.isRNNoiseSupported = true;
-    assert.deepEqual(JSON.parse(JSON.stringify(client.getAudioConstraints().audio)), {
-        echoCancellation: false,
-        autoGainControl: false,
-        noiseSuppression: false,
+}
+
+for (const legacy of [true, false, undefined]) {
+    test(`legacy noise setting ${String(legacy)} migrates to off`, () => {
+        const values = new Map();
+        const saved = { keyboard_shortcuts: false };
+        if (legacy !== undefined) saved.mic_noise_suppression = legacy;
+        values.set('SFU_SETTINGS', JSON.stringify(saved));
+        const context = vm.createContext({
+            localStorage: {
+                getItem: (key) => values.get(key) ?? null,
+                setItem: (key, value) => values.set(key, value),
+            },
+        });
+        const source = fs.readFileSync(require('node:path').join(__dirname, 'LocalStorage.js'), 'utf8');
+        vm.runInContext(source + '\nglobalThis.LocalStorage = LocalStorage;', context);
+        const settings = new context.LocalStorage().getLocalStorageSettings();
+        assert.equal(settings.mic_noise_suppression_mode, 'off');
+        assert.equal(Object.hasOwn(settings, 'mic_noise_suppression'), false);
     });
-    settings.mic_echo_cancellation = true;
-    settings.mic_auto_gain_control = true;
-    assert.equal(client.getAudioConstraints().audio.echoCancellation, true);
-    assert.equal(client.getAudioConstraints().audio.autoGainControl, true);
-});
+}
 
 test('updates the raw capture track and persists a successful setting', async () => {
     const track = {
