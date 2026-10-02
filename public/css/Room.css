@@ -2477,8 +2477,8 @@ body {
     transform: scale(1);
 }
 
-/* on open display devices tab */
-#tabRoom {
+/* Initially show audio devices, matching the active navigation button. */
+#tabAudioDevices {
     display: block;
 }
 
