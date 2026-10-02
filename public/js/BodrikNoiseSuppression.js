@@ -61,5 +61,85 @@
         return loading;
     }
 
-    window.BodrikNoiseSuppression = { modes, normalize, browserConstraint, url, load };
+    const menuBindings = new WeakMap();
+    const menuHelp = new WeakMap();
+
+    /** Build a quick-menu select backed by the authoritative settings control. */
+    function appendMenuSelect(menu, source) {
+        menuBindings.get(source)?.();
+        menuHelp.get(menu)?.forEach((instance) => instance.destroy());
+        menuHelp.delete(menu);
+        const row = document.createElement('div');
+        row.className = 'device-menu-toggle-row';
+        const label = document.createElement('label');
+        label.className = 'title';
+        label.htmlFor = 'deviceMenuNoiseSuppression';
+        label.textContent = window.i18n?.t('Noise suppression', 'labels') || 'Noise suppression';
+        const select = source.cloneNode(true);
+        select.id = label.htmlFor;
+        select.value = source.value;
+        select.style.cssText = 'width:160px;max-width:100%;margin:0';
+        select.addEventListener('click', (event) => event.stopPropagation());
+        select.addEventListener('change', () => {
+            source.value = select.value;
+            source.dispatchEvent(new Event('change', { bubbles: true }));
+            select.value = source.value;
+        });
+        /** Reflect changes from the settings panel without owning a second mode state. */
+        const sync = () => {
+            select.value = source.value;
+        };
+        source.addEventListener('change', sync);
+        menuBindings.set(source, () => source.removeEventListener('change', sync));
+        row.append(label, select);
+        menu.appendChild(row);
+    }
+
+    /** Reuse authoritative help content on quick-menu controls; dispose instances on rebuild. */
+    function appendMenuHelp(menu) {
+        const instances = [];
+        for (const [controlId, helpId] of [
+            ['deviceMenuNoiseSuppression', 'noiseSuppressionHelp'],
+            ['deviceMenuEchoCancellation', 'echoCancellationHelp'],
+            ['deviceMenuAutoGainControl', 'autoGainControlHelp'],
+        ]) {
+            const label = menu.querySelector(`label[for="${controlId}"]`);
+            const source = document.getElementById(helpId);
+            if (!label || !source?._tippy) continue;
+            const wrapper = document.createElement('span');
+            wrapper.className = 'device-menu-help-label';
+            label.replaceWith(wrapper);
+            const button = source.cloneNode(true);
+            button.id = `${controlId}Help`;
+            button.classList.add('device-menu-help-button');
+            wrapper.append(label, button);
+            const instance = window.tippy(button, {
+                content: source._tippy.props.content,
+                allowHTML: true,
+                trigger: source._tippy.props.trigger || 'mouseenter focus',
+                placement: 'bottom',
+                appendTo: () => document.body,
+                maxWidth: Math.min(340, window.innerWidth - 32),
+            });
+            button.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (instance.props.trigger === 'manual') {
+                    instance.state.isVisible ? instance.hide() : instance.show();
+                }
+            });
+            instances.push(instance);
+        }
+        menuHelp.set(menu, instances);
+    }
+
+    window.BodrikNoiseSuppression = {
+        modes,
+        normalize,
+        browserConstraint,
+        url,
+        load,
+        appendMenuSelect,
+        appendMenuHelp,
+    };
 })();

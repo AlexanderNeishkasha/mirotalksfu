@@ -12,6 +12,105 @@ const css = read('../css/ThemeControls.css');
 const en = JSON.parse(read('../lang/en.json'));
 const ru = JSON.parse(read('../lang/ru.json'));
 
+test('quick noise select delegates to settings and follows settings changes after rebuild', () => {
+    const dom = new JSDOM(page, { runScripts: 'outside-only' });
+    try {
+        dom.window.eval(read('BodrikNoiseSuppression.js'));
+        const source = dom.window.document.getElementById('noiseSuppressionMode');
+        const menu = dom.window.document.createElement('div');
+        const api = dom.window.BodrikNoiseSuppression;
+        let menuClicks = 0;
+        menu.addEventListener('click', () => {
+            menuClicks++;
+        });
+        let changes = 0;
+        source.addEventListener('change', () => {
+            changes++;
+        });
+        for (const mode of ['off', 'browser', 'rnnoise']) {
+            menu.replaceChildren();
+            api.appendMenuSelect(menu, source);
+            const select = menu.querySelector('select');
+            const click = new dom.window.MouseEvent('click', { bubbles: true, cancelable: true });
+            select.dispatchEvent(click);
+            assert.equal(menuClicks, 0, 'select clicks must not rebuild the enclosing menu');
+            assert.equal(click.defaultPrevented, false, 'native select opening must remain enabled');
+            select.value = mode;
+            select.dispatchEvent(new dom.window.Event('change'));
+            assert.equal(source.value, mode);
+            source.value = 'off';
+            source.dispatchEvent(new dom.window.Event('change'));
+            assert.equal(select.value, 'off');
+        }
+        assert.equal(changes, 6);
+    } finally {
+        dom.window.close();
+    }
+});
+
+test('quick-menu help reuses content, toggles on click, and destroys obsolete instances', () => {
+    const dom = new JSDOM(page, { runScripts: 'outside-only' });
+    try {
+        dom.window.eval(read('BodrikNoiseSuppression.js'));
+        const menu = dom.window.document.createElement('div');
+        const source = dom.window.document.getElementById('noiseSuppressionMode');
+        const instances = [];
+        dom.window.tippy = (button, props) => {
+            const instance = {
+                state: { isVisible: false },
+                show() {
+                    this.state.isVisible = true;
+                },
+                hide() {
+                    this.state.isVisible = false;
+                },
+                destroy() {
+                    this.destroyed = true;
+                },
+                props,
+            };
+            instances.push(instance);
+            return instance;
+        };
+        let bubbled = 0;
+        menu.addEventListener('click', () => {
+            bubbled++;
+        });
+        for (const [control, help] of [
+            ['deviceMenuNoiseSuppression', 'noiseSuppressionHelp'],
+            ['deviceMenuEchoCancellation', 'echoCancellationHelp'],
+            ['deviceMenuAutoGainControl', 'autoGainControlHelp'],
+        ]) {
+            const label = dom.window.document.createElement('label');
+            label.htmlFor = control;
+            menu.append(label);
+            dom.window.document.getElementById(help)._tippy = { props: { content: help, trigger: 'manual' } };
+        }
+        const api = dom.window.BodrikNoiseSuppression;
+        api.appendMenuHelp(menu);
+        assert.equal(instances.length, 3);
+        for (const [index, button] of [...menu.querySelectorAll('button')].entries()) {
+            button.click();
+            assert.equal(instances[index].state.isVisible, true);
+            button.click();
+            assert.equal(instances[index].state.isVisible, false);
+            assert.ok(button.getAttribute('aria-label'));
+        }
+        assert.equal(bubbled, 0);
+        assert.equal(instances[0].props.content, 'noiseSuppressionHelp');
+        api.appendMenuSelect(menu, source);
+        assert.ok(instances.every((instance) => instance.destroyed));
+        dom.window.document.getElementById('echoCancellationHelp')._tippy.props.trigger = 'mouseenter focus';
+        api.appendMenuHelp(menu);
+        const desktop = instances.findLast((instance) => instance.props.content === 'echoCancellationHelp');
+        assert.equal(desktop.props.trigger, 'mouseenter focus');
+        menu.querySelector('#deviceMenuEchoCancellationHelp').click();
+        assert.equal(desktop.state.isVisible, false, 'desktop click must not manually toggle hover help');
+    } finally {
+        dom.window.close();
+    }
+});
+
 test('three microphone settings expose accessible circular help controls', () => {
     const dom = new JSDOM(page);
     try {
@@ -25,7 +124,7 @@ test('three microphone settings expose accessible circular help controls', () =>
     } finally {
         dom.window.close();
     }
-    assert.match(css, /#mySettings \.setting-help-button\s*\{[\s\S]*margin: 0[\s\S]*border-radius: 50%/);
+    assert.match(css, /#mySettings \.setting-help-button,[\s\S]*?\{[\s\S]*margin: 0[\s\S]*border-radius: 50%/);
     assert.match(css, /#mySettings \.setting-help-button:hover,[\s\S]*color: #fff/);
 });
 
@@ -37,8 +136,8 @@ test('noise mode select is wide and keeps neutral mutually exclusive labels', ()
             [...select.options].map((option) => [option.value, option.textContent]),
             [
                 ['off', 'Off'],
-                ['browser', 'Browser'],
-                ['rnnoise', 'RNNoise'],
+                ['browser', 'Basic'],
+                ['rnnoise', 'Enhanced'],
             ]
         );
         assert.match(select.className, /mic-noise-mode-select/);
@@ -59,14 +158,14 @@ test('noise mode select is wide and keeps neutral mutually exclusive labels', ()
 });
 
 for (const key of [
-    'Browser noise suppression — recommended',
-    'Uses the browser or device audio processing with the lowest load. Start with this mode.',
-    'RNNoise — enhanced',
-    'Removes steady background noise more aggressively, but uses more CPU, memory, and battery. Choose browser mode if audio stutters or sounds distorted.',
+    'Basic',
+    'Reduces background noise with minimal processing load.',
+    'Enhanced',
+    'Suppresses background noise more strongly, using more CPU and battery.',
     'Echo cancellation',
-    'Enable it when sound plays through speakers or a laptop: it helps prevent other participants from hearing their voices returned through your microphone. Headphones usually do not need it.',
+    'Helps reduce echo when using speakers.',
     'Automatic gain control',
-    'Keeps quiet and loud speech at a more even level. Enable it for a distant microphone or changing speaking volume; disable it if volume pumps or you transmit music.',
+    'Automatically evens out quiet and loud speech.',
 ]) {
     test(`microphone help has maintained English and Russian copy: ${key}`, () => {
         assert.equal(en.tooltips[key], key);

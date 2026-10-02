@@ -87,7 +87,15 @@
     white-space: nowrap;
 }
 
-#mySettings .setting-help-button {
+.device-menu-help-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+#mySettings .setting-help-button,
+#bottomButtons #startAudioDeviceMenu button.device-menu-help-button {
     display: inline-grid;
     width: 20px;
     min-width: 20px;
@@ -95,20 +103,25 @@
     flex: 0 0 20px;
     align-self: center;
     place-items: center;
+    justify-content: center;
+    text-align: center;
+    box-shadow: none;
     margin: 0;
     padding: 0;
-    border: 1px solid color-mix(in srgb, var(--room-switch-accent) 70%, transparent);
+    border: 1px solid color-mix(in srgb, var(--room-switch-accent) 70%, transparent) !important;
     border-radius: 50%;
     color: var(--room-switch-accent);
-    background: color-mix(in srgb, var(--room-switch-accent) 10%, transparent);
+    background: color-mix(in srgb, var(--room-switch-accent) 10%, transparent) !important;
     font: 700 12px/1 sans-serif;
     cursor: help;
 }
 
 #mySettings .setting-help-button:hover,
-#mySettings .setting-help-button:focus-visible {
+#mySettings .setting-help-button:focus-visible,
+#bottomButtons #startAudioDeviceMenu button.device-menu-help-button:hover,
+#bottomButtons #startAudioDeviceMenu button.device-menu-help-button:focus-visible {
     color: #fff;
-    background: var(--room-switch-accent);
+    background: var(--room-switch-accent) !important;
     outline: none;
     transform: none;
 }

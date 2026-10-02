@@ -453,16 +453,16 @@ function setMicProcessingHelpTippy() {
             'noiseSuppressionHelp',
             [
                 {
-                    title: 'Browser noise suppression — recommended',
-                    text: 'Uses the browser or device audio processing with the lowest load. Start with this mode.',
+                    title: 'Basic',
+                    text: 'Reduces background noise with minimal processing load.',
                 },
                 {
-                    title: 'RNNoise — enhanced',
-                    text: 'Removes steady background noise more aggressively, but uses more CPU, memory, and battery. Choose browser mode if audio stutters or sounds distorted.',
+                    title: 'Enhanced',
+                    text: 'Suppresses background noise more strongly, using more CPU and battery.',
                 },
                 {
                     title: 'Off',
-                    text: 'Leaves microphone noise unfiltered. Useful in a quiet room or when preserving non-speech audio matters.',
+                    text: 'Leaves microphone sound without noise filtering.',
                 },
             ],
         ],
@@ -471,7 +471,7 @@ function setMicProcessingHelpTippy() {
             [
                 {
                     title: 'Echo cancellation',
-                    text: 'Enable it when sound plays through speakers or a laptop: it helps prevent other participants from hearing their voices returned through your microphone. Headphones usually do not need it.',
+                    text: 'Helps reduce echo when using speakers.',
                 },
             ],
         ],
@@ -480,7 +480,7 @@ function setMicProcessingHelpTippy() {
             [
                 {
                     title: 'Automatic gain control',
-                    text: 'Keeps quiet and loud speech at a more even level. Enable it for a distant microphone or changing speaking volume; disable it if volume pumps or you transmit music.',
+                    text: 'Automatically evens out quiet and loud speech.',
                 },
             ],
         ],
@@ -4585,8 +4585,10 @@ function setupQuickDeviceSwitchDropdowns() {
         appendMenuDivider(audioMenu);
         appendMenuHeader(audioMenu, 'fas fa-ear-listen', 'Microphone Controls');
 
+        window.BodrikNoiseSuppression.appendMenuSelect(audioMenu, noiseSuppressionMode);
         appendMenuToggle(audioMenu, 'deviceMenuEchoCancellation', 'Echo cancellation', switchEchoCancellation);
         appendMenuToggle(audioMenu, 'deviceMenuAutoGainControl', 'Automatic gain control', switchAutoGainControl);
+        window.BodrikNoiseSuppression.appendMenuHelp(audioMenu);
         if (showPushToTalk) {
             appendMenuToggle(audioMenu, 'deviceMenuPushToTalk', 'Push to talk', switchPushToTalk);
         }
