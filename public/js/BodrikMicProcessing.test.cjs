@@ -17,14 +17,14 @@ function fixture(track) {
     return { settings, input, storage, roomClient };
 }
 
-test('new microphone settings default all optional processing to off', () => {
+test('new microphone settings enable basic noise suppression, echo cancellation and gain control', () => {
     const context = vm.createContext({ localStorage: { getItem: () => null } });
     const source = fs.readFileSync(require('node:path').join(__dirname, 'LocalStorage.js'), 'utf8');
     vm.runInContext(source + '\nglobalThis.LocalStorage = LocalStorage;', context);
     const settings = new context.LocalStorage().SFU_SETTINGS;
-    assert.equal(settings.mic_noise_suppression_mode, 'off');
-    assert.notEqual(settings.mic_echo_cancellation, true);
-    assert.notEqual(settings.mic_auto_gain_control, true);
+    assert.equal(settings.mic_noise_suppression_mode, 'browser');
+    assert.equal(settings.mic_echo_cancellation, true);
+    assert.equal(settings.mic_auto_gain_control, true);
 });
 
 for (const [mode, customEnabled, expected] of [
@@ -56,7 +56,7 @@ for (const [mode, customEnabled, expected] of [
 }
 
 for (const legacy of [true, false, undefined]) {
-    test(`legacy noise setting ${String(legacy)} migrates to off`, () => {
+    test(`legacy noise setting ${String(legacy)} migrates to basic`, () => {
         const values = new Map();
         const saved = { keyboard_shortcuts: false };
         if (legacy !== undefined) saved.mic_noise_suppression = legacy;
@@ -70,7 +70,7 @@ for (const legacy of [true, false, undefined]) {
         const source = fs.readFileSync(require('node:path').join(__dirname, 'LocalStorage.js'), 'utf8');
         vm.runInContext(source + '\nglobalThis.LocalStorage = LocalStorage;', context);
         const settings = new context.LocalStorage().getLocalStorageSettings();
-        assert.equal(settings.mic_noise_suppression_mode, 'off');
+        assert.equal(settings.mic_noise_suppression_mode, 'browser');
         assert.equal(Object.hasOwn(settings, 'mic_noise_suppression'), false);
     });
 }

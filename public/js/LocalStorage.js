@@ -31,9 +31,9 @@ class LocalStorage {
 
             moderator_disconnect_all_on_leave: false, // Disconnect all participants on leave room
             dominant_speaker_focus: false, // Focus on dominant speaker
-            mic_noise_suppression_mode: 'off', // off | browser | rnnoise
-            mic_echo_cancellation: false, // Browser echo cancellation
-            mic_auto_gain_control: false, // Browser automatic gain control
+            mic_noise_suppression_mode: 'browser', // off | browser | rnnoise
+            mic_echo_cancellation: true, // Browser echo cancellation
+            mic_auto_gain_control: true, // Browser automatic gain control
             speaker_volume: 100, // master output volume 0-100
             video_fps: 0, // default 1280x768 30fps
             aspect_ratio: 0, // default (adaptive)
@@ -149,14 +149,16 @@ class LocalStorage {
         const settings = this.getObjectLocalStorage('SFU_SETTINGS');
         if (!settings) return settings;
 
-        const noiseMigration = 'BODRIK_NOISE_MODE_V3_DEFAULT_OFF';
+        const noiseMigration = 'BODRIK_MIC_SPEECH_DEFAULTS_V4';
         if (!localStorage.getItem(noiseMigration)) {
-            settings.mic_noise_suppression_mode = 'off';
+            settings.mic_noise_suppression_mode = 'browser';
+            settings.mic_echo_cancellation = true;
+            settings.mic_auto_gain_control = true;
             delete settings.mic_noise_suppression;
             this.setSettings(settings);
             localStorage.setItem(noiseMigration, '1');
         } else if (!['off', 'browser', 'rnnoise'].includes(settings.mic_noise_suppression_mode)) {
-            settings.mic_noise_suppression_mode = 'off';
+            settings.mic_noise_suppression_mode = 'browser';
             delete settings.mic_noise_suppression;
             this.setSettings(settings);
         }
