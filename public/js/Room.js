@@ -5903,18 +5903,18 @@ function showError(errorElement, message, delay = 5000) {
 // Call this when the session starts (e.g., after joining a room)
 function startRoomSession() {
     preventExit = true;
-    // Push a new state so the back button can be intercepted
-    history.pushState({ sessionActive: true }, '', location.href);
+    window.BodrikPanelBack.start(!isDesktopDevice);
 }
 
 // Call this when the session ends (e.g., after leaving a room)
 function endRoomSession() {
     preventExit = false;
+    window.BodrikPanelBack.stop();
 }
 
 // Intercept browser BACK button
 window.addEventListener('popstate', (event) => {
-    if (!preventExit) return;
+    if (window.BodrikPanelBack.handleBack(event) || !preventExit) return;
     // Show a custom confirmation dialog
     Swal.fire({
         background: swalBackground,
