@@ -16,7 +16,6 @@ const isRulesActive = true;
 let BUTTONS = {
     popup: {
         shareRoomPopup: true,
-        shareRoomQrOnHover: true,
     },
     main: {
         shareButton: true, // for quest, presenter default true
@@ -39,7 +38,6 @@ let BUTTONS = {
         extraButton: true,
     },
     settings: {
-        activeRooms: true,
         fileSharing: true,
         lockRoomButton: true, // presenter
         unlockRoomButton: true, // presenter
@@ -66,7 +64,6 @@ let BUTTONS = {
         focusVideoButton: true,
         muteAudioButton: true,
         videoPrivacyButton: true,
-        audioVolumeInput: true,
     },
     consumerVideo: {
         videoPictureInPicture: true,
@@ -81,7 +78,7 @@ let BUTTONS = {
 
         muteVideoButton: true,
         muteAudioButton: true,
-        audioVolumeInput: true,
+
         // Presenter
         banButton: true, // presenter
         ejectButton: true, // presenter

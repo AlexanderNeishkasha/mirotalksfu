@@ -19,13 +19,11 @@ prod dependencies: {
     he                      : https://www.npmjs.com/package/he
     helmet                  : https://www.npmjs.com/package/helmet
     httpolyglot             : https://www.npmjs.com/package/httpolyglot
-    js-yaml                 : https://www.npmjs.com/package/js-yaml
     jsdom                   : https://www.npmjs.com/package/jsdom
     jsonwebtoken            : https://www.npmjs.com/package/jsonwebtoken
     mediasoup               : https://www.npmjs.com/package/mediasoup
     mediasoup-client        : https://www.npmjs.com/package/mediasoup-client
     socket.io               : https://www.npmjs.com/package/socket.io
-    swagger-ui-express      : https://www.npmjs.com/package/swagger-ui-express
     uuid                    : https://www.npmjs.com/package/uuid
 }
 
@@ -61,7 +59,7 @@ dev dependencies: {
 const express = require('express');
 
 const { admittedPeer } = require('./BodrikJoinDiagnostics');
-const { registerPageRoutes } = require('./BodrikPageRoutes');
+const { registerPageRoutes, registerNotFoundRoute } = require('./BodrikPageRoutes');
 const { registerRoomChat } = require('./BodrikRoomChat');
 const { DiagnosticStore, registerClientDiagnostics } = require('./ClientDiagnostics');
 
@@ -97,9 +95,6 @@ const { createRecoveryGrace } = require('./BodrikRecoveryGrace');
 const HtmlInjector = require('./HtmlInjector');
 const { browserConsoleScript } = require('./BodrikBrowserConsole');
 const log = new Logger('Server');
-const yaml = require('js-yaml');
-const swaggerUi = require('swagger-ui-express');
-const swaggerDocument = yaml.load(fs.readFileSync(path.join(__dirname, '/../api/swagger.yaml'), 'utf8'));
 
 const restrictAccessByIP = require('./middleware/IpWhitelist');
 const { applyEmbedHeaders, embedAllowedOrigins, embedCsp } = require('./middleware/EmbedHeaders');
@@ -122,20 +117,6 @@ const ipKeyGenerator = (req) => {
 const minutesLabel = (n) => `${n} minute${n === 1 ? '' : 's'}`;
 
 // Limit public room enumeration by requester IP.
-const activeRoomsLimiterCfg = config.ui?.rooms?.activeRoomsRateLimit || {};
-const activeRoomsLimiterWindowMs = activeRoomsLimiterCfg.windowMs || 60 * 1000;
-const activeRoomsLimiterMax = activeRoomsLimiterCfg.max || 60;
-const activeRoomsLimiterMinutes = Math.ceil(activeRoomsLimiterWindowMs / (60 * 1000));
-const activeRoomsLimiter = rateLimit({
-    windowMs: activeRoomsLimiterWindowMs,
-    max: activeRoomsLimiterMax,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: {
-        error: `Too many requests. Please try again after ${minutesLabel(activeRoomsLimiterMinutes)}.`,
-    },
-    keyGenerator: (req) => ipKeyGenerator(req),
-});
 
 // Socket.IO createRoom rate limiter (per IP) — sliding window in memory.
 // Prevents unauthenticated sockets from spamming arbitrary room entries
@@ -174,8 +155,6 @@ setInterval(
 const brandHtmlInjection = config?.ui?.brand?.htmlInjection ?? true;
 
 // Incoming Stream to RTPM
-const { v4: uuidv4 } = require('uuid');
-
 // Secrets previously shipped as defaults: treated as unset so they can never authorize a request.
 
 const app = express();
@@ -237,14 +216,7 @@ if (
 
 const restApi = {
     basePath: '/api/v1', // api endpoint path
-    docs: host + '/api/v1/docs', // api docs
     allowed: config.api?.allowed || {},
-};
-
-// Handle WebHook
-const webhook = {
-    enabled: config?.integrations?.webhook?.enabled || false,
-    url: config?.integrations?.webhook?.url || 'http://localhost:8888/webhook-endpoint',
 };
 
 // directory
@@ -256,9 +228,6 @@ const dir = {
 const views = {
     html: path.join(__dirname, '../../public/views'),
 
-    notFound: path.join(__dirname, '../../', 'public/views/404.html'),
-    permission: path.join(__dirname, '../../', 'public/views/permission.html'),
-    privacy: path.join(__dirname, '../../', 'public/views/privacy.html'),
     room: path.join(__dirname, '../../', 'public/views/Room.html'),
 };
 
@@ -406,7 +375,7 @@ function startServer() {
     );
     app.use(express.json({ limit: '50mb' })); // Handles JSON payloads
     app.use(express.urlencoded({ extended: true, limit: '50mb' })); // Handles URL-encoded payloads
-    app.use(restApi.basePath + '/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument)); // api docs
+    // api docs
 
     // IP Whitelist check ...
     app.use(restrictAccessByIP);
@@ -513,16 +482,6 @@ function startServer() {
 
     // not specified correctly the room id
 
-    // if not allow video/audio
-    app.get('/permission', (req, res) => {
-        res.sendFile(views.permission);
-    });
-
-    // privacy policy
-    app.get('/privacy', (req, res) => {
-        res.sendFile(views.privacy);
-    });
-
     // handle who are you: Presenter or Guest
 
     // handle login if user_auth enabled
@@ -538,108 +497,6 @@ function startServer() {
     // ####################################################
     // REST API
     // ####################################################
-
-    app.get(restApi.basePath + '/stats', (req, res) => {
-        try {
-            // Check if endpoint allowed
-            if (restApi.allowed && !restApi.allowed.stats) {
-                return res.status(403).json({
-                    success: false,
-                    error: 'This endpoint has been disabled. Please contact the administrator for further information.',
-                });
-            }
-            // check if user was authorized for the api call
-            const { host, authorization } = req.headers;
-            const api = new ServerApi(host, authorization);
-
-            if (!api.isAuthorized()) {
-                log.debug('MiroTalk get meetings - Unauthorized', {
-                    header: req.headers,
-                    body: req.body,
-                });
-                return res.status(403).json({ error: 'Unauthorized!' });
-            }
-
-            const { timestamp, totalRooms, totalUsers } = api.getStats(roomList);
-
-            res.json({
-                success: true,
-                timestamp,
-                totalRooms,
-                totalUsers,
-            });
-
-            // log.debug the output if all done
-            log.debug('MiroTalk get stats - Authorized', {
-                header: req.headers,
-                body: req.body,
-                timestamp,
-                totalRooms,
-                totalUsers,
-            });
-        } catch (error) {
-            console.error('Error fetching stats', error);
-            res.status(500).json({ success: false, error: 'Failed to retrieve stats.' });
-        }
-    });
-
-    // request meetings list
-    app.get(restApi.basePath + '/meetings', (req, res) => {
-        // Check if endpoint allowed
-        if (restApi.allowed && !restApi.allowed.meetings) {
-            return res.status(403).json({
-                error: 'This endpoint has been disabled. Please contact the administrator for further information.',
-            });
-        }
-        // check if user was authorized for the api call
-        const { host, authorization } = req.headers;
-        const api = new ServerApi(host, authorization);
-        if (!api.isAuthorized()) {
-            log.debug('MiroTalk get meetings - Unauthorized', {
-                header: req.headers,
-                body: req.body,
-            });
-            return res.status(403).json({ error: 'Unauthorized!' });
-        }
-        // Get meetings
-        const meetings = api.getMeetings(roomList);
-        res.json({ meetings: meetings });
-        // log.debug the output if all done
-        log.debug('MiroTalk get meetings - Authorized', {
-            header: req.headers,
-            body: req.body,
-            meetings: meetings,
-        });
-    });
-
-    // request meeting room endpoint
-    app.post(restApi.basePath + '/meeting', (req, res) => {
-        // Check if endpoint allowed
-        if (restApi.allowed && !restApi.allowed.meeting) {
-            return res.status(403).json({
-                error: 'This endpoint has been disabled. Please contact the administrator for further information.',
-            });
-        }
-        // check if user was authorized for the api call
-        const { host, authorization } = req.headers;
-        const api = new ServerApi(host, authorization);
-        if (!api.isAuthorized()) {
-            log.debug('MiroTalk get meeting - Unauthorized', {
-                header: req.headers,
-                body: req.body,
-            });
-            return res.status(403).json({ error: 'Unauthorized!' });
-        }
-        // setup meeting URL
-        const meetingURL = api.getMeetingURL();
-        res.json({ meeting: meetingURL });
-        // log.debug the output if all done
-        log.debug('MiroTalk get meeting - Authorized', {
-            header: req.headers,
-            body: req.body,
-            meeting: meetingURL,
-        });
-    });
 
     // request join room endpoint
     app.post(restApi.basePath + '/join', (req, res) => {
@@ -661,41 +518,13 @@ function startServer() {
         }
         // setup Join URL
         const joinURL = api.getJoinURL(req.body);
+        if (!joinURL) return res.status(400).json({ error: 'Room is required' });
         res.json({ join: joinURL });
         // log.debug the output if all done
         log.debug('MiroTalk get join - Authorized', {
             header: req.headers,
             body: req.body,
             join: joinURL,
-        });
-    });
-
-    // request token endpoint
-    app.post(restApi.basePath + '/token', (req, res) => {
-        // Check if endpoint allowed
-        if (restApi.allowed && !restApi.allowed.token) {
-            return res.status(403).json({
-                error: 'This endpoint has been disabled. Please contact the administrator for further information.',
-            });
-        }
-        // check if user was authorized for the api call
-        const { host, authorization } = req.headers;
-        const api = new ServerApi(host, authorization);
-        if (!api.isAuthorized()) {
-            log.debug('MiroTalk get token - Unauthorized', {
-                header: req.headers,
-                body: req.body,
-            });
-            return res.status(403).json({ error: 'Unauthorized!' });
-        }
-        // Get Token
-        const token = api.getToken(req.body);
-        res.json({ token: token });
-        // log.debug the output if all done
-        log.debug('MiroTalk get token - Authorized', {
-            header: req.headers,
-            body: req.body,
-            token: token,
         });
     });
 
@@ -742,39 +571,9 @@ function startServer() {
     // ####################################################
 
     // ####################################################
-    // AUTHORIZED API IF ALLOWED
     // ####################################################
 
-    // request active rooms endpoint
-    app.get(restApi.basePath + '/activeRooms', activeRoomsLimiter, (req, res) => {
-        // Check if endpoint allowed
-        if (!config.ui?.rooms?.showActive) {
-            return res.status(403).json({
-                error: 'This endpoint has been disabled. Please contact the administrator for further information.',
-            });
-        }
-        // Public endpoint gated only by config.ui.rooms.showActive: when enabled it
-        // intentionally returns the active rooms list without authorization so the
-        // event-zone dashboard (/activeRooms) can display it.
-        const { host } = req.headers;
-        const api = new ServerApi(host);
-
-        // Get active rooms
-        const activeRooms = api.getActiveRooms(roomList);
-        res.json({ activeRooms: activeRooms });
-
-        // log.debug the output if all done
-        log.debug('MiroTalk get active rooms - Authorized', {
-            header: req.headers,
-            body: req.body,
-            activeRooms: activeRooms,
-        });
-    });
-
-    // not match any of page before, so 404 not found
-    app.use((req, res) => {
-        res.sendFile(views.notFound);
-    });
+    registerNotFoundRoute(app, process.env.BODRIK_BYE_URL);
 
     // Global error handler for URIError and other errors
     app.use((err, req, res, next) => {
@@ -836,7 +635,6 @@ function startServer() {
             // API & Services
             api: {
                 rest_api: restApi,
-                webhook: webhook.enabled ? webhook : false,
             },
 
             // Media Configuration
@@ -1219,10 +1017,6 @@ function startServer() {
                 });
             }
 
-            const activeRooms = getActiveRooms();
-
-            log.debug('[Join] - current active rooms', activeRooms);
-
             if (!(socket.room_id in presenters)) presenters[socket.room_id] = {};
 
             // Set the presenters
@@ -1294,8 +1088,6 @@ function startServer() {
                     return cb('notAllowed');
                 }
             }
-
-            handleJoinWebHook(room.id, room.getSessionId(), data.peer_info);
 
             const roomJson = room.toJson();
 
@@ -1894,8 +1686,6 @@ function startServer() {
                     if (!peer.peer_lobby) continue;
 
                     peer.updatePeerInfo({ type: 'lobby', status: false });
-
-                    handleJoinWebHook(room.id, room.getSessionId(), peer.peer_info);
                 }
             }
         });
@@ -2274,21 +2064,6 @@ function startServer() {
 
                 log.debug('[Disconnect] - peer name', { peer_name, reason });
 
-                if (webhook.enabled) {
-                    const data = {
-                        timestamp: log.getDateTime(false),
-                        room_id: socket.room_id,
-                        session_id: room?.getSessionId ? room.getSessionId() : undefined,
-                        peer: peer?.peer_info,
-                        reason: reason,
-                    };
-                    // Trigger a POST request when a user disconnects
-                    axios
-                        .post(webhook.url, { event: 'disconnect', data }, { timeout: 5000 })
-                        .then((response) => log.debug('Disconnect event tracked:', response.data))
-                        .catch((error) => log.error('Error tracking disconnect event:', error.message));
-                }
-
                 room.removePeer(socket.id);
 
                 room.broadCast(socket.id, 'removeMe', removeMeData(room, peer_name, isPresenter));
@@ -2320,10 +2095,6 @@ function startServer() {
                     delete presenters[socket.room_id];
 
                     log.debug('[Disconnect] - Last peer - current presenters grouped by roomId', presenters);
-
-                    const activeRooms = getActiveRooms();
-
-                    log.debug('[Disconnect] - Last peer - current active rooms', activeRooms);
                 }
 
                 removeIP(socket);
@@ -2357,20 +2128,6 @@ function startServer() {
 
             log.debug('Exit room', peer_name);
 
-            if (webhook.enabled) {
-                const data = {
-                    timestamp: log.getDateTime(false),
-                    room_id: socket.room_id,
-                    session_id: room?.getSessionId ? room.getSessionId() : undefined,
-                    peer: peer?.peer_info,
-                };
-                // Trigger a POST request when a user exits
-                axios
-                    .post(webhook.url, { event: 'exit', data }, { timeout: 5000 })
-                    .then((response) => log.debug('ExitRoom event tracked:', response.data))
-                    .catch((error) => log.error('Error tracking exitRoom event:', error.message));
-            }
-
             room.removePeer(socket.id);
 
             room.broadCast(socket.id, 'removeMe', removeMeData(room, peer_name, isPresenter));
@@ -2402,10 +2159,6 @@ function startServer() {
                 delete presenters[socket.room_id];
 
                 log.debug('[REMOVE ME] - Last peer - current presenters grouped by roomId', presenters);
-
-                const activeRooms = getActiveRooms();
-
-                log.debug('[REMOVE ME] - Last peer - current active rooms', activeRooms);
             }
 
             removeIP(socket);
@@ -2416,24 +2169,6 @@ function startServer() {
         });
 
         // Helpers
-
-        async function handleJoinWebHook(room_id, session_id, peer_info) {
-            // handle WebHook
-            if (webhook.enabled) {
-                // Trigger a POST request when a user joins
-                const data = {
-                    timestamp: log.getDateTime(false),
-                    room_id,
-                    session_id,
-                    peer_info,
-                };
-
-                axios
-                    .post(webhook.url, { event: 'join', data }, { timeout: 5000 })
-                    .then((response) => log.debug('Join event tracked:', response.data))
-                    .catch((error) => log.error('Error tracking join event:', error.message));
-            }
-        }
 
         function getRoomAndPeer(socket) {
             const room = getRoom(socket);
@@ -2639,21 +2374,6 @@ function startServer() {
         const payload = JSON.parse(decryptedPayload);
 
         return payload;
-    }
-
-    function getActiveRooms() {
-        const roomIds = Array.from(roomList.keys());
-        const roomPeersArray = roomIds.map((roomId) => {
-            const room = roomList.get(roomId);
-            const peerCount = (room && room.getPeersCount()) || 0;
-
-            return {
-                room: roomId,
-
-                peers: peerCount,
-            };
-        });
-        return roomPeersArray;
     }
 
     async function isRoomAllowedForUser(message, username, room) {

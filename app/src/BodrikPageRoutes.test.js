@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { existsSync, readFileSync } = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
-const { registerPageRoutes } = require('./BodrikPageRoutes');
+const { registerPageRoutes, registerNotFoundRoute, sitePage } = require('./BodrikPageRoutes');
 
 /** Collect registered callbacks with deterministic admission decisions and an inspectable response. */
 function harness(overrides = {}) {
@@ -173,6 +173,48 @@ for (const [name, settings, slug, status] of [
     });
 }
 
+for (const [base, pathname, expected] of [
+    ['https://bodrik.fm/bye?old=1#fragment', '/privacy', 'https://bodrik.fm/privacy'],
+    ['http://pc.local:3000/bye', '/404', 'http://pc.local:3000/404'],
+    ['', '/privacy', null],
+    ['not a URL', '/404', null],
+]) {
+    test(`retained Bodrik page URL: ${base || 'missing'} → ${pathname}`, () => {
+        assert.equal(sitePage(base, pathname), expected);
+    });
+}
+
+test('privacy redirects to the retained same-site Bodrik privacy page', () => {
+    const { routes, response } = harness();
+    routes.get('/privacy')({}, response);
+    assert.equal(response.code, 302);
+    assert.equal(response.location, 'https://bodrik.test/privacy');
+});
+
+for (const [name, requestPath, byeUrl, status, location, json] of [
+    ['browser route', '/anything', 'https://bodrik.test/bye', 302, 'https://bodrik.test/404', false],
+    ['API route', '/api/v1/unknown', 'https://bodrik.test/bye', 404, undefined, true],
+    ['API root', '/api', 'https://bodrik.test/bye', 404, undefined, true],
+    ['missing destination', '/anything', '', 404, undefined, false],
+]) {
+    test(`final route fallback: ${name}`, () => {
+        let fallback;
+        registerNotFoundRoute(
+            {
+                use: (callback) => {
+                    fallback = callback;
+                },
+            },
+            byeUrl
+        );
+        const { response } = harness();
+        fallback({ path: requestPath }, response);
+        assert.equal(response.code, status);
+        assert.equal(response.location, location);
+        assert.equal(Boolean(response.body?.message), json);
+    });
+}
+
 test('standalone pages redirect to Bodrik or return Gone when no destination is configured', () => {
     for (const byeUrl of ['https://bodrik.test/bye', '']) {
         const { routes } = harness({ byeUrl });
@@ -223,8 +265,14 @@ test('retired standalone artifacts and unused authentication/monitoring integrat
     );
     assert.doesNotMatch(config, /process\.env\.(OIDC_|NGROK_|SENTRY_)/);
     assert.doesNotMatch(browser, /axios\.get\('\/profile'|force_peer_name/);
-    for (const endpoint of ['/meeting', '/join', '/token'])
+    for (const endpoint of ['/meeting/:room', '/join']) {
         assert.ok(server.includes(`restApi.basePath + '${endpoint}'`), endpoint);
-    for (const name of ['permission', 'privacy', '404'])
-        assert.ok(existsSync(path.join(root, `public/views/${name}.html`)));
+    }
+    for (const endpoint of ['/stats', '/meetings', '/token', '/activeRooms']) {
+        assert.equal(server.includes(`restApi.basePath + '${endpoint}'`), false, endpoint);
+    }
+    assert.doesNotMatch(server, /app\.post\(restApi\.basePath \+ '\/meeting'/);
+    for (const name of ['permission', 'privacy', '404', '50X', 'maintenance']) {
+        assert.equal(existsSync(path.join(root, `public/views/${name}.html`)), false, name);
+    }
 });

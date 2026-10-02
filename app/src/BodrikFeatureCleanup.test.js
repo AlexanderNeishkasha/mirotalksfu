@@ -73,7 +73,10 @@ function browser(context = {}) {
 for (const [name, patterns] of [
     ['AI chat', /chatGPT|deepSeek|chat_cant_chatgpt|chat_cant_deep_seek/i],
     ['scheduling and mail', /scheduleMeeting|shareRoomByEmail|nodemailer|SCHEDULE_MEETING|EMAIL_ALERTS/],
-    ['external integrations', /require\(['"]\.\/(Discord|Mattermost)|integrations\??\.(slack|discord|mattermost)/],
+    [
+        'external integrations',
+        /require\(['"]\.\/(Discord|Mattermost)|integrations\??\.(slack|discord|mattermost|webhook)|WEBHOOK_|handleJoinWebHook/,
+    ],
     ['geolocation', /navigator\.geolocation|GeoLocation|IPLookup|geoLocationButton|geolocationButton/],
     ['server recording', /recSync|recUploadToken|recServerFileName|S3Client|@aws-sdk|handleServerRecordingStop/],
 ]) {
@@ -108,6 +111,10 @@ test('retired pages/assets/packages are removed without removing the ordinary me
         'public/images/deepSeek.png',
         'public/images/email.png',
         'public/images/geolocation.png',
+        'webhook/server.js',
+        'webhook/package.json',
+        'webhook/README.md',
+        'public/css/Translate.css',
     ]) {
         assert.equal(existsSync(path.join(__dirname, '../..', file)), false, file);
     }

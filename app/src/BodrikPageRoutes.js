@@ -1,6 +1,19 @@
 'use strict';
 const { isValidRoomName } = require('./Validator');
 
+/** Resolve retained Bodrik pages from the already configured same-site bye URL. */
+function sitePage(byeUrl, pathname) {
+    try {
+        const url = new URL(byeUrl);
+        url.pathname = pathname;
+        url.search = '';
+        url.hash = '';
+        return url.toString();
+    } catch {
+        return null;
+    }
+}
+
 /** Register Bodrik invitation entry points without standalone room creation or login pages. */
 function registerPageRoutes(app, options) {
     const {
@@ -79,6 +92,10 @@ function registerPageRoutes(app, options) {
     });
     app.get('/join/:roomId', (req, res) => invite(req.params.roomId, res));
     app.get('/room/:slug', (req, res) => invite(req.params.slug, res));
+    app.get('/privacy', (_req, res) => {
+        const privacy = sitePage(byeUrl, '/privacy');
+        return privacy ? res.redirect(302, privacy) : res.status(404).send('Not found');
+    });
     for (const route of [
         '/',
         '/newroom',
@@ -104,4 +121,15 @@ function registerPageRoutes(app, options) {
     }
 }
 
-module.exports = { registerPageRoutes };
+/** Register the final fallback after all retained page and API routes. */
+function registerNotFoundRoute(app, byeUrl) {
+    app.use((req, res) => {
+        if (req.path === '/api' || req.path.startsWith('/api/')) {
+            return res.status(404).json({ message: 'Not found' });
+        }
+        const notFound = sitePage(byeUrl, '/404');
+        return notFound ? res.redirect(302, notFound) : res.status(404).send('Not found');
+    });
+}
+
+module.exports = { registerPageRoutes, registerNotFoundRoute, sitePage };

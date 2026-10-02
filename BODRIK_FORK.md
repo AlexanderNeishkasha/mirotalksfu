@@ -53,6 +53,24 @@ its producer/consumer lifecycle are removed. Public/private moderation, message
 reactions, images, files, links and Markdown remain. The server derives sender
 identity and room membership from admitted socket state, excludes lobby peers,
 and never relays private chat outside the target's current room.
+
+Unused join/exit/disconnect webhooks and their standalone receiver example are
+removed; the authoritative Rust conference integration does not consume them.
+Branding configuration now contains only meeting/legal metadata, language/app
+identity, icons, OpenGraph data and About source/version. Landing-page sections
+and environment keys are retired. An audited asset sweep removes unreferenced
+upstream landing, infrastructure, RTMP, broadcasting and obsolete notification
+images/sounds while retaining configured Bodrik icons plus dynamic avatar,
+virtual-background and sound families. The public provider API is reduced to the
+two backend consumers: room-bound join URL issuance and authoritative meeting
+termination. Room catalogs, generic meeting/token/statistics endpoints, Swagger,
+its example clients and endpoint-specific configuration are removed. Upstream privacy, 404, 50X and maintenance
+HTML pages are removed: `/privacy` redirects to the same-site Bodrik privacy
+page, unknown browser routes redirect to Bodrik `/404`, and unknown API routes return
+JSON 404. Device access is optional: participants without a camera and microphone
+can join as listeners, while explicit attempts to enable a missing/blocked device
+still show the in-room actionable retry dialog. The obsolete permission page and
+its large landing-page JS/CSS/vendor dependencies are removed.
 Empty camera selectors offer a localized
 permission retry that releases its temporary stream without publishing video.
 The service-specific backend, TURN server, deployment configuration, environment

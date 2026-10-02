@@ -333,58 +333,21 @@ module.exports = {
      * - keySecret : Authentication secret for API requests
      *               (Always override default in production)
      *
-     * Endpoint Control:
-     * -----------------
-     * - stats      : Enable/disable system statistics endpoint [true/false] (default: true)
-     * - meetings   : Enable/disable meetings list endpoint [true/false] (default: true)
-     * - meeting    : Enable/disable single meeting operations [true/false] (default: true)
-     * - join       : Enable/disable meeting join endpoint [true/false] (default: true)
-     * - token      : Enable/disable token generation endpoint [true/false] (default: false)
-     *
-     * API Documentation:
-     * ------------------
-     * - Complete API reference: https://docs.mirotalk.com/mirotalk-sfu/api/
+     * Retained endpoints:
+     * -------------------
+     * - join       : Issue a room-bound participant URL for the Bodrik backend.
+     * - meetingEnd : Terminate an authoritative conference target.
      */
     api: {
         keySecret: process.env.API_KEY_SECRET,
         allowed: {
-            stats: process.env.API_ALLOW_STATS !== 'false',
-            meetings: process.env.API_ALLOW_MEETINGS === 'true',
-            meeting: process.env.API_ALLOW_MEETING !== 'false',
             meetingEnd: process.env.API_ALLOW_MEETING_END === 'true',
             join: process.env.API_ALLOW_JOIN !== 'false',
-            token: process.env.API_ALLOW_TOKEN === 'true',
         },
     },
 
     // ==============================================
-    // 6. Third-Party Integrations
-    // ==============================================
-
-    integrations: {
-        /**
-         * Webhook Configuration Settings
-         * =============================
-         * Controls the webhook notification system for sending event data to external services.
-         *
-         * Core Settings:
-         * ---------------------
-         * - enabled: Turns webhook notifications on/off
-         * - url: The endpoint URL where webhook payloads will be sent in JSON format
-         *
-         * Implementation Guide:
-         * --------------------
-         * - For complete implementation examples, refer to:
-         *      - Project demo: /mirotalksfu/webhook/ folder
-         */
-        webhook: {
-            enabled: process.env.WEBHOOK_ENABLED === 'true',
-            url: process.env.WEBHOOK_URL || 'https://your-site.com/webhook-endpoint',
-        },
-    },
-
-    // ==============================================
-    // 7. UI/UX Customization
+    // 6. UI/UX Customization
     // ==============================================
 
     ui: {
@@ -399,45 +362,14 @@ module.exports = {
          * ==============================================
          * - https://codecanyon.net/item/mirotalk-sfu-webrtc-realtime-video-conferences/40769970
          */
-        rooms: {
-            /**
-             * Room Display Settings
-             * ---------------------
-             * - showActive: Show active rooms in the UI (default: false)
-             *   https://sfu.mirotalk.com/activeRooms
-             * - activeRoomsRateLimit: Throttle the public /api/v1/activeRooms
-             *   endpoint per IP to prevent enumeration/scraping abuse without
-             *   breaking the public "event zone" UX.
-             */
-            showActive: process.env.SHOW_ACTIVE_ROOMS === 'true',
-            activeRoomsRateLimit: {
-                windowMs:
-                    Math.max(parseInt(process.env.ACTIVE_ROOMS_RATE_LIMIT_WINDOW_MINUTES, 10) || 1, 1) * 60 * 1000,
-                max: Math.max(parseInt(process.env.ACTIVE_ROOMS_RATE_LIMIT_MAX, 10) || 60, 1),
-            },
-        },
+
         brand: {
-            /**
-             * Application Branding
-             * --------------------
-             * Core application identity and user interface text elements.
-             *
-             * Note:
-             * Set BRAND_HTML_INJECTION to 'false' to disable HTML injection.
-             * This allows for static branding in the public/views folder, without dynamic content injection.
-             */
             htmlInjection: process.env.BRAND_HTML_INJECTION !== 'false',
 
             app: {
                 language: 'ru',
                 translationMode: 'native', // Bodrik FM provides only human-maintained Russian and English.
                 name: process.env.APP_NAME || 'MiroTalk SFU',
-                title:
-                    process.env.APP_TITLE ||
-                    '<h1>MiroTalk SFU</h1> Free browser based Real-time video calls.<br />Simple, Secure, Fast.',
-                description:
-                    process.env.APP_DESCRIPTION ||
-                    'Start your next video call with a single click. No download, plug-in, or login is required.',
             },
 
             /**
@@ -477,25 +409,6 @@ module.exports = {
                     'Build your own Zoom alternative with MiroTalk SFU, an open-source self-hosted WebRTC video conferencing platform powered by Mediasoup. Host scalable meetings, webinars, classrooms, screen sharing and real-time collaboration.',
                 image: process.env.OG_IMAGE_URL || 'https://sfu.mirotalk.com/images/mirotalksfu.png',
                 url: process.env.OG_URL || 'https://sfu.mirotalk.com',
-            },
-
-            /**
-             * UI Section Visibility
-             * ---------------------
-             * Toggle display of various page sections.
-             * Set to 'false' via environment variables to hide.
-             */
-            html: {
-                topSponsors: process.env.SHOW_TOP_SPONSORS !== 'false',
-                features: process.env.SHOW_FEATURES !== 'false',
-                teams: process.env.SHOW_TEAMS !== 'false',
-                tryEasier: process.env.SHOW_TRY_EASIER !== 'false',
-                poweredBy: process.env.SHOW_POWERED_BY !== 'false',
-                sponsors: process.env.SHOW_SPONSORS !== 'false',
-                pastSponsors: process.env.SHOW_PAST_SPONSORS !== 'false',
-                advertisers: process.env.SHOW_ADVERTISERS !== 'false',
-                supportUs: process.env.SHOW_SUPPORT_US !== 'false',
-                footer: process.env.SHOW_FOOTER !== 'false',
             },
 
             /**
@@ -554,7 +467,6 @@ module.exports = {
             // Popup Configuration
             popup: {
                 shareRoomPopup: process.env.SHOW_SHARE_ROOM_POPUP !== 'false',
-                shareRoomQrOnHover: process.env.SHOW_SHARE_ROOM_QR_ON_HOVER !== 'false',
             },
             // Main control buttons visible in the UI
             main: {
@@ -585,7 +497,6 @@ module.exports = {
                 joinLockButton: process.env.SHOW_JOIN_LOCK !== 'false',
                 micOptionsButton: process.env.SHOW_MIC_OPTIONS !== 'false',
 
-                tabNotificationsBtn: process.env.SHOW_NOTIFICATIONS_TAB !== 'false',
                 tabModerator: process.env.SHOW_MODERATOR_TAB !== 'false',
 
                 tabRecording: process.env.SHOW_RECORDING_TAB !== 'false',
@@ -606,7 +517,6 @@ module.exports = {
                 focusVideoButton: process.env.SHOW_FOCUS_BUTTON !== 'false',
                 muteAudioButton: process.env.SHOW_MUTE_AUDIO !== 'false',
                 videoPrivacyButton: process.env.SHOW_PRIVACY_TOGGLE !== 'false',
-                audioVolumeInput: process.env.SHOW_VOLUME_CONTROL !== 'false',
             },
 
             // Video controls for consumer (remote users)
@@ -623,7 +533,6 @@ module.exports = {
 
                 muteVideoButton: process.env.SHOW_MUTE_VIDEO !== 'false',
                 muteAudioButton: process.env.SHOW_MUTE_AUDIO !== 'false',
-                audioVolumeInput: process.env.SHOW_VOLUME_CONTROL !== 'false',
 
                 banButton: process.env.SHOW_BAN_BUTTON !== 'false',
                 ejectButton: process.env.SHOW_EJECT_BUTTON !== 'false',

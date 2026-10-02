@@ -1,355 +1,83 @@
 'use strict';
-
-// npx mocha test-ServerApi.js
-
-require('should');
-
-const sinon = require('sinon');
-const proxyquire = require('proxyquire');
-const jwt = require('jsonwebtoken');
+const should = require('should');
 const CryptoJS = require('crypto-js');
-const ServerApi = require('../app/src/ServerApi');
-const config = require('../app/src/config');
+const jwt = require('jsonwebtoken');
+const proxyquire = require('proxyquire').noCallThru();
 
-describe('test-ServerAPI', () => {
-    let serverApi;
-    const host = 'example.com';
-    const authorization = 'secret-key';
-    const apiKeySecret = 'secret-key';
-    const timestamp = new Date().toISOString();
+const host = 'meet.example.test';
+const secret = 'test-api-secret';
+const config = {
+    api: { keySecret: secret },
+    security: { jwt: { key: 'test-jwt-secret-with-enough-entropy', exp: '1h' } },
+};
+const ServerApi = proxyquire('../app/src/ServerApi', { './config': config });
 
-    beforeEach(() => {
-        // Mocking config values
-        sinon.stub(config.api, 'keySecret').value(apiKeySecret);
-        serverApi = new ServerApi(host, authorization);
+/** Decode retained room-bound token fields for contract assertions. */
+function decodeJoinToken(url) {
+    const token = new URL(url).searchParams.get('token');
+    const envelope = jwt.verify(token, config.security.jwt.key);
+    return JSON.parse(CryptoJS.AES.decrypt(envelope.data, config.security.jwt.key).toString(CryptoJS.enc.Utf8));
+}
+
+describe('ServerApi retained Bodrik endpoints', () => {
+    it('authorizes only an exact configured API secret', () => {
+        new ServerApi(host, secret).isAuthorized().should.equal(true);
+        new ServerApi(host, 'wrong').isAuthorized().should.equal(false);
+        new ServerApi(host).isAuthorized().should.equal(false);
     });
 
-    afterEach(() => {
-        sinon.restore();
-    });
-
-    describe('isAuthorized', () => {
-        it('should return true when authorization matches the api key secret', () => {
-            serverApi.isAuthorized().should.be.true();
+    it('creates a room-bound join URL with encoded participant fields', () => {
+        const api = new ServerApi(host, secret);
+        const join = api.getJoinURL({
+            room: 'private-room',
+            name: 'Игрок & GM',
+            avatar: '/avatar.png',
+            audio: true,
+            video: false,
+            token: { username: 'host', password: 'password', presenter: true, room: 'private-room' },
         });
-
-        it('should return false when authorization does not match the api key secret', () => {
-            serverApi = new ServerApi(host, 'wrong-key');
-            serverApi.isAuthorized().should.be.false();
-        });
-    });
-
-    describe('getStats', () => {
-        it('should return total number of rooms and users', () => {
-            const roomList = new Map([
-                [
-                    'room1',
-                    {
-                        peers: new Map([
-                            ['peer1', { peer_info: { peer_name: 'John Doe' } }],
-                            ['peer2', { peer_info: { peer_name: 'Jane Doe' } }],
-                        ]),
-                    },
-                ],
-                [
-                    'room2',
-                    {
-                        peers: new Map([['peer3', { peer_info: { peer_name: 'Sam Smith' } }]]),
-                    },
-                ],
-            ]);
-
-            const result = serverApi.getStats(roomList, timestamp);
-
-            result.should.deepEqual({
-                timestamp: timestamp,
-                totalRooms: 2,
-                totalUsers: 3,
-            });
-        });
-
-        it('should return 0 users when there are no peers in any room', () => {
-            const roomList = new Map([
-                ['room1', { peers: new Map() }],
-                ['room2', { peers: new Map() }],
-            ]);
-
-            const result = serverApi.getStats(roomList, timestamp);
-
-            result.should.deepEqual({
-                timestamp: timestamp,
-                totalRooms: 2,
-                totalUsers: 0,
-            });
-        });
-
-        it('should return 0 rooms when roomList is empty', () => {
-            const roomList = new Map();
-
-            const result = serverApi.getStats(roomList, timestamp);
-
-            result.should.deepEqual({
-                timestamp: timestamp,
-                totalRooms: 0,
-                totalUsers: 0,
-            });
+        const url = new URL(join);
+        url.origin.should.equal(`https://${host}`);
+        url.pathname.should.equal('/join');
+        url.searchParams.get('room').should.equal('private-room');
+        url.searchParams.get('name').should.equal('Игрок & GM');
+        decodeJoinToken(join).should.containDeep({
+            username: 'host',
+            password: 'password',
+            presenter: 'true',
+            room: 'private-room',
         });
     });
 
-    describe('getMeetings', () => {
-        it('should return formatted meetings with peer information', () => {
-            const roomList = new Map([
-                [
-                    'room1',
-                    {
-                        peers: new Map([
-                            [
-                                'peer1',
-                                {
-                                    peer_info: {
-                                        peer_name: 'John Doe',
-                                        peer_presenter: true,
-                                        peer_video: true,
-                                        peer_audio: true,
-                                        peer_screen: false,
-                                        peer_hand: false,
-                                        os_name: 'Windows',
-                                        os_version: '10',
-                                        browser_name: 'Chrome',
-                                        browser_version: '100',
-                                    },
-                                },
-                            ],
-                        ]),
-                    },
-                ],
-            ]);
-
-            const result = serverApi.getMeetings(roomList);
-            result.should.deepEqual([
-                {
-                    roomId: 'room1',
-                    peers: [
-                        {
-                            name: 'John Doe',
-                            presenter: true,
-                            video: true,
-                            audio: true,
-                            screen: false,
-                            hand: false,
-                            os: 'Windows 10',
-                            browser: 'Chrome 100',
-                        },
-                    ],
-                },
-            ]);
-        });
-
-        it('should handle rooms with no peers', () => {
-            const roomList = new Map([['room1', { peers: new Map() }]]);
-            const result = serverApi.getMeetings(roomList);
-            result.should.deepEqual([{ roomId: 'room1', peers: [] }]);
-        });
+    it('does not invent a provider room when the authoritative room is missing', () => {
+        const join = new ServerApi(host, secret).getJoinURL({ name: 'Guest' });
+        should(join).equal(null);
     });
 
-    describe('getMeetingURL', () => {
-        it('should return a meeting URL with a generated UUID', () => {
-            const uuidV4Stub = sinon.stub().returns('12345');
-            const ServerApi = proxyquire('../app/src/ServerApi', {
-                uuid: { v4: uuidV4Stub },
-            });
-
-            serverApi = new ServerApi(host, authorization);
-
-            const result = serverApi.getMeetingURL();
-            result.should.equal('https://example.com/join/12345');
-        });
+    it('terminates a retained room and closes every peer', () => {
+        const removed = [];
+        const sent = [];
+        const room = {
+            sendToAll: (event, data) => sent.push({ event, data }),
+            getPeers: () =>
+                new Map([
+                    ['one', {}],
+                    ['two', {}],
+                ]),
+            removePeer: (id) => removed.push(id),
+        };
+        const rooms = new Map([['private-room', room]]);
+        const result = new ServerApi(host, secret).endMeeting(rooms, 'private-room', 'https://bodrik.fm/bye');
+        result.should.containDeep({ success: true, room: 'private-room' });
+        removed.should.deepEqual(['one', 'two']);
+        rooms.has('private-room').should.equal(false);
+        sent[0].should.containDeep({ event: 'cmd', data: { type: 'ejectAll', redirect: 'https://bodrik.fm/bye' } });
     });
 
-    describe('getJoinURL', () => {
-        it('should return a valid join URL with the given data', () => {
-            const data = {
-                room: 'room1',
-                roomPassword: 'password123',
-                name: 'John Doe',
-                avatar: 'test.jpg',
-                audio: true,
-                video: false,
-                screen: false,
-                chat: false,
-                hide: false,
-                notify: false,
-                duration: '00:30:00',
-                token: { username: 'user', password: 'pass', presenter: true, expire: '1h' },
-            };
-
-            const tokenStub = sinon.stub(serverApi, 'getToken').returns('testToken');
-
-            const result = serverApi.getJoinURL(data);
-            result.should.equal(
-                'https://example.com/join?room=room1&roomPassword=password123&name=John%20Doe&avatar=test.jpg&audio=true&video=false&screen=false&chat=false&hide=false&notify=false&duration=00:30:00&token=testToken'
-            );
-
-            tokenStub.restore();
-        });
-
-        it('should use default values when data is not provided', () => {
-            const randomStub = sinon.stub().returns('123456');
-            const uuidV4Stub = sinon.stub().returns('room1');
-            const ServerApi = proxyquire('../app/src/ServerApi', {
-                uuid: { v4: uuidV4Stub },
-            });
-
-            serverApi = new ServerApi(host, authorization);
-            sinon.stub(serverApi, 'getRandomNumber').callsFake(randomStub);
-
-            const result = serverApi.getJoinURL({});
-            result.should.equal(
-                'https://example.com/join?room=room1&roomPassword=false&name=User-123456&avatar=false&audio=false&video=false&screen=false&chat=false&hide=false&notify=false&duration=unlimited'
-            );
-        });
-    });
-
-    describe('getToken', () => {
-        it('should return an encrypted JWT token', () => {
-            const tokenData = { username: 'user', password: 'pass', presenter: true, expire: '1h' };
-            const signStub = sinon.stub(jwt, 'sign').returns('jwtToken');
-            const encryptStub = sinon.stub(CryptoJS.AES, 'encrypt').returns({ toString: () => 'encryptedPayload' });
-
-            const result = serverApi.getToken(tokenData);
-            result.should.equal('jwtToken');
-
-            signStub
-                .calledWith({ data: 'encryptedPayload' }, 'mirotalksfu_jwt_secret', { expiresIn: '1h' })
-                .should.be.true();
-            encryptStub
-                .calledWith(
-                    JSON.stringify({ username: 'user', password: 'pass', presenter: 'true' }),
-                    'mirotalksfu_jwt_secret'
-                )
-                .should.be.true();
-
-            signStub.restore();
-            encryptStub.restore();
-        });
-
-        it('should return an empty string if no token data is provided', () => {
-            const result = serverApi.getToken(null);
-            result.should.equal('');
-        });
-    });
-
-    describe('endMeeting', () => {
-        it('should end an existing meeting and return success', () => {
-            const removePeerStub = sinon.stub();
-            const sendToAllStub = sinon.stub();
-            const roomList = new Map([
-                [
-                    'room1',
-                    {
-                        getPeers: () =>
-                            new Map([
-                                ['peer1', {}],
-                                ['peer2', {}],
-                            ]),
-                        removePeer: removePeerStub,
-                        sendToAll: sendToAllStub,
-                    },
-                ],
-            ]);
-
-            const result = serverApi.endMeeting(roomList, 'room1');
-
-            result.should.deepEqual({ success: true, message: 'Meeting ended', room: 'room1' });
-            sendToAllStub.calledOnce.should.be.true();
-            sendToAllStub
-                .calledWith('cmd', { type: 'ejectAll', peer_name: 'API', broadcast: true, redirect: '' })
-                .should.be.true();
-            removePeerStub.calledTwice.should.be.true();
-            roomList.has('room1').should.be.false();
-        });
-
-        it('should pass redirect URL to peers when provided', () => {
-            const removePeerStub = sinon.stub();
-            const sendToAllStub = sinon.stub();
-            const roomList = new Map([
-                [
-                    'room1',
-                    {
-                        getPeers: () => new Map([['peer1', {}]]),
-                        removePeer: removePeerStub,
-                        sendToAll: sendToAllStub,
-                    },
-                ],
-            ]);
-
-            const result = serverApi.endMeeting(roomList, 'room1', 'https://example.com/goodbye');
-
-            result.should.deepEqual({ success: true, message: 'Meeting ended', room: 'room1' });
-            sendToAllStub
-                .calledWith('cmd', {
-                    type: 'ejectAll',
-                    peer_name: 'API',
-                    broadcast: true,
-                    redirect: 'https://example.com/goodbye',
-                })
-                .should.be.true();
-            removePeerStub.calledOnce.should.be.true();
-            roomList.has('room1').should.be.false();
-        });
-
-        it('should use empty redirect when redirect is not provided', () => {
-            const sendToAllStub = sinon.stub();
-            const roomList = new Map([
-                [
-                    'room1',
-                    {
-                        getPeers: () => new Map([['peer1', {}]]),
-                        removePeer: sinon.stub(),
-                        sendToAll: sendToAllStub,
-                    },
-                ],
-            ]);
-
-            serverApi.endMeeting(roomList, 'room1');
-
-            sendToAllStub
-                .calledWith('cmd', { type: 'ejectAll', peer_name: 'API', broadcast: true, redirect: '' })
-                .should.be.true();
-        });
-
-        it('should return error when room does not exist', () => {
-            const roomList = new Map();
-
-            const result = serverApi.endMeeting(roomList, 'nonexistent');
-
-            result.should.deepEqual({ success: false, error: 'Room not found' });
-        });
-
-        it('should handle room with no peers', () => {
-            const sendToAllStub = sinon.stub();
-            const roomList = new Map([
-                [
-                    'room1',
-                    {
-                        getPeers: () => new Map(),
-                        removePeer: sinon.stub(),
-                        sendToAll: sendToAllStub,
-                    },
-                ],
-            ]);
-
-            const result = serverApi.endMeeting(roomList, 'room1');
-
-            result.should.deepEqual({ success: true, message: 'Meeting ended', room: 'room1' });
-            roomList.has('room1').should.be.false();
-        });
-    });
-
-    describe('getRandomNumber', () => {
-        it('should return a random number between 0 and 999999', () => {
-            const result = serverApi.getRandomNumber();
-            result.should.be.within(0, 999999);
+    it('reports idempotent termination of an absent room', () => {
+        new ServerApi(host, secret).endMeeting(new Map(), 'missing').should.containDeep({
+            success: false,
+            error: 'Room not found',
         });
     });
 });

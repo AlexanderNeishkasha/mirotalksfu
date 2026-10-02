@@ -302,7 +302,6 @@ let isVideoControlsOn = false;
 let isChatPasteTxt = false;
 let isChatMarkdownOn = false;
 
-let joinRoomWithoutAudioVideo = true;
 let joinRoomWithScreen = false;
 
 let audio = false;
@@ -564,16 +563,13 @@ function makeId(length) {
 // INIT ROOM
 // ####################################################
 
+/** Open prejoin even without capture devices so listeners can receive room audio. */
 async function initRoom() {
-    if (!isAudioAllowed && !isVideoAllowed && !joinRoomWithoutAudioVideo) {
-        openURL(`/permission?room_id=${room_id}&message=Not allowed both Audio and Video`);
-    } else {
-        setButtonsInit();
-        handleSelectsInit();
-        handleUsernameEmojiPicker();
-        await whoAreYou();
-        await setSelectsInit();
-    }
+    setButtonsInit();
+    handleSelectsInit();
+    handleUsernameEmojiPicker();
+    await whoAreYou();
+    await setSelectsInit();
 }
 
 // ####################################################

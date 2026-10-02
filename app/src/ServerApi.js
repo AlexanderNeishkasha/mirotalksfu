@@ -4,7 +4,6 @@ const jwt = require('jsonwebtoken');
 const CryptoJS = require('crypto-js');
 
 const config = require('./config');
-const { v4: uuidV4 } = require('uuid');
 
 const JWT_KEY = config.security?.jwt?.key || 'mirotalksfu_jwt_secret';
 const JWT_EXP = config.security?.jwt?.exp || '1h';
@@ -21,55 +20,6 @@ module.exports = class ServerApi {
         if (!this._authorization || typeof this._authorization !== 'string') return false;
         if (this._authorization !== this._api_key_secret) return false;
         return true;
-    }
-
-    getStats(roomList, timestamp = new Date().toISOString()) {
-        const totalUsers = Array.from(roomList.values()).reduce((total, room) => total + room.peers.size, 0);
-        const totalRooms = roomList.size;
-        return { timestamp, totalRooms, totalUsers };
-    }
-
-    getActiveRooms(roomList) {
-        return Array.from(roomList.entries()).map(([roomId, room]) => ({
-            id: roomId,
-            peers: room.peers.size,
-            join: 'https://' + this._host + '/' + roomId,
-        }));
-    }
-
-    getMeetings(roomList) {
-        const meetings = Array.from(roomList.entries()).map(([id, room]) => {
-            const peers = Array.from(room.peers.values()).map(
-                ({
-                    peer_info: {
-                        peer_name,
-                        peer_presenter,
-                        peer_video,
-                        peer_audio,
-                        peer_screen,
-                        peer_hand,
-                        os_name,
-                        os_version,
-                        browser_name,
-                        browser_version,
-                    },
-                }) => ({
-                    name: peer_name,
-                    presenter: peer_presenter,
-                    video: peer_video,
-                    audio: peer_audio,
-                    screen: peer_screen,
-                    hand: peer_hand,
-                    os: os_name ? `${os_name} ${os_version}` : '',
-                    browser: browser_name ? `${browser_name} ${browser_version}` : '',
-                })
-            );
-            return {
-                roomId: id,
-                peers: peers,
-            };
-        });
-        return meetings;
     }
 
     endMeeting(roomList, room, redirect = '') {
@@ -99,15 +49,12 @@ module.exports = class ServerApi {
         return { success: true, message: 'Meeting ended', room: room };
     }
 
-    getMeetingURL() {
-        return 'https://' + this._host + '/join/' + uuidV4();
-    }
-
     getJoinURL(data) {
         // Get data
         const { room, roomPassword, name, avatar, audio, video, screen, chat, hide, notify, duration, token } = data;
 
-        const roomValue = room || uuidV4();
+        if (typeof room !== 'string' || !room.trim()) return null;
+        const roomValue = room;
         const roomPasswordValue = roomPassword || false;
         const nameValue = name || 'User-' + this.getRandomNumber();
         const avatarValue = avatar || false;
