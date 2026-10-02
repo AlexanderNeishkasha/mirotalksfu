@@ -66,6 +66,7 @@ let BUTTONS = {
         videoPrivacyButton: true,
     },
     consumerVideo: {
+        audioVolumeInput: true,
         videoPictureInPicture: true,
         videoMirrorButton: true,
         pinVideoButton: true,
