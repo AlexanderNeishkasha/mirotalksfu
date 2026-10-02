@@ -3029,15 +3029,7 @@ class RoomClient {
                     this.isVideoFullScreenSupported &&
                     myDropdownContent.appendChild(this.createDropdownItem(fs, 'Full Screen', myDropdownContent));
 
-                if (myDropdownContent.childElementCount > 0) {
-                    myDropdownDiv.appendChild(myDropdownBtn);
-                    document.body.appendChild(myDropdownContent);
-                    myDropdownBtn._dropdownContent = myDropdownContent;
-                    this.handleDropdownEvents(myDropdownDiv, myDropdownBtn, myDropdownContent);
-                    vb.appendChild(myDropdownDiv);
-                } else {
-                    myDropdownContent.remove();
-                }
+                window.BodrikVideoDropdown.attach(this, vb, myDropdownDiv, myDropdownBtn, myDropdownContent);
                 BUTTONS.producerVideo.muteAudioButton && vb.appendChild(au);
                 BUTTONS.producerVideo.videoPrivacyButton && !isScreen && vb.appendChild(vp);
 
@@ -3811,12 +3803,7 @@ class RoomClient {
                 BUTTONS.consumerVideo.ejectButton &&
                     eVc.appendChild(this.createDropdownItem(ko, 'Kick Out', eVc, 'red'));
 
-                eDiv.appendChild(eBtn);
-                document.body.appendChild(eVc);
-                eBtn._dropdownContent = eVc;
-                this.handleDropdownEvents(eDiv, eBtn, eVc);
-
-                vb.appendChild(eDiv);
+                window.BodrikVideoDropdown.attach(this, vb, eDiv, eBtn, eVc, true);
                 BUTTONS.consumerVideo.audioVolumeInput && vb.appendChild(pv);
                 BUTTONS.consumerVideo.muteAudioButton && vb.appendChild(au);
                 BUTTONS.consumerVideo.muteVideoButton && vb.appendChild(cm);
@@ -4141,12 +4128,7 @@ class RoomClient {
             BUTTONS.videoOff.ejectButton && eVc.appendChild(this.createDropdownItem(ko, 'Kick Out', eVc, 'red'));
         }
 
-        eDiv.appendChild(eBtn);
-        document.body.appendChild(eVc);
-        eBtn._dropdownContent = eVc;
-        this.handleDropdownEvents(eDiv, eBtn, eVc);
-
-        vb.appendChild(eDiv);
+        window.BodrikVideoDropdown.attach(this, vb, eDiv, eBtn, eVc, remotePeer);
         remotePeer && BUTTONS.videoOff.audioVolumeInput && vb.appendChild(pv);
         BUTTONS.videoOff.muteAudioButton && vb.appendChild(au);
         if (BUTTONS.videoOff.pinVideoButton && !this.isMobileDevice) vb.appendChild(pn);
@@ -5418,10 +5400,12 @@ class RoomClient {
         return item;
     }
 
+    /** Bind dropdown interactions without allowing an empty menu to open. */
     handleDropdownEvents(dropdownDiv, dropdownBtn, dropdownContent) {
         let closeTimer = null;
 
         const showDropdown = () => {
+            if (!dropdownContent.childElementCount) return;
             if (closeTimer) {
                 clearTimeout(closeTimer);
                 closeTimer = null;
@@ -9111,8 +9095,7 @@ class RoomClient {
         }
     }
 
-    // Add or remove a presenter-only moderation control on an already-rendered tile menu,
-    // without re-consuming media. `container` is the dropdown (consumer) or menu bar (videoOff).
+    /** Reconcile an existing tile's moderator action and derive menu visibility without re-consuming media. */
     reconcilePresenterMenuItem(container, btnId, shouldExist, createFn) {
         const existing = this.getId(btnId);
         if (shouldExist && !existing) {
@@ -9121,6 +9104,7 @@ class RoomClient {
             const wrapper = existing.closest('.navbar-dropdown-item') || existing;
             wrapper.remove();
         }
+        window.BodrikVideoDropdown.sync(container);
     }
 
     /** Reconcile role, ban, and eject controls on existing tiles after a presenter change. */
