@@ -485,14 +485,24 @@ function setMicProcessingHelpTippy() {
             ],
         ],
     ];
+    const touchHelp = isMobileDevice || isTabletDevice || isIPadDevice;
     for (const [id, sections] of definitions) {
-        setTippy(id, micHelpHtml(sections), isMobileDevice ? 'bottom' : 'right', true);
-        const instance = getId(id)?._tippy;
+        const button = getId(id);
+        setTippy(id, micHelpHtml(sections), touchHelp ? 'bottom' : 'right', true);
+        const instance = button?._tippy;
         instance?.setProps({
-            trigger: 'mouseenter focus click',
+            trigger: touchHelp ? 'manual' : 'mouseenter focus',
             hideOnClick: true,
             maxWidth: Math.min(340, window.innerWidth - 32),
+            appendTo: () => document.body,
         });
+        if (touchHelp && button && instance) {
+            button.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                instance.state.isVisible ? instance.hide() : instance.show();
+            });
+        }
     }
 }
 

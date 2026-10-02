@@ -75,8 +75,11 @@ for (const key of [
     });
 }
 
-test('help supports hover, keyboard focus, and mobile tap', () => {
-    assert.match(room, /trigger: 'mouseenter focus click'/);
-    assert.match(room, /setTippy\(id, micHelpHtml\(sections\), isMobileDevice \? 'bottom' : 'right', true\)/);
+test('help supports desktop hover/focus and an explicit mobile/tablet tap toggle', () => {
+    assert.match(room, /const touchHelp = isMobileDevice \|\| isTabletDevice \|\| isIPadDevice/);
+    assert.match(room, /trigger: touchHelp \? 'manual' : 'mouseenter focus'/);
+    assert.match(room, /setTippy\(id, micHelpHtml\(sections\), touchHelp \? 'bottom' : 'right', true\)/);
+    assert.match(room, /instance\.state\.isVisible \? instance\.hide\(\) : instance\.show\(\)/);
+    assert.match(room, /appendTo: \(\) => document\.body/);
     assert.match(room, /maxWidth: Math\.min\(340, window\.innerWidth - 32\)/);
 });
