@@ -4349,26 +4349,10 @@ class RoomClient {
         if (peer_avatar && this.isValidAvatarURL(peer_avatar)) {
             elem.setAttribute('src', peer_avatar);
         } else if (cfg.useAvatarSvg) {
-            rc.isValidEmail(peer_name)
-                ? elem.setAttribute('src', this.genGravatar(peer_name))
-                : elem.setAttribute('src', this.genAvatarSvg(peer_name, 250));
+            elem.setAttribute('src', this.genAvatarSvg(peer_name, 250));
         } else {
             elem.setAttribute('src', image.avatar);
         }
-    }
-
-    genGravatar(email, size = false) {
-        const hash = md5(email.toLowerCase().trim());
-        const gravatarURL = `https://www.gravatar.com/avatar/${hash}` + (size ? `?s=${size}` : '?s=250') + '?d=404';
-        return gravatarURL;
-        function md5(input) {
-            return CryptoJS.MD5(input).toString();
-        }
-    }
-
-    isValidEmail(email) {
-        const emailRegex = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
-        return emailRegex.test(email);
     }
 
     genAvatarSvg(peerName, avatarImgSize) {
@@ -6002,18 +5986,14 @@ class RoomClient {
 
     setMsgAvatar(avatar, peerName, peerAvatar = false) {
         const avatarImg =
-            peerAvatar && this.isValidAvatarURL(peerAvatar)
-                ? peerAvatar
-                : this.isValidEmail(peerName)
-                  ? this.genGravatar(peerName)
-                  : this.genAvatarSvg(peerName, 32);
+            peerAvatar && this.isValidAvatarURL(peerAvatar) ? peerAvatar : this.genAvatarSvg(peerName, 32);
         avatar === 'left' ? (this.leftMsgAvatar = avatarImg) : (this.rightMsgAvatar = avatarImg);
     }
 
     /** Render a sanitized human message, image, and per-message reactions. */
     appendMessage(side, img, fromName, fromId, msg, toId, toName, msgId = '') {
         const getSide = filterXSS(side);
-        // img is always internally computed (isValidAvatarURL / genAvatarSvg / genGravatar) and is
+        // img is always internally computed (isValidAvatarURL / genAvatarSvg) and is
         // set via setAttribute — no XSS risk. filterXSS must NOT be applied here because it encodes
         // '<', '>' and '&' which breaks SVG data URIs produced by genAvatarSvg.
         const getImg =
@@ -7847,10 +7827,6 @@ class RoomClient {
                 this.userLog('info', `${icons.moderator} Moderator: everyone follows me ${status}`, 'top-end');
                 break;
 
-            case 'customThemeKeep':
-                this.userLog('info', `${icons.theme} Custom theme keep ${status}`, 'top-end');
-                break;
-
             default:
                 break;
         }
@@ -7991,11 +7967,7 @@ class RoomClient {
             const safePeerId = this.sanitizeHtml(peer_id);
 
             const avatarImg =
-                peer_avatar && this.isValidAvatarURL(peer_avatar)
-                    ? peer_avatar
-                    : this.isValidEmail(peer_name)
-                      ? this.genGravatar(peer_name, 32)
-                      : this.genAvatarSvg(peer_name, 32);
+                peer_avatar && this.isValidAvatarURL(peer_avatar) ? peer_avatar : this.genAvatarSvg(peer_name, 32);
 
             const lobbyAcceptId = `${displayName}___${safePeerId}___lobbyAccept`;
             const lobbyRejectId = `${displayName}___${safePeerId}___lobbyReject`;

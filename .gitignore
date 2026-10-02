@@ -8,8 +8,10 @@
 node_modules
 npm-debug.log
 
-# cache
+# cache and generated browser dependencies
 .cache
+.generated/
+public/vendor/
 
 # personal
 .env

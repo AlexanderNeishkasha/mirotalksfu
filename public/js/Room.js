@@ -122,71 +122,6 @@ console.log('LOCAL_STORAGE', {
 });
 
 // ####################################################
-// THEME CUSTOM COLOR - PICKER
-// ####################################################
-
-const themeCustom = {
-    input: document.getElementById('themeColorPicker'),
-    color: localStorageSettings.theme_color ? localStorageSettings.theme_color : '#000000',
-    keep: localStorageSettings.theme_custom ? localStorageSettings.theme_custom : false,
-};
-
-const pickr = Pickr.create({
-    el: themeCustom.input,
-    theme: 'classic', // or 'monolith', or 'nano'
-    default: themeCustom.color,
-    useAsButton: true,
-
-    swatches: [
-        'rgba(244, 67, 54, 1)',
-        'rgba(233, 30, 99, 0.95)',
-        'rgba(156, 39, 176, 0.9)',
-        'rgba(103, 58, 183, 0.85)',
-        'rgba(63, 81, 181, 0.8)',
-        'rgba(33, 150, 243, 0.75)',
-        'rgba(3, 169, 244, 0.7)',
-        'rgba(0, 188, 212, 0.7)',
-        'rgba(0, 150, 136, 0.75)',
-        'rgba(76, 175, 80, 0.8)',
-        'rgba(139, 195, 74, 0.85)',
-        'rgba(205, 220, 57, 0.9)',
-        'rgba(255, 235, 59, 0.95)',
-        'rgba(255, 193, 7, 1)',
-    ],
-
-    components: {
-        // Main components
-        preview: true,
-        opacity: true,
-        hue: true,
-
-        // Input / output Options
-        interaction: {
-            hex: false,
-            rgba: false,
-            hsla: false,
-            hsva: false,
-            cmyk: false,
-            input: false,
-            clear: false,
-            save: false,
-        },
-    },
-})
-    .on('init', (pickr) => {
-        themeCustom.input.value = pickr.getSelectedColor().toHEXA().toString(0);
-    })
-    .on('change', (color) => {
-        themeCustom.color = color.toHEXA().toString();
-        themeCustom.input.value = themeCustom.color;
-        setCustomTheme();
-    })
-    .on('changestop', (color) => {
-        localStorageSettings.theme_color = themeCustom.color;
-        lS.setSettings(localStorageSettings);
-    });
-
-// ####################################################
 // ENUMERATE DEVICES SELECTS
 // ####################################################
 
@@ -388,8 +323,6 @@ function initDocumentListener() {
 
 /** Initialize room admission, device choices, and retained control hints. */
 async function initClient() {
-    await getThemes();
-    setTheme();
     window.BodrikTheme.connect(publicRoomSlug, applyTheme);
 
     if (!isMobileDevice) {
@@ -1577,14 +1510,10 @@ function joinRoom(peer_name, room_id) {
 function roomIsReady() {
     startRoomSession();
 
-    if (peer_avatar && isValidAvatarURL(peer_avatar)) {
-        myProfileAvatar.setAttribute('src', peer_avatar);
-    } else if (rc.isValidEmail(peer_name)) {
-        myProfileAvatar.style.borderRadius = `50px`;
-        myProfileAvatar.setAttribute('src', rc.genGravatar(peer_name));
-    } else {
-        myProfileAvatar.setAttribute('src', rc.genAvatarSvg(peer_name, 64));
-    }
+    myProfileAvatar.setAttribute(
+        'src',
+        peer_avatar && isValidAvatarURL(peer_avatar) ? peer_avatar : rc.genAvatarSvg(peer_name, 64)
+    );
 
     updateMyAvatarResetButtonVisibility();
 
@@ -1816,32 +1745,8 @@ async function updateMyPeerAvatarByUrl() {
                 localGrid.appendChild(makeAvatarImg(url));
             }
 
-            // DiceBear random avatars
-            const randomAvatarLabel = document.createElement('p');
-            randomAvatarLabel.textContent = 'Or pick a random avatar:';
-            randomAvatarLabel.style.cssText = 'color:#aaa;font-size:12px;margin:10px 0 6px;text-align:center;';
-
-            const randomAvatarGrid = document.createElement('div');
-            randomAvatarGrid.style.cssText =
-                'display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-bottom:4px;';
-            const dicebearStyles = [
-                'bottts-neutral',
-                'adventurer-neutral',
-                'thumbs',
-                'initials',
-                'identicon',
-                'shapes',
-            ];
-
-            for (let i = 0; i < 6; i++) {
-                const seed = Math.random().toString(36).substring(2, 10);
-                const style = dicebearStyles[i % dicebearStyles.length];
-                const url = `https://api.dicebear.com/9.x/${style}/svg?seed=${encodeURIComponent(seed)}`;
-                randomAvatarGrid.appendChild(makeAvatarImg(url));
-            }
-
             let insertAfter = input;
-            for (const el of [localLabel, localGrid, randomAvatarLabel, randomAvatarGrid]) {
+            for (const el of [localLabel, localGrid]) {
                 insertAfter.parentNode.insertBefore(el, insertAfter.nextSibling);
                 insertAfter = el;
             }
@@ -1921,12 +1826,7 @@ function resetMyPeerAvatarInMemory() {
     localStorageSettings.peer_avatar = '';
     lS.setSettings(localStorageSettings);
 
-    if (rc.isValidEmail(peer_name)) {
-        myProfileAvatar.style.borderRadius = '50px';
-        myProfileAvatar.setAttribute('src', rc.genGravatar(peer_name));
-    } else {
-        myProfileAvatar.setAttribute('src', rc.genAvatarSvg(peer_name, 64));
-    }
+    myProfileAvatar.setAttribute('src', rc.genAvatarSvg(peer_name, 64));
 
     rc.setVideoAvatarImgName(rc.peer_id + '__img', peer_name, false);
     rc.setMsgAvatar('left', peer_name, false);
@@ -2233,9 +2133,6 @@ function handleButtons() {
     };
     tabShortcutsBtn.onclick = (e) => {
         rc.openTab(e, 'tabShortcuts');
-    };
-    tabStylingBtn.onclick = (e) => {
-        rc.openTab(e, 'tabStyling');
     };
     tabLanguagesBtn.onclick = (e) => {
         rc.openTab(e, 'tabLanguages');
@@ -3111,17 +3008,7 @@ function handleSelects() {
     };
 
     // styling
-    keepCustomTheme.onchange = (e) => {
-        themeCustom.keep = e.currentTarget.checked;
-        selectTheme.disabled = themeCustom.keep;
-        updateThemeCardsDisabled();
-        rc.roomMessage('customThemeKeep', themeCustom.keep);
-        localStorageSettings.theme_custom = themeCustom.keep;
-        localStorageSettings.theme_color = themeCustom.color;
-        lS.setSettings(localStorageSettings);
-        setTheme();
-        e.target.blur();
-    };
+
     BtnAspectRatio.onchange = () => {
         adaptAspectRatio(videoMediaContainer.childElementCount);
         localStorageSettings.aspect_ratio = BtnAspectRatio.selectedIndex;
@@ -3140,19 +3027,7 @@ function handleSelects() {
         localStorageSettings.video_controls = BtnVideoControls.selectedIndex;
         lS.setSettings(localStorageSettings);
     };
-    selectTheme.onchange = () => {
-        localStorageSettings.theme = selectTheme.selectedIndex;
-        lS.setSettings(localStorageSettings);
-        setTheme();
-    };
-    document.querySelectorAll('.theme-card').forEach((card) => {
-        card.onclick = () => {
-            if (card.classList.contains('disabled')) return;
-            const index = parseInt(card.dataset.index);
-            selectTheme.selectedIndex = index;
-            selectTheme.onchange();
-        };
-    });
+
     BtnsBarPosition.onchange = () => {
         rc.changeBtnsBarPosition(BtnsBarPosition.value);
         localStorageSettings.buttons_bar = BtnsBarPosition.selectedIndex;
@@ -3439,12 +3314,28 @@ function handleInputs() {
 // EMOJI PIKER
 // ####################################################
 
+let emojiDataPromise;
+/** Load the locked emoji dataset once from the same-origin nginx vendor release. */
+function getEmojiData() {
+    if (!emojiDataPromise) {
+        emojiDataPromise = fetch('/vendor/emoji-mart/data-native.json?package=1.2.1').then((response) => {
+            if (!response.ok) throw new Error(`Emoji data request failed (${response.status})`);
+            return response.json();
+        });
+        emojiDataPromise.catch(() => {
+            emojiDataPromise = null;
+        });
+    }
+    return emojiDataPromise;
+}
+
 function toggleUsernameEmoji() {
     getId('usernameEmoji').classList.toggle('hidden');
 }
 
 function handleUsernameEmojiPicker() {
     const pickerOptions = {
+        data: getEmojiData,
         theme: 'dark',
         onEmojiSelect: addEmojiToUsername,
     };
@@ -3467,6 +3358,7 @@ function handleUsernameEmojiPicker() {
 
 function handleChatEmojiPicker() {
     const pickerOptions = {
+        data: getEmojiData,
         theme: 'dark',
         onEmojiSelect: addEmojiToMsg,
     };
@@ -3531,11 +3423,6 @@ function loadSettingsFromLocalStorage() {
     switchShare.checked = notify;
     switchKeepButtonsVisible.checked = isKeepButtonsVisible;
     switchShortcuts.checked = isShortcutsEnabled;
-
-    keepCustomTheme.checked = themeCustom.keep;
-    selectTheme.disabled = themeCustom.keep;
-    updateThemeCardsDisabled();
-    themeCustom.input.value = themeCustom.color;
 
     switchDominantSpeakerFocus.checked = localStorageSettings.dominant_speaker_focus;
     switchNoiseSuppression.checked = localStorageSettings.mic_noise_suppression;
@@ -4062,11 +3949,6 @@ async function sound(name, force = false) {
     } catch (err) {
         return false;
     }
-}
-
-function isValidEmail(email) {
-    const emailRegex = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
-    return emailRegex.test(email);
 }
 
 function isValidAvatarURL(url) {
@@ -5481,9 +5363,6 @@ function getParticipantAvatar(peerName, peerAvatar = false) {
     if (peerAvatar && isValidAvatarURL(peerAvatar)) {
         return peerAvatar;
     }
-    if (rc.isValidEmail(peerName)) {
-        return rc.genGravatar(peerName);
-    }
     return rc.genAvatarSvg(peerName, 32);
 }
 
@@ -5494,240 +5373,11 @@ function getParticipantAvatar(peerName, peerAvatar = false) {
 /**
  * Get Themes config from server side and merge with built-in defaults
  */
-async function getThemes() {
-    try {
-        const response = await fetchRoomJson('/themes');
-        const serverThemes = response.message;
-        if (serverThemes) {
-            // Deep merge each theme: server overrides take precedence
-            for (const [name, vars] of Object.entries(serverThemes)) {
-                themeMap[name] = themeMap[name] ? { ...themeMap[name], ...vars } : vars;
-            }
-            renderDynamicThemeCards();
-            console.log('ROOM THEMES SETTINGS', {
-                serverThemes: serverThemes,
-                clientThemes: Object.keys(themeMap),
-            });
-        }
-    } catch (error) {
-        console.error('GET THEMES ERROR', error.message);
-    }
-}
 
 /**
  * Dynamically add theme cards & dropdown options for server-defined themes
  * that are not part of the built-in defaults.
  */
-function renderDynamicThemeCards() {
-    const grid = getId('themeCardsGrid');
-    if (!grid) return;
-
-    const builtInThemes = new Set(Array.from(selectTheme.options).map((opt) => opt.value));
-
-    const iconPool = [
-        'fa-solid fa-wand-magic-sparkles',
-        'fa-solid fa-palette',
-        'fa-solid fa-paint-roller',
-        'fa-solid fa-swatchbook',
-        'fa-solid fa-brush',
-        'fa-solid fa-eye-dropper',
-        'fa-solid fa-fill-drip',
-        'fa-solid fa-circle-half-stroke',
-    ];
-    let iconIndex = 0;
-
-    for (const [name, vars] of Object.entries(themeMap)) {
-        if (builtInThemes.has(name)) continue;
-
-        // Add <option> to the hidden select
-        const option = document.createElement('option');
-        option.value = name;
-        option.textContent = name.charAt(0).toUpperCase() + name.slice(1);
-        selectTheme.appendChild(option);
-
-        const index = selectTheme.options.length - 1;
-
-        // Pick an icon and a color from the theme's --dd-color
-        const iconClass = iconPool[iconIndex % iconPool.length];
-        iconIndex++;
-        const iconColor = vars['--dd-color'] || '#c0c0c0';
-
-        // Create the card
-        const card = document.createElement('div');
-        card.className = 'theme-card';
-        card.dataset.theme = name;
-        card.dataset.index = index;
-        card.innerHTML = renderRoomTemplate('themeCardTemplate', {
-            text: { label: option.textContent },
-            attrs: { iconClass },
-        });
-
-        // Apply dynamic icon color via inline style
-        const icon = card.querySelector('i');
-        icon.style.color = iconColor;
-
-        // Set dynamic active border color
-        card.style.setProperty('--dynamic-theme-color', iconColor);
-
-        // Click handler (same logic as built-in cards)
-        card.onclick = () => {
-            if (card.classList.contains('disabled')) return;
-            selectTheme.selectedIndex = index;
-            selectTheme.onchange();
-        };
-
-        grid.appendChild(card);
-    }
-}
-
-let themeMap = {
-    default: {
-        '--body-bg': 'linear-gradient(135deg, #0e0e14, #1e1e28)',
-        '--trx-bg': 'linear-gradient(135deg, #0e0e14, #1e1e28)',
-        '--msger-bg': 'linear-gradient(135deg, #0e0e14, #1e1e28)',
-        '--left-msg-bg': '#141420',
-        '--right-msg-bg': '#1a1a26',
-        '--select-bg': '#161622',
-        '--select-focus-color': 'rgba(102, 190, 255, 0.5)',
-        '--tab-btn-active': '#1e1e28',
-        '--settings-bg': 'linear-gradient(135deg, #0e0e14, #1e1e28)',
-
-        '--btns-bg-color': 'rgba(10, 10, 16, 0.8)',
-        '--dd-color': '#E8E8EC',
-        '--room-switch-accent': '#4678F9',
-        '--room-switch-ink': '#FFFFFF',
-    },
-    dark: {
-        '--body-bg': 'linear-gradient(135deg, #0d0d12, #181820)',
-        '--trx-bg': 'linear-gradient(135deg, #0d0d12, #181820)',
-        '--msger-bg': 'linear-gradient(135deg, #0d0d12, #181820)',
-        '--left-msg-bg': '#111118',
-        '--right-msg-bg': '#1a1a22',
-        '--select-bg': '#14141c',
-        '--select-focus-color': 'rgba(154, 186, 255, 0.42)',
-        '--tab-btn-active': '#181820',
-        '--settings-bg': 'linear-gradient(135deg, #0d0d12, #181820)',
-
-        '--btns-bg-color': 'rgba(10, 10, 16, 0.85)',
-        '--dd-color': '#E0E0E6',
-        '--room-switch-accent': '#4678F9',
-        '--room-switch-ink': '#FFFFFF',
-    },
-    grey: {
-        '--body-bg': 'linear-gradient(135deg, #1c1c24, #3a3a46)',
-        '--trx-bg': 'linear-gradient(135deg, #1c1c24, #3a3a46)',
-        '--msger-bg': 'linear-gradient(135deg, #1c1c24, #3a3a46)',
-        '--left-msg-bg': '#24242e',
-        '--right-msg-bg': '#32323e',
-        '--select-bg': '#222230',
-        '--select-focus-color': 'rgba(196, 204, 224, 0.38)',
-        '--tab-btn-active': '#3a3a46',
-        '--settings-bg': 'linear-gradient(135deg, #1c1c24, #3a3a46)',
-
-        '--btns-bg-color': 'rgba(22, 22, 30, 0.75)',
-        '--dd-color': '#E4E4EA',
-        '--room-switch-accent': '#4678F9',
-        '--room-switch-ink': '#FFFFFF',
-    },
-    green: {
-        '--body-bg': 'linear-gradient(135deg, #0f1d1a, #1a3830)',
-        '--trx-bg': 'linear-gradient(135deg, #0f1d1a, #1a3830)',
-        '--msger-bg': 'linear-gradient(135deg, #0f1d1a, #1a3830)',
-        '--left-msg-bg': '#0d1816',
-        '--right-msg-bg': '#1e2e2a',
-        '--select-bg': '#122420',
-        '--select-focus-color': 'rgba(111, 207, 151, 0.42)',
-        '--tab-btn-active': '#1a3830',
-        '--settings-bg': 'linear-gradient(135deg, #0f1d1a, #1a3830)',
-
-        '--btns-bg-color': 'rgba(12, 24, 20, 0.75)',
-        '--dd-color': '#6FCF97',
-    },
-    blue: {
-        '--body-bg': 'linear-gradient(135deg, #111827, #1e3050)',
-        '--trx-bg': 'linear-gradient(135deg, #111827, #1e3050)',
-        '--msger-bg': 'linear-gradient(135deg, #111827, #1e3050)',
-        '--left-msg-bg': '#0e1420',
-        '--right-msg-bg': '#1a2840',
-        '--select-bg': '#131c30',
-        '--select-focus-color': 'rgba(107, 163, 214, 0.45)',
-        '--tab-btn-active': '#1e3050',
-        '--settings-bg': 'linear-gradient(135deg, #111827, #1e3050)',
-
-        '--btns-bg-color': 'rgba(14, 20, 34, 0.75)',
-        '--dd-color': '#6BA3D6',
-    },
-    red: {
-        '--body-bg': 'linear-gradient(135deg, #1c1015, #332028)',
-        '--trx-bg': 'linear-gradient(135deg, #1c1015, #332028)',
-        '--msger-bg': 'linear-gradient(135deg, #1c1015, #332028)',
-        '--left-msg-bg': '#180e12',
-        '--right-msg-bg': '#2a1c22',
-        '--select-bg': '#20141a',
-        '--select-focus-color': 'rgba(224, 112, 112, 0.42)',
-        '--tab-btn-active': '#332028',
-        '--settings-bg': 'linear-gradient(135deg, #1c1015, #332028)',
-
-        '--btns-bg-color': 'rgba(22, 12, 16, 0.75)',
-        '--dd-color': '#E07070',
-    },
-    purple: {
-        '--body-bg': 'linear-gradient(135deg, #18102a, #2e2045)',
-        '--trx-bg': 'linear-gradient(135deg, #18102a, #2e2045)',
-        '--msger-bg': 'linear-gradient(135deg, #18102a, #2e2045)',
-        '--left-msg-bg': '#140e22',
-        '--right-msg-bg': '#261c3a',
-        '--select-bg': '#1c1430',
-        '--select-focus-color': 'rgba(176, 124, 200, 0.42)',
-        '--tab-btn-active': '#2e2045',
-        '--settings-bg': 'linear-gradient(135deg, #18102a, #2e2045)',
-
-        '--btns-bg-color': 'rgba(18, 12, 34, 0.75)',
-        '--dd-color': '#B07CC8',
-    },
-    orange: {
-        '--body-bg': 'linear-gradient(135deg, #1c1510, #3a2a1a)',
-        '--trx-bg': 'linear-gradient(135deg, #1c1510, #3a2a1a)',
-        '--msger-bg': 'linear-gradient(135deg, #1c1510, #3a2a1a)',
-        '--left-msg-bg': '#18120e',
-        '--right-msg-bg': '#302218',
-        '--select-bg': '#221a12',
-        '--select-focus-color': 'rgba(232, 165, 96, 0.45)',
-        '--tab-btn-active': '#3a2a1a',
-        '--settings-bg': 'linear-gradient(135deg, #1c1510, #3a2a1a)',
-
-        '--btns-bg-color': 'rgba(22, 16, 12, 0.75)',
-        '--dd-color': '#E8A560',
-    },
-    pink: {
-        '--body-bg': 'linear-gradient(135deg, #1c1018, #382030)',
-        '--trx-bg': 'linear-gradient(135deg, #1c1018, #382030)',
-        '--msger-bg': 'linear-gradient(135deg, #1c1018, #382030)',
-        '--left-msg-bg': '#180e14',
-        '--right-msg-bg': '#2e1c28',
-        '--select-bg': '#201420',
-        '--select-focus-color': 'rgba(216, 139, 160, 0.42)',
-        '--tab-btn-active': '#382030',
-        '--settings-bg': 'linear-gradient(135deg, #1c1018, #382030)',
-
-        '--btns-bg-color': 'rgba(22, 12, 18, 0.75)',
-        '--dd-color': '#D88BA0',
-    },
-    yellow: {
-        '--body-bg': 'linear-gradient(135deg, #1a1810, #36321a)',
-        '--trx-bg': 'linear-gradient(135deg, #1a1810, #36321a)',
-        '--msger-bg': 'linear-gradient(135deg, #1a1810, #36321a)',
-        '--left-msg-bg': '#16140e',
-        '--right-msg-bg': '#2c2a18',
-        '--select-bg': '#201e12',
-        '--select-focus-color': 'rgba(212, 184, 92, 0.44)',
-        '--tab-btn-active': '#36321a',
-        '--settings-bg': 'linear-gradient(135deg, #1a1810, #36321a)',
-
-        '--btns-bg-color': 'rgba(20, 18, 12, 0.75)',
-        '--dd-color': '#D4B85C',
-    },
-};
 
 function applyTheme(props) {
     const root = document.documentElement.style;
@@ -5738,66 +5388,6 @@ function applyTheme(props) {
     root.setProperty('--room-switch-ink', props['--room-switch-ink'] || '#101314');
     swalBackground = props['--body-bg'];
     document.body.style.background = props['--body-bg'];
-}
-
-function setCustomTheme() {
-    const color = themeCustom.color;
-    const grad = `radial-gradient(${color}, ${color})`;
-    applyTheme({
-        '--body-bg': grad,
-        '--trx-bg': grad,
-        '--msger-bg': grad,
-        '--left-msg-bg': color,
-        '--right-msg-bg': color,
-        '--select-bg': color,
-        '--select-focus-color': `color-mix(in srgb, ${color} 58%, white)`,
-        '--tab-btn-active': color,
-        '--settings-bg': grad,
-
-        '--btns-bg-color': 'rgba(0, 0, 0, 0.7)',
-        '--dd-color': '#FFFFFF',
-        '--room-switch-accent': `color-mix(in srgb, ${color} 45%, white)`,
-        '--room-switch-ink': '#101314',
-    });
-}
-
-function setTheme() {
-    if (window.BodrikTheme.applyCurrent()) return;
-    if (themeCustom.keep) return setCustomTheme();
-
-    selectTheme.selectedIndex = localStorageSettings.theme;
-    const theme = selectTheme.value;
-    const themeNames = Object.keys(themeMap);
-    const themeIndex = themeNames.indexOf(theme);
-
-    if (themeIndex !== -1) {
-        applyTheme(themeMap[theme]);
-        selectTheme.selectedIndex = themeIndex;
-    }
-
-    if (rc) rc.isChatBgTransparent = false;
-    updateThemeCardsActive();
-}
-
-function updateThemeCardsActive() {
-    const cards = document.querySelectorAll('.theme-card');
-    cards.forEach((card) => {
-        const isActive = parseInt(card.dataset.index) === selectTheme.selectedIndex;
-        card.classList.toggle('active', isActive);
-        // For dynamic (server-added) cards, apply active border/shadow via inline style
-        const dynamicColor = card.style.getPropertyValue('--dynamic-theme-color');
-        if (dynamicColor) {
-            card.style.borderColor = isActive ? dynamicColor : '';
-            card.style.boxShadow = isActive ? `0 0 12px ${dynamicColor}33` : '';
-        }
-    });
-}
-
-function updateThemeCardsDisabled() {
-    const cards = document.querySelectorAll('.theme-card');
-    cards.forEach((card) => {
-        card.classList.toggle('disabled', selectTheme.disabled);
-    });
 }
 
 // ####################################################

@@ -284,6 +284,15 @@ function startServer() {
             .type('application/javascript')
             .send(browserConsoleScript(process.env.NODE_ENV));
     });
+    const browserVendorDirectory = process.env.BROWSER_VENDOR_DIR || path.join(dir.public, 'vendor');
+    app.use(
+        '/vendor',
+        express.static(browserVendorDirectory, {
+            maxAge: '1d',
+            fallthrough: false,
+            setHeaders: (res) => res.setHeader('X-Content-Type-Options', 'nosniff'),
+        })
+    );
     // Use all static files from the public folder
     app.use(
         express.static(dir.public, {
@@ -415,9 +424,6 @@ function startServer() {
     });
 
     // UI themes configuration
-    app.get('/themes', (req, res) => {
-        res.status(200).json({ message: config?.ui?.themes ? config.ui.themes : false });
-    });
 
     // main page
 
@@ -534,6 +540,9 @@ function startServer() {
 
     // Global error handler for URIError and other errors
     app.use((err, req, res, next) => {
+        if (err?.status === 404 && req.path.startsWith('/vendor/')) {
+            return res.status(404).send({ status: 404, message: 'Vendor asset not found' });
+        }
         if (err instanceof URIError) {
             log.warn('Malformed URI detected', {
                 url: req.url,

@@ -23,8 +23,10 @@ else delete require.cache[loggerPath];
 /** Provide isolated public files and close watchers before removing their directory. */
 async function fixture(t, options = {}) {
     const root = await mkdtemp(path.join(tmpdir(), 'bodrik-assets-'));
-    for (const directory of ['js', 'css', 'sfu']) await mkdir(path.join(root, directory));
+    for (const directory of ['js', 'css', 'sfu', 'vendor/library'])
+        await mkdir(path.join(root, directory), { recursive: true });
     await writeFile(path.join(root, 'js/app.js'), 'console.log("first");');
+    await writeFile(path.join(root, 'vendor/library/app.js'), 'console.log("vendor");');
     await writeFile(path.join(root, 'css/app.css'), 'body { color: red; }');
     const versions = new AssetVersions(root, { development: false, ...options });
     const watcherReady = versions.watcher ? once(versions.watcher, 'ready') : Promise.resolve();
@@ -39,6 +41,7 @@ for (const [name, url] of [
     ['relative', '../js/app.js'],
     ['absolute', '/css/app.css'],
     ['plain', 'js/app.js'],
+    ['vendor', '../vendor/library/app.js'],
 ]) {
     test(`production versions actual local assets with the pinned SHA: ${name}`, async (t) => {
         const { versions } = await fixture(t, { revision: 'a'.repeat(40) });

@@ -156,13 +156,12 @@ test('retained server wiring has no unresolved identifiers after feature removal
     assert.deepEqual(result.messages, []);
 });
 
-test('room loads one color picker and only its active classic theme', () => {
+test('room retires local theme controls while keeping retained meeting controls', () => {
     const dom = new JSDOM(read('public/views/Room.html'));
     try {
         const doc = dom.window.document;
-        assert.equal(doc.querySelectorAll('script[src*="pickr"]').length, 1);
-        assert.equal(doc.querySelectorAll('link[href*="pickr"]').length, 1);
-        assert.ok(doc.querySelector('link[href*="pickr"]').href.includes('classic'));
+        assert.equal(doc.querySelector('script[src*="pickr"], link[href*="pickr"]'), null);
+        assert.equal(doc.querySelector('#tabStylingBtn, #tabStyling, #selectTheme, #keepCustomTheme'), null);
         for (const selector of [
             '[id="switchServerRecording"]',
             '[id="chatGPTMessages"]',

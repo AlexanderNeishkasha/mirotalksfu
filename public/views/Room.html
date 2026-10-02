@@ -42,38 +42,31 @@
         <link rel="stylesheet" href="../css/MeetingAbout.css" />
         <link rel="stylesheet" href="../css/CameraAccess.css" />
 
-        <!-- https://cdnjs.com/libraries/font-awesome -->
+        <!-- Self-hosted browser styles -->
 
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css" />
+        <link rel="stylesheet" href="../vendor/fontawesome/css/all.min.css" />
 
         <!-- https://animate.style 4 using for swal fadeIn-Out -->
 
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
+        <link rel="stylesheet" href="../vendor/animate/animate.min.css" />
 
         <!-- Bootstrap 5  https://getbootstrap.com/docs/5.0/components/-->
 
-        <!--  pickr  https://github.com/simonwep/pickr -->
-
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@simonwep/pickr@1.9.1/dist/themes/classic.min.css" />
-
         <!-- Highlight  https://github.com/highlightjs/highlight.js -->
 
-        <link
-            rel="stylesheet"
-            href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/atom-one-dark.min.css"
-        />
+        <link rel="stylesheet" href="../vendor/highlight/atom-one-dark.min.css" />
 
         <!-- Bootstrap 5 -->
 
         <link
-            href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css"
+            href="../vendor/bootstrap/bootstrap.min.css"
             rel="stylesheet"
             integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC"
             crossorigin="anonymous"
         />
         <script
             defer
-            src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"
+            src="../vendor/bootstrap/bootstrap.bundle.min.js"
             integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM"
             crossorigin="anonymous"
         ></script>
@@ -83,27 +76,25 @@
 
         <!-- UAParser -->
 
-        <script defer src="https://cdn.jsdelivr.net/npm/ua-parser-js@2.0.10/dist/ua-parser.min.js"></script>
+        <script defer src="../vendor/ua-parser/ua-parser.min.js"></script>
 
         <script defer src="../js/Brand.js"></script>
         <script defer src="../js/I18n.js"></script>
         <script defer src="../js/BodrikToast.js"></script>
         <script defer src="../js/BodrikAbout.js"></script>
 
-        <!-- Js scripts https://cdn.jsdelivr.net -->
+        <!-- Self-hosted browser scripts -->
 
-        <script defer src="https://cdn.jsdelivr.net/npm/@simonwep/pickr@1.9.1/dist/pickr.min.js"></script>
+        <script defer src="../vendor/marked/marked.umd.js"></script>
 
-        <script defer src="https://cdn.jsdelivr.net/npm/marked@18.0.14/lib/marked.umd.js"></script>
+        <script defer src="../vendor/sweetalert2/sweetalert2.all.min.js"></script>
+        <script defer src="../vendor/emoji-mart/browser.js"></script>
+        <script defer src="../vendor/popper/popper.min.js"></script>
+        <script defer src="../vendor/tippy/tippy-bundle.umd.min.js"></script>
 
-        <script defer src="https://cdn.jsdelivr.net/npm/sweetalert2@11.4.8"></script>
-        <script defer src="https://cdn.jsdelivr.net/npm/emoji-mart@5.6.0/dist/browser.js"></script>
-        <script defer src="https://cdnjs.cloudflare.com/ajax/libs/tippy.js/6.3.7/tippy-bundle.umd.min.js"></script>
+        <script defer src="../vendor/highlight/highlight.min.js"></script>
 
-        <script defer src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
-        <script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
-
-        <script defer src="https://cdn.jsdelivr.net/npm/xss@1.0.15/dist/xss.min.js"></script>
+        <script defer src="../vendor/xss/xss.min.js"></script>
 
         <script defer src="/socket.io/socket.io.js"></script>
         <script defer src="../sfu/MediasoupClient.js"></script>
@@ -470,9 +461,7 @@
                     <button id="tabAspectBtn" class="fas fa-screwdriver-wrench tablinks">
                         <p class="tabButtonText">Layout</p>
                     </button>
-                    <button id="tabStylingBtn" class="fas fa-palette tablinks" style="display: none">
-                        <p class="tabButtonText">Appearance</p>
-                    </button>
+
                     <button id="tabLanguagesBtn" class="fas fa-globe tablinks">
                         <p class="tabButtonText">Language</p>
                     </button>
@@ -1395,96 +1384,6 @@
                             <option value="off">Hidden</option>
                             <option value="on">Visible</option>
                         </select>
-                        <br />
-                    </div>
-
-                    <div id="tabStyling" class="tabcontent">
-                        <div class="settings-section-intro">
-                            <h3>Appearance</h3>
-                            <p>Personalize the interface theme.</p>
-                        </div>
-                        <div class="title">
-                            <i class="fa-solid fa-palette"></i>
-                            <p>Theme:</p>
-                        </div>
-                        <br />
-                        <select id="selectTheme" class="form-select text-light bg-dark">
-                            <option value="default">Default</option>
-                            <option value="dark">Dark</option>
-                            <option value="grey">Grey</option>
-                            <option value="green">Green</option>
-                            <option value="blue">Blue</option>
-                            <option value="red">Red</option>
-                            <option value="purple">Purple</option>
-                            <option value="orange">Orange</option>
-                            <option value="pink">Pink</option>
-                            <option value="yellow">Yellow</option>
-                        </select>
-                        <div id="themeCardsGrid" class="theme-cards-grid">
-                            <div class="theme-card" data-theme="default" data-index="0">
-                                <i class="fa-solid fa-circle-dot"></i>
-                                <span>Default</span>
-                            </div>
-                            <div class="theme-card" data-theme="dark" data-index="1">
-                                <i class="fa-solid fa-moon"></i>
-                                <span>Dark</span>
-                            </div>
-                            <div class="theme-card" data-theme="grey" data-index="2">
-                                <i class="fa-solid fa-cloud"></i>
-                                <span>Grey</span>
-                            </div>
-                            <div class="theme-card" data-theme="green" data-index="3">
-                                <i class="fa-solid fa-leaf"></i>
-                                <span>Green</span>
-                            </div>
-                            <div class="theme-card" data-theme="blue" data-index="4">
-                                <i class="fa-solid fa-droplet"></i>
-                                <span>Blue</span>
-                            </div>
-                            <div class="theme-card" data-theme="red" data-index="5">
-                                <i class="fa-solid fa-fire"></i>
-                                <span>Red</span>
-                            </div>
-                            <div class="theme-card" data-theme="purple" data-index="6">
-                                <i class="fa-solid fa-gem"></i>
-                                <span>Purple</span>
-                            </div>
-                            <div class="theme-card" data-theme="orange" data-index="7">
-                                <i class="fa-solid fa-sun"></i>
-                                <span>Orange</span>
-                            </div>
-                            <div class="theme-card" data-theme="pink" data-index="8">
-                                <i class="fa-solid fa-heart"></i>
-                                <span>Pink</span>
-                            </div>
-                            <div class="theme-card" data-theme="yellow" data-index="9">
-                                <i class="fa-solid fa-star"></i>
-                                <span>Yellow</span>
-                            </div>
-                        </div>
-                        <br />
-                        <div class="title">
-                            <i class="fas fa-fill-drip"></i>
-                            <p>Custom theme:</p>
-                        </div>
-                        <br />
-                        <input id="themeColorPicker" class="theme-color-picker" type="text" />
-                        <br />
-                        <table class="settingsTable">
-                            <tr>
-                                <td>
-                                    <div class="title">
-                                        <i class="fas fa-save"></i>
-                                        <p>Keep custom color</p>
-                                    </div>
-                                </td>
-                                <td>
-                                    <div class="form-check form-switch form-switch-md title">
-                                        <input id="keepCustomTheme" class="form-check-input" type="checkbox" />
-                                    </div>
-                                </td>
-                            </tr>
-                        </table>
                         <br />
                     </div>
 

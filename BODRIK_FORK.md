@@ -33,15 +33,20 @@ geolocation (including IP geolocation lookup) are retired end to end. Server
 recording, chunk uploads, S3 storage, and the standalone recording receiver are
 removed. Local recording still buffers the encoder's final data, repairs WebM
 duration, and downloads to the participant's device; it retains music/participant
-volume and microphone-mute handling. The color picker loads one modern build and
-its active classic theme only. Standalone landing/login/room-creation/catalog,
+volume and microphone-mute handling. The hidden local Appearance tab, custom color state and Pickr are removed;
+`BodrikTheme` follows the authoritative Studio palette as the only theme source. Standalone landing/login/room-creation/catalog,
 waiting-room and widget pages are retired; canonical Bodrik invitation exchange,
 room-bound JWT admission, permission guidance, privacy and error pages remain.
 OIDC, ngrok and Sentry integrations and their dependencies are removed.
 Virtual backgrounds load MediaPipe only on activation, and gifler only for GIFs.
 Each effect owns a cloned camera track, generated output, abortable pipeline and
 animation; disabling, switching cameras and leaving invalidate obsolete work.
-Load failures retain ordinary camera capture. GIF downloads are cancellable,
+All retained browser libraries, Font Awesome fonts and virtual-background
+JS/WASM/models are built from exact package-lock versions into an image artifact;
+the SFU entrypoint publishes it atomically through a host bind mount without a
+second image build. Production and development nginx serve `/vendor/` directly
+from `.vendor/current` with bounded caching, so participants make no third-party CDN requests. Emoji Mart receives a local Unicode 15 dataset instead of its default jsDelivr URL, and Font Awesome 6.7.2 replaces the warning-prone 6.1.1 font. License notices ship
+with the generated assets. Load failures retain ordinary camera capture. GIF downloads are cancellable,
 temporary URLs are revoked, and zero-delay GIF frames are normalized to prevent
 gifler 0.1.0's catch-up loop from freezing a tab. Raw producer camera capture is
 owned separately from its derived output so closing effects cannot leak capture.
@@ -78,8 +83,9 @@ variables, credentials, and user-uploaded data are not stored in this repository
 
 Local JS/CSS URLs are versioned automatically by the HTML injector. Production
 uses `MIROTALK_SOURCE_REVISION`; development uses cached file-content hashes
-invalidated by a polling watcher. Generated backend scripts and CDN URLs are
-left untouched. Do not add manual `?v=` values to templates or pin them in tests.
+invalidated by a polling watcher. Generated backend scripts remain untouched;
+self-hosted vendor JS/CSS use the same versioning, while lazy binary/model assets
+carry their locked package version. Do not add manual cache versions elsewhere.
 
 To build from the checked-out `main` source, run `docker build -t mirotalk-sfu-bodrik .`.
 Runtime settings depend on the deployment; refer to `.env.template` for upstream

@@ -18,10 +18,14 @@ class AssetVersions {
         } = {}
     ) {
         this.publicRoot = path.resolve(publicRoot);
+        this.vendorRoot = path.resolve(process.env.BROWSER_VENDOR_DIR || path.join(this.publicRoot, 'vendor'));
         this.revision = !development && /^[a-f0-9]{40}$/i.test(revision) ? revision.toLowerCase() : null;
         this.hashes = new Map();
         this.files = new Set();
-        const directories = ['js', 'css', 'sfu'].map((directory) => path.join(this.publicRoot, directory));
+        const directories = [
+            ...['js', 'css', 'sfu'].map((directory) => path.join(this.publicRoot, directory)),
+            this.vendorRoot,
+        ];
         this.ready = Promise.all(directories.map((directory) => this.indexFiles(directory)));
         this.ready.catch((error) => log.error('Asset indexing failed', error));
         this.watcher = null;
@@ -59,12 +63,15 @@ class AssetVersions {
 
     /** Resolve only known static asset namespaces; never read CDN, generated routes or paths outside public/. */
     assetFile(url) {
-        const match = url.match(/^(?:\.\.?\/|\/)?((?:js|css|sfu)\/[^?#]+\.(?:js|css))(?:[?#]|$)/i);
+        const match = url.match(/^(?:\.\.?\/|\/)?((?:js|css|sfu|vendor)\/[^?#]+\.(?:js|css))(?:[?#]|$)/i);
         if (!match) return null;
         const relative = decodeURIComponent(match[1]);
         if (relative.includes('\\') || relative.split('/').includes('..')) throw new Error('Unsafe local asset path');
-        const file = path.resolve(this.publicRoot, relative);
-        if (!file.startsWith(this.publicRoot + path.sep)) throw new Error('Asset path escapes public directory');
+        const vendorAsset = relative.toLowerCase().startsWith('vendor/');
+        const ownedRoot = vendorAsset ? this.vendorRoot : this.publicRoot;
+        const ownedRelative = vendorAsset ? relative.slice('vendor/'.length) : relative;
+        const file = path.resolve(ownedRoot, ownedRelative);
+        if (!file.startsWith(ownedRoot + path.sep)) throw new Error('Asset path escapes owned directory');
         return this.files.has(file) ? file : null;
     }
 
