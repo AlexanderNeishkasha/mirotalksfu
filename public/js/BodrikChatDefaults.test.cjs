@@ -18,6 +18,18 @@ function storage(savedSettings) {
     return { values, Store: context.LocalStorage };
 }
 
+for (const [name, avatar, expected] of [
+    ['legacy gallery', 'https://meet.test/images/avatars/avatar_01.png', ''],
+    ['relative legacy gallery', '/images/avatars/avatar_25.png', ''],
+    ['uploaded avatar', 'https://meet.test/avatars/user.png', 'https://meet.test/avatars/user.png'],
+    ['external avatar', 'https://example.test/photo.png', 'https://example.test/photo.png'],
+]) {
+    test(`retired avatar gallery preference: ${name}`, () => {
+        const { Store } = storage({ peer_avatar: avatar });
+        assert.equal(new Store().getLocalStorageSettings().peer_avatar, expected);
+    });
+}
+
 test('new visitors keep chat closed on join and on incoming messages', () => {
     const { Store } = storage();
     const store = new Store();

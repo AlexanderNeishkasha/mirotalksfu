@@ -9,7 +9,7 @@ const root = path.join(__dirname, '../..');
 /** Check explicit local page assets against files included in the public source tree. */
 function pageAssets(file) {
     const html = readFileSync(path.join(root, file), 'utf8');
-    return [...html.matchAll(/(?:src|href)="(?:\.\.\/)?(css|js|images)\/([^"?#]+)(?:[?#][^"]*)?"/g)].map(
+    return [...html.matchAll(/(?:src|href)="(?:\.\.\/)?(css|js|images|svg)\/([^"?#]+)(?:[?#][^"]*)?"/g)].map(
         ([, directory, name]) => `public/${directory}/${name}`
     );
 }
@@ -22,10 +22,12 @@ test('retained pages reference only present local assets', () => {
 
 test('runtime-configured Bodrik icons and dynamic avatar/sound families remain available', () => {
     for (const asset of [
+        'public/svg/emptyChat.svg',
+        'public/images/logo.svg',
+        'public/images/pricing-illustration.svg',
+        'public/images/mirotalksfu.png',
         'public/images/bodrik-favicon-32x32.png',
         'public/images/bodrik-apple-touch-icon.png',
-        'public/images/avatars/avatar_01.png',
-        'public/images/avatars/avatar_25.png',
         'public/sounds/alert.wav',
         'public/sounds/ban.wav',
         'public/sounds/eject.wav',
@@ -36,6 +38,29 @@ test('runtime-configured Bodrik icons and dynamic avatar/sound families remain a
 });
 
 for (const asset of [
+    'public/images/avatars',
+    'public/sponsors',
+    'public/advertisers',
+    'public/svg/aiAvatars.svg',
+    'public/svg/api.svg',
+    'public/svg/audioStreaming.svg',
+    'public/svg/broadcasting.svg',
+    'public/svg/chatgpt.svg',
+    'public/svg/collaborativeWhitboard.svg',
+    'public/svg/fileSharing.svg',
+    'public/svg/maximumSecurity.svg',
+    'public/svg/recordingMeeting.svg',
+    'public/svg/rtmp.svg',
+    'public/svg/screenSharing.svg',
+    'public/svg/totalPrivacy.svg',
+    'public/svg/virtualBackgrounds.svg',
+    'public/svg/webcamChat.svg',
+    'public/svg/webcamStreaming.svg',
+    'public/images/cta-illustration.svg',
+    'public/images/hero-back-illustration.svg',
+    'public/images/hero-top-illustration.svg',
+    'public/images/maintenance.gif',
+    'public/images/mirotalk-mc.png',
     'public/images/architecture.svg',
     'public/images/broadcasting.png',
     'public/images/browsers.png',

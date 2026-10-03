@@ -149,6 +149,14 @@ class LocalStorage {
         const settings = this.getObjectLocalStorage('SFU_SETTINGS');
         if (!settings) return settings;
 
+        if (
+            typeof settings.peer_avatar === 'string' &&
+            /^(?:https?:\/\/[^/]+)?\/images\/avatars\/avatar_\d{2}\.png(?:[?#].*)?$/.test(settings.peer_avatar)
+        ) {
+            settings.peer_avatar = '';
+            this.setSettings(settings);
+        }
+
         const noiseMigration = 'BODRIK_MIC_SPEECH_DEFAULTS_V4';
         if (!localStorage.getItem(noiseMigration)) {
             settings.mic_noise_suppression_mode = 'browser';
