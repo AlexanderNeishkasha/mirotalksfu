@@ -1,114 +1,67 @@
-# In-room UI translations (native / human)
+# In-room UI translations
 
-Optional, hand-editable translation files for the **in-room video conference UI**.
+Bodrik FM uses human-maintained Russian and English translations. Google Translate
+and machine-translation modes are not used.
 
-When a file `public/lang/<lang>.json` exists for the configured UI language and native
-translation is enabled, MiroTalk SFU uses it to translate the in-room UI **and disables the
-Google Translate widget** for that page. When no such file exists (or the mode forces
-Google), the runtime machine translation (Google, 133+ languages) is used exactly as before.
-This is fully opt-in and non-breaking.
+## Runtime behavior
 
-The configured language comes from `config.ui.brand.app.language` (env `UI_LANGUAGE`,
-default `en`). See [app/src/config.template.js](../../app/src/config.template.js).
+- [I18n.js](../js/I18n.js) defaults to Russian and loads [ru.json](ru.json).
+- Settings → Language switches between Russian and English without reloading.
+- The browser preference is stored as `uiLanguageOverride` in localStorage;
+  selecting Russian removes the override. Unsupported saved languages are ignored.
+- English displays the original source strings. [en.json](en.json) is the English
+  translation reference, not a runtime dependency for English mode.
+- Missing Russian translations remain English; dictionaries are not shared across
+  namespaces.
+- `UI_LANGUAGE` and `UI_TRANSLATION_MODE` do not control this fork's language picker.
+  Adding another JSON file alone does not enable another language.
 
-## Translation mode (`UI_TRANSLATION_MODE`)
+## Maintaining strings
 
-`config.ui.brand.app.translationMode` (env `UI_TRANSLATION_MODE`) controls the strategy.
-**The default is `google`**, if the value is unset, empty, or invalid, MiroTalk behaves
-exactly as before native translation existed (backward compatible). Native translation is
-opt-in via `auto` or `native`.
+Keep English source keys and translated values in the same namespace in both
+`en.json` and `ru.json`. Keys must match the UI source, including punctuation and
+casing; surrounding whitespace is ignored. Preserve placeholders such as `{name}`
+and `{count}`.
 
-| Mode               | Behavior                                                            | In-room language switcher                      |
-| ------------------ | ------------------------------------------------------------------- | ---------------------------------------------- |
-| `google` (default) | Always use Google machine translation; native files are ignored     | Google Translate combo                         |
-| `auto`             | Use the native file if it exists for the language, otherwise Google | Native picker (native/English) or Google combo |
-| `native`           | Human files only — never load Google (missing strings stay English) | Native picker                                  |
+| Namespace | UI context |
+| --- | --- |
+| `tooltips` | Tippy help and hover hints |
+| `buttons` | Button text and attributes inside buttons |
+| `labels` | Other text, headings, dropdown labels and attributes |
+| `dialogs` | SweetAlert dialog text and buttons |
+| `toasts` | Notifications |
 
-Notes on behavior:
+For example, a dropdown label outside a button belongs in `labels`, even if the
+same English text already exists in `buttons`.
 
-- In `auto`/`native`, an in-room **Language** picker (Settings → Language) lists English
-  plus every language that has a native file, and switches **live without a page reload**.
-- In `google`, the switcher is the Google Translate combo (English needs no translation, so
-  the native picker is not shown).
-- The chosen language is remembered per browser (`localStorage`): `uiLanguageOverride` for
-  the native picker, `googleTransLang` for the Google combo. It overrides `UI_LANGUAGE` on
-  the next load until reset back to the server default.
+Exclude content from DOM translation with `class="notranslate"`, `translate="no"`
+or `data-i18n-skip`. Chat messages, participant names and other user content should
+not be translated. These dictionaries cover the meeting UI, not the main frontend
+or documentation.
 
-## How to add a language
+## Extraction helper
 
-Use `public/lang/en.json` as the starting point for every translation. It contains the
-current in-room UI strings, grouped by namespace, with each English source string used as
-both the key and the initial value.
+From the fork root (`mirotalk/source`):
 
-1. Copy `en.json` to a new file named after the language code used in `UI_LANGUAGE`, e.g.
-   Hungarian:
-
-    ```bash
-    cp public/lang/en.json public/lang/hu.json
-    ```
-
-2. Open `hu.json` and translate each **value**. Leave every **key** (the English source
-   string) unchanged.
-
-    ```json
-    {
-        "tooltips": {
-            "Mute": "Némítás"
-        },
-        "dialogs": {
-            "Cancel": "Mégse"
-        }
-    }
-    ```
-
-3. Enable native translation and select the language, then open a room:
-
-    ```bash
-    UI_TRANSLATION_MODE=auto   # or "native"
-    UI_LANGUAGE=hu             # or config.ui.brand.app.language = 'hu'
-    ```
-
-    With the default `google` mode the native file is ignored, so `auto` or `native` is
-    required to activate it.
-
-Missing or empty values fall back to the original English text, you can translate
-incrementally and ship a partial file.
-
-## Namespaces
-
-Keys are grouped by UI context so the same English word can be translated differently
-depending on where it appears (e.g. "Cancel" as a dialog button vs. a tooltip):
-
-| Namespace  | Covers                                                                |
-| ---------- | --------------------------------------------------------------------- |
-| `tooltips` | Tippy tooltips (hover hints on controls)                              |
-| `buttons`  | Text and `title`/`placeholder`/`aria-label` on `<button>` elements    |
-| `labels`   | All other static UI text, headings, placeholders and label attributes |
-| `dialogs`  | SweetAlert popups: titles, buttons, input placeholders, body text     |
-| `toasts`   | Snackbar / toast notifications                                        |
-
-## Notes
-
-- Keys must match the English source **exactly** (including punctuation and casing).
-  Surrounding whitespace is ignored.
-- A few dynamically-built strings use a `{name}` placeholder in the key (e.g.
-  `"Start with {name}"`); keep the `{name}` token unchanged in your translation. Other
-  strings with inline dynamic values (counts, arbitrary names) are not translated and remain
-  in English.
-- To exclude an element from translation, add `class="notranslate"`, `translate="no"`, or
-  `data-i18n-skip` in the HTML.
-- Out of scope: the marketing/landing site, documentation, and user-generated content
-  (chat messages, transcriptions).
-
-## Regenerating the English template
-
-`en.json` is generated from the in-room source strings, and every other language file is
-synchronized to the same namespace and key structure:
-
-```bash
+```sh
 node app/src/scripts/extract-ui-lang.js
 ```
 
-The script preserves existing translated values. Missing keys are added to each language
-with the English source text as a fallback, ready for human translation, and stale keys are
-removed. Review the generated changes before committing them.
+This helper rewrites `en.json` from detected source strings and synchronizes the
+other dictionaries. It preserves translations for detected keys, adds missing
+keys with English values and removes keys it did not detect.
+
+Extraction is heuristic: review the diff before accepting it, especially strings
+in dynamic menus, shared helpers and microphone help. Restore any valid keys the
+scanner missed; do not treat the generated result as authoritative.
+
+Run the maintained checks after changing translations:
+
+```sh
+npm run lint
+npm run format:check
+npm run test:bodrik
+```
+
+Also verify the affected UI in both languages, including dynamic dropdowns and
+already-open tooltips.
